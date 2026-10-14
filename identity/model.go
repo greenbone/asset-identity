@@ -1,5 +1,6 @@
 // Package identity represents identifier values and their in-memory observations.
-// It does not normalize identifier payloads or implement asset matching.
+// Model operations preserve raw payloads; explicit semantic operations normalize
+// supported formats. Neither implements asset matching.
 package identity
 
 import (
