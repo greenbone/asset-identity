@@ -49,3 +49,6 @@ pkg/
 # go.mod
 # go.sum
 
+
+/dist/
+/build/

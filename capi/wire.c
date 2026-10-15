@@ -1,0 +1,67 @@
+#include "wire.h"
+#include "_cgo_export.h"
+#include <stdlib.h>
+
+static void free_string(gai_wire_string_t value) {
+    free((void *)value.data);
+}
+
+static void free_identifiers(const gai_wire_identifier_t *values, size_t count) {
+    for (size_t i = 0; values && i < count; i++) {
+        free_string(values[i].value);
+        for (size_t j = 0; values[i].scope.dimensions && j < values[i].scope.count; j++) {
+            free_string(values[i].scope.dimensions[j].name);
+            free_string(values[i].scope.dimensions[j].value);
+        }
+        free((void *)values[i].scope.dimensions);
+    }
+    free((void *)values);
+}
+
+gai_wire_status_t gai_wire_decide(
+    const gai_wire_observation_t *observation,
+    const gai_wire_candidate_t *candidates, size_t candidate_count,
+    const gai_wire_policy_t *policy,
+    gai_wire_decision_t **decision, gai_wire_error_t **error) {
+    return gvmAssetIdentityDecide((gai_wire_observation_t *)observation,
+        (gai_wire_candidate_t *)candidates, candidate_count,
+        (gai_wire_policy_t *)policy, decision, error);
+}
+
+gai_wire_status_t gai_wire_default_policy(
+    gai_wire_policy_t **policy, gai_wire_error_t **error) {
+    return gvmAssetIdentityDefaultPolicy(policy, error);
+}
+
+void gai_wire_decision_free(gai_wire_decision_t *decision) {
+    if (!decision) return;
+    free_string(decision->selected_key);
+    free((void *)decision->potential_merge_indices);
+    for (size_t i = 0; decision->potential_merge_keys && i < decision->potential_merge_count; i++)
+        free_string(decision->potential_merge_keys[i]);
+    free((void *)decision->potential_merge_keys);
+    if (decision->conflict) {
+        free_string(decision->conflict->reason);
+        free((void *)decision->conflict->candidate_indices);
+        free_identifiers(decision->conflict->identifiers, decision->conflict->identifier_count);
+        free((void *)decision->conflict);
+    }
+    free(decision);
+}
+
+void gai_wire_policy_free(gai_wire_policy_t *policy) {
+    if (!policy) return;
+    free((void *)policy->strong_order);
+    free((void *)policy->fuzzy);
+    free(policy);
+}
+
+void gai_wire_error_free(gai_wire_error_t *error) {
+    if (!error) return;
+    free_string(error->message);
+    free(error);
+}
+
+uint32_t gai_wire_abi_version(void) {
+    return GAI_WIRE_ABI_VERSION;
+}

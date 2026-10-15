@@ -1,0 +1,11 @@
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=@LIBDIR@
+includedir=@INCLUDEDIR@
+
+Name: libgvm_asset_identity
+Description: Greenbone Asset Identity Library
+Version: 1.0.0
+Requires: glib-2.0 >= 2.42.0
+Cflags: -I${includedir}
+Libs: -L${libdir} -lgvm_asset_identity
