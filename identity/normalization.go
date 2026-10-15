@@ -12,18 +12,13 @@ var (
 	ErrUnsupportedIdentifierFormat = errors.New("unsupported identifier format")
 )
 
-// ValidateIdentifier checks supported payload syntax without mutating input.
-// It does not establish producer authenticity, scope sufficiency, or matching eligibility.
-// Unlike IdentifierValue.Validate, it checks type-specific payload formats.
+// ValidateIdentifier checks type-specific payload syntax without mutating input.
 func ValidateIdentifier(value IdentifierValue) error {
 	_, err := canonicalIdentifierValue(value)
 	return err
 }
 
-// NormalizeIdentifier returns a canonical payload and an independent scope copy.
-// Opaque Greenbone, agent, and cloud payloads are only checked for nonemptiness;
-// no producer-specific generation, namespace, placeholder, or conversion rules
-// are inferred. Unsupported collector formats return an error.
+// NormalizeIdentifier returns a canonical payload and an independently owned scope.
 func NormalizeIdentifier(value IdentifierValue) (IdentifierValue, error) {
 	canonical, err := canonicalIdentifierValue(value)
 	if err != nil {
@@ -34,9 +29,8 @@ func NormalizeIdentifier(value IdentifierValue) (IdentifierValue, error) {
 	return result, nil
 }
 
-// EqualIdentifiers compares canonical type, payload, and complete supplied scope.
-// Both inputs must be valid, even when their types differ. Error precedence is a
-// then b. Equality does not decide asset identity or matching eligibility.
+// EqualIdentifiers compares canonical type, payload, and scope.
+// Both inputs are validated, with errors reported from a before b.
 func EqualIdentifiers(a, b IdentifierValue) (bool, error) {
 	left, err := NormalizeIdentifier(a)
 	if err != nil {

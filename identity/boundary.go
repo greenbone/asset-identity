@@ -2,13 +2,8 @@ package identity
 
 import "fmt"
 
-// BoundaryContext describes one logical identity namespace for a matching view.
-// Nonempty BoundaryIDs MUST be caller-resolved qualified compatibility-class keys:
-// equivalent contexts have identical keys and distinct keys identify known
-// incompatible namespaces. The library does not validate a qualification grammar,
-// trust arbitrary raw strings, resolve aliases, or infer a key from ScannerID.
-// Missing/unresolved context MUST be supplied with an empty BoundaryID. Callers
-// partition historical evidence by boundary before using matching foundations.
+// BoundaryContext holds caller-resolved, qualified identity boundaries.
+// Empty BoundaryID means unresolved; ScannerID is optional provenance only.
 type BoundaryContext struct {
 	BoundaryID string
 	ScannerID  string // optional observer provenance, never identity or trust
@@ -23,10 +18,8 @@ const (
 	BoundaryUnknown      BoundaryCompatibility = "UNKNOWN"
 )
 
-// CompareBoundaries compares only caller-resolved keys under BoundaryContext's
-// input assumption. It cannot establish that nonempty raw strings are qualified.
-// Missing either key produces UNKNOWN, including both-missing and same scanner.
-// Strong cross-boundary eligibility is intentionally not provided by this helper.
+// CompareBoundaries compares caller-resolved keys without validating qualification.
+// Equal keys are compatible, distinct keys incompatible, and missing keys unknown.
 func CompareBoundaries(a, b BoundaryContext) BoundaryCompatibility {
 	if a.BoundaryID == "" || b.BoundaryID == "" {
 		return BoundaryUnknown
@@ -37,8 +30,7 @@ func CompareBoundaries(a, b BoundaryContext) BoundaryCompatibility {
 	return BoundaryIncompatible
 }
 
-// FuzzyBoundaryMode governs boundary admission into fuzzy selection and merge
-// evaluation only. It does not grant independent merge safety or strong trust.
+// FuzzyBoundaryMode governs fuzzy selection and merge evaluation admission.
 type FuzzyBoundaryMode string
 
 const (
@@ -56,9 +48,7 @@ func (m FuzzyBoundaryMode) Validate() error {
 	}
 }
 
-// Admit applies the same boundary gate to fuzzy selection and merge evaluation.
-// Legacy admits UNKNOWN without changing compatibility or establishing identity.
-// Callers must still apply containment and independently approved merge safety.
+// Admit checks fuzzy boundary admission without granting identity or merge safety.
 func (m FuzzyBoundaryMode) Admit(c BoundaryCompatibility) (bool, error) {
 	if err := m.Validate(); err != nil {
 		return false, err

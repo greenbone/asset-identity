@@ -1,6 +1,4 @@
-// Package identity represents identifier values and their in-memory observations.
-// Model operations preserve raw payloads; explicit semantic operations normalize
-// supported formats. Neither implements asset matching.
+// Package identity provides identifier models, normalization, and matching foundations.
 package identity
 
 import (
@@ -160,9 +158,8 @@ func (h ObservationHistory) Clone() ObservationHistory {
 	return out
 }
 
-// NewObservationHistory copies, normalizes, and validates supplied observations.
-// It preserves entry order and duplicates without imposing a retention policy.
-// On failure it returns nil and the first error with its zero-based entry index.
+// NewObservationHistory copies, validates, and normalizes timestamps, preserving entry order.
+// It returns nil and the first indexed error on failure.
 func NewObservationHistory(input ObservationHistory) (ObservationHistory, error) {
 	if input == nil {
 		return nil, nil

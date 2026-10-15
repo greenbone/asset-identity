@@ -9,9 +9,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// Only the SPEC-001B public-key-line grammar is supported. Fingerprints,
-// certificates, known-hosts records, and private keys need separate producer
-// contracts; no guessed conversion to public-key material is possible.
+// Only public-key lines are supported; fingerprints and certificates need producer contracts.
 func canonicalSSHKey(value string) (string, error) {
 	if strings.HasSuffix(value, "\n") {
 		value = strings.TrimSuffix(value, "\n")
@@ -20,29 +18,29 @@ func canonicalSSHKey(value string) (string, error) {
 	if strings.ContainsAny(value, "\r\n") {
 		return "", ErrInvalidIdentifierValue
 	}
-	split := strings.IndexAny(value, " \t")
-	if split < 0 {
+	separatorIndex := strings.IndexAny(value, " \t")
+	if separatorIndex < 0 {
 		return "", ErrUnsupportedIdentifierFormat
 	}
-	algorithm := value[:split]
+	algorithm := value[:separatorIndex]
 	switch algorithm {
 	case ssh.KeyAlgoED25519, ssh.KeyAlgoRSA, ssh.KeyAlgoECDSA256, ssh.KeyAlgoECDSA384, ssh.KeyAlgoECDSA521:
 	default:
 		return "", ErrUnsupportedIdentifierFormat
 	}
-	rest := strings.TrimLeft(value[split:], " \t")
-	encoded := rest
-	if i := strings.IndexAny(rest, " \t"); i >= 0 {
-		encoded = rest[:i]
+	keyData := strings.TrimLeft(value[separatorIndex:], " \t")
+	encodedKey := keyData
+	if i := strings.IndexAny(keyData, " \t"); i >= 0 {
+		encodedKey = keyData[:i]
 	}
-	if strings.HasPrefix(encoded, "SHA256:") || strings.HasPrefix(encoded, "MD5:") {
+	if strings.HasPrefix(encodedKey, "SHA256:") || strings.HasPrefix(encodedKey, "MD5:") {
 		return "", ErrUnsupportedIdentifierFormat
 	}
-	blob, err := base64.StdEncoding.Strict().DecodeString(encoded)
+	keyBlob, err := base64.StdEncoding.Strict().DecodeString(encodedKey)
 	if err != nil {
 		return "", ErrInvalidIdentifierValue
 	}
-	key, err := ssh.ParsePublicKey(blob)
+	key, err := ssh.ParsePublicKey(keyBlob)
 	if err != nil || key.Type() != algorithm {
 		return "", ErrInvalidIdentifierValue
 	}
@@ -52,7 +50,7 @@ func canonicalSSHKey(value string) (string, error) {
 		}
 	}
 	canonical := key.Marshal()
-	if !bytes.Equal(blob, canonical) {
+	if !bytes.Equal(keyBlob, canonical) {
 		return "", ErrInvalidIdentifierValue
 	}
 	return algorithm + " " + base64.StdEncoding.EncodeToString(canonical), nil

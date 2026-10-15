@@ -90,8 +90,7 @@ func TestMatchPolicyValidation(t *testing.T) {
 }
 
 func TestBoundaryFoundations(t *testing.T) {
-	// These illustrative keys are asserted caller-resolved compatibility classes,
-	// not examples of a library-validated qualification grammar.
+	// Boundary keys are asserted caller-resolved fixtures, not a qualification grammar.
 	tests := []struct {
 		name string
 		a, b identity.BoundaryContext

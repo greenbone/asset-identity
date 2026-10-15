@@ -10,31 +10,25 @@ import (
 var (
 	// ErrInvalidMatchPolicy identifies an invalid foundation policy configuration.
 	ErrInvalidMatchPolicy = errors.New("invalid matching policy")
-	// ErrUnresolvedMatchingRule identifies a requested operation whose domain rule
-	// is pending. It is not an asset conflict or an actionable reconciliation result.
+	// ErrUnresolvedMatchingRule identifies an operation blocked by a pending domain rule.
 	ErrUnresolvedMatchingRule = errors.New("unresolved matching rule")
 )
 
-// FuzzyMember configures a supported type's fuzzy membership and weight.
-// Weight is configuration data only. This phase does not compute scores or choose
-// the pending accumulation precision, order, overflow, or zero-weight semantics.
+// FuzzyMember configures a fuzzy type and weight; it does not define scoring precision.
 type FuzzyMember struct {
 	Type   IdentifierType
 	Weight float64
 }
 
-// MatchPolicy contains the independently specified matching foundations only.
-// StrongOrder determines membership and absolute priority; empty disables strong
-// participation. Fuzzy membership is independent and disjoint. This type neither
-// grants producer eligibility nor represents a complete production Decide policy.
+// MatchPolicy configures matching membership, priority, and fuzzy boundary admission.
+// It does not grant evidence eligibility or merge authorization.
 type MatchPolicy struct {
 	StrongOrder       []IdentifierType
 	Fuzzy             []FuzzyMember
 	FuzzyBoundaryMode FuzzyBoundaryMode
 }
 
-// GreenboneMatchPolicy returns fresh caller-owned defaults. It does not grant
-// strong cross-boundary eligibility, evidence admission, or merge authorization.
+// GreenboneMatchPolicy returns independently owned Greenbone defaults.
 func GreenboneMatchPolicy() MatchPolicy {
 	return MatchPolicy{
 		StrongOrder:       []IdentifierType{TypeGreenboneID, TypeAgentID, TypeMachineID, TypeBIOSUUID, TypeSSHHostKey, TypeTLSPublicKeyHash, TypeCloudIdentifier},
@@ -50,11 +44,8 @@ func (p MatchPolicy) Clone() MatchPolicy {
 	return p
 }
 
-// Validate checks approved foundation constraints without changing policy.
-// Zero-weight fuzzy entries and fuzzy FQDN participation return
-// ErrUnresolvedMatchingRule: their behavior needs domain approval. An empty fuzzy
-// list is allowed; it defines no fuzzy evidence, not suppression of stage entry.
-// Success does not validate pending producer, conflict, history, or merge rules.
+// Validate checks foundation constraints without mutating policy.
+// Unresolved zero-weight or fuzzy FQDN behavior returns ErrUnresolvedMatchingRule.
 func (p MatchPolicy) Validate() error {
 	if err := p.FuzzyBoundaryMode.Validate(); err != nil {
 		return err
@@ -85,7 +76,7 @@ func (p MatchPolicy) Validate() error {
 		}
 		fuzzy[member.Type] = true
 	}
-	// Check all approved invalid constraints before reporting deferred semantics.
+	// Report invalid configuration before deferred semantics.
 	for i, member := range p.Fuzzy {
 		if member.Weight == 0 {
 			return fmt.Errorf("%w: fuzzy member %d: zero weight semantics", ErrUnresolvedMatchingRule, i)

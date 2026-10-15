@@ -1,0 +1,5281 @@
+{
+  "Name": "empty-observation",
+  "Observation": [],
+  "Candidates": [
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "no-candidates",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    }
+  ],
+  "Candidates": [],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "candidate-superset",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1061997773,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "single-subset-new-key",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0
+  ]
+}
+{
+  "Name": "partial-overlap",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "multiple-subsets",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": 30,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0,
+    1
+  ]
+}
+{
+  "Name": "timestamp-ranking",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "older",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "newer",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 1,
+  "SelectedKey": "newer",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    0
+  ]
+}
+{
+  "Name": "input-order-tie",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "z",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "a",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "z",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    1
+  ]
+}
+{
+  "Name": "no-observation-intersection-merge",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    1
+  ]
+}
+{
+  "Name": "empty-subset",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": []
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0
+  ]
+}
+{
+  "Name": "negative-timestamps",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k1",
+      "LastSeen": -10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    1
+  ]
+}
+{
+  "Name": "all-weights-and-counts",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1076258406,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "exact-duplicates",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1068708659,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "mac-versus-ip-and-host-contained",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "ip-host",
+      "LastSeen": 999,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "mac",
+      "LastSeen": 1,
+      "Identifiers": [
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0,
+    1
+  ]
+}
+{
+  "Name": "generated-0000",
+  "Observation": [],
+  "Candidates": [],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0001",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": []
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 2,
+  "SelectedKey": "k2",
+  "SelectedScoreBits": 1080452710,
+  "PotentialMergeIndices": [
+    0,
+    1
+  ]
+}
+{
+  "Name": "generated-0002",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0003",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 1,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0004",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    1
+  ]
+}
+{
+  "Name": "generated-0005",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0006",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0
+  ]
+}
+{
+  "Name": "generated-0007",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0008",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    2
+  ]
+}
+{
+  "Name": "generated-0009",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0010",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0011",
+  "Observation": [
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 1,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0012",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k0",
+  "SelectedScoreBits": 1067030938,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0013",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0014",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0015",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k0",
+  "SelectedScoreBits": 1077097268,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0016",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0017",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    }
+  ],
+  "Candidates": [],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0018",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0019",
+  "Observation": [
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0020",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0,
+    2
+  ]
+}
+{
+  "Name": "generated-0021",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0022",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0
+  ]
+}
+{
+  "Name": "generated-0023",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0024",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0,
+    1
+  ]
+}
+{
+  "Name": "generated-0025",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": -1,
+      "Identifiers": []
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 3,
+  "SelectedKey": "k3",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    1
+  ]
+}
+{
+  "Name": "generated-0026",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0027",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0028",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0029",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0
+  ]
+}
+{
+  "Name": "generated-0030",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0031",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 1,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    2,
+    3
+  ]
+}
+{
+  "Name": "generated-0032",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    1,
+    2
+  ]
+}
+{
+  "Name": "generated-0033",
+  "Observation": [
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0034",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0035",
+  "Observation": [
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0036",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0037",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k4",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0038",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k4",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 3,
+  "SelectedKey": "k3",
+  "SelectedScoreBits": 1074580685,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0039",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 1,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1068708659,
+  "PotentialMergeIndices": [
+    2
+  ]
+}
+{
+  "Name": "generated-0040",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    2
+  ]
+}
+{
+  "Name": "generated-0041",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    2
+  ]
+}
+{
+  "Name": "generated-0042",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    }
+  ],
+  "Candidates": [],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0043",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0044",
+  "Observation": [
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0045",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0046",
+  "Observation": [
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0
+  ]
+}
+{
+  "Name": "generated-0047",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0048",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 1,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1061997773,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0049",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0050",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0
+  ]
+}
+{
+  "Name": "generated-0051",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0052",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0053",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k0",
+  "SelectedScoreBits": 1077097268,
+  "PotentialMergeIndices": [
+    1,
+    2
+  ]
+}
+{
+  "Name": "generated-0054",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    1
+  ]
+}
+{
+  "Name": "generated-0055",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    1,
+    2,
+    3
+  ]
+}
+{
+  "Name": "generated-0056",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0057",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k4",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0058",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.3"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k4",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0059",
+  "Observation": [
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    }
+  ],
+  "Candidates": [],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0060",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0061",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 20,
+      "Identifiers": [
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": -1,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
+{
+  "Name": "generated-0062",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "hostname",
+      "Value": "h2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:02"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h1"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k1",
+      "LastSeen": 0,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:01"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k2",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.3"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k3",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "ip",
+          "Value": "192.0.2.2"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    },
+    {
+      "AssetKey": "k4",
+      "LastSeen": -100,
+      "Identifiers": [
+        {
+          "Type": "ip",
+          "Value": "192.0.2.1"
+        },
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    4
+  ]
+}
+{
+  "Name": "generated-0063",
+  "Observation": [
+    {
+      "Type": "ip",
+      "Value": "192.0.2.1"
+    },
+    {
+      "Type": "ip",
+      "Value": "192.0.2.2"
+    },
+    {
+      "Type": "mac",
+      "Value": "02:00:00:00:00:01"
+    }
+  ],
+  "Candidates": [
+    {
+      "AssetKey": "k0",
+      "LastSeen": 10,
+      "Identifiers": [
+        {
+          "Type": "hostname",
+          "Value": "h2"
+        },
+        {
+          "Type": "mac",
+          "Value": "02:00:00:00:00:02"
+        }
+      ]
+    }
+  ],
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
+}
