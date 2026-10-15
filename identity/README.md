@@ -11,16 +11,17 @@ MAC/hostname/IP with weights 1/.4/.4. Policies and clones own their slices.
 
 Strong matching runs first, ranks same-value candidates by newest UTC nanosecond
 LastSeen, missing last, then key bytes. Strong no-match creates a key without fuzzy
-fallback. Undefined strong contradictions remain `ErrUnresolvedMatchingRule`;
-CONFLICT is reserved for a defined rule, not inferred from differing values.
+fallback. Distinct incoming values at the winning strong priority produce CONFLICT;
+if nothing matches, multiplicity of any configured strong type produces CONFLICT.
+Lower-priority disagreements and candidate-only values do not veto selection.
 
 The internal fuzzy kernel uses C float32 scoring, whole-second timestamp ranking,
-input-order ties, and literal empty subsets. No public compatibility modes remain.
+nil-as-Unix-epoch fuzzy times, input-order ties, and literal empty subsets. No public compatibility modes remain.
 Potential targets produce non-actionable REVIEW with proposed survivor/new-key
 information preserved. No result authorizes merges or mutates database state.
 
-Zero weights, fuzzy FQDN projection, missing fuzzy timestamps, and unkeyed rows
-remain explicit unresolved cases. Duplicate keys are rejected. Inputs are not
+Nonpositive/nonfinite fuzzy weights, fuzzy FQDN membership, empty candidate keys,
+and duplicate candidate keys are rejected. FQDN remains supported as strong. Inputs are not
 mutated or retained; callers synchronize concurrent mutation.
 
 See [SPEC-002](../docs/specs/SPEC-002-reconciliation.md) and the

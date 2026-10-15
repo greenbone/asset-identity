@@ -2,6 +2,7 @@ package identity
 
 import (
 	"errors"
+	"math"
 	"reflect"
 	"sync"
 	"testing"
@@ -143,12 +144,127 @@ func TestDecideRejectsDuplicateKeysBeforeMatching(t *testing.T) {
 	}
 }
 
-func TestDecideDefersUndefinedContradictions(t *testing.T) {
+func TestDecideStrongMultiplicity(t *testing.T) {
 	g1 := fuzzyValue(TypeGreenboneID, "g1")
 	g2 := fuzzyValue(TypeGreenboneID, "g2")
-	got, err := Decide(Observation{Identifiers: []IdentifierValue{g1, g2}}, []Candidate{fuzzyRow("K1", 10, g1), fuzzyRow("K2", 20, g2)}, GreenboneMatchPolicy())
-	if !errors.Is(err, ErrUnresolvedMatchingRule) || !reflect.DeepEqual(got, Decision{}) {
-		t.Fatalf("invented conflict rule: %+v %v", got, err)
+	a1 := fuzzyValue(TypeAgentID, "a1")
+	a2 := fuzzyValue(TypeAgentID, "a2")
+	ip := fuzzyValue(TypeIP, "192.0.2.1")
+	tests := []struct {
+		name         string
+		values       []IdentifierValue
+		rows         []Candidate
+		action       DecisionAction
+		selected     string
+		conflictType IdentifierType
+		indices      []int
+	}{
+		{"lower priority multiplicity cannot veto", []IdentifierValue{g1, a1, a2}, []Candidate{fuzzyRow("G", 10, g1), fuzzyRow("A1", 20, a1), fuzzyRow("A2", 30, a2)}, ActionReuse, "G", "", nil},
+		{"winning priority multiplicity", []IdentifierValue{g1, g2, a1}, []Candidate{fuzzyRow("G1", 10, g1), fuzzyRow("G2", 20, g2), fuzzyRow("A", 30, a1)}, ActionConflict, "", TypeGreenboneID, []int{0, 1}},
+		{"unmatched value at winning priority still conflicts", []IdentifierValue{g1, g2}, []Candidate{fuzzyRow("G", 10, g1)}, ActionConflict, "", TypeGreenboneID, []int{0}},
+		{"single value multiple candidates ranks", []IdentifierValue{g1}, []Candidate{fuzzyRow("old", 10, g1), fuzzyRow("new", 20, g1)}, ActionReuse, "new", "", nil},
+		{"no match multiplicity conflicts without fuzzy", []IdentifierValue{g1, g2, ip}, []Candidate{fuzzyRow("weak", 10, ip)}, ActionConflict, "", TypeGreenboneID, nil},
+		{"no candidates multiplicity conflicts", []IdentifierValue{g1, g2}, nil, ActionConflict, "", TypeGreenboneID, nil},
+		{"no match lower type multiplicity conflicts", []IdentifierValue{g1, a1, a2}, nil, ActionConflict, "", TypeAgentID, nil},
+		{"no match single value creates without fuzzy", []IdentifierValue{g1, ip}, []Candidate{fuzzyRow("weak", 10, ip)}, ActionCreate, "", "", nil},
+		{"candidate only differing values do not conflict", []IdentifierValue{g1}, []Candidate{fuzzyRow("K", 10, g1, g2)}, ActionReuse, "K", "", nil},
+		{"unmatched higher multiplicity does not veto lower match", []IdentifierValue{g1, g2, a1}, []Candidate{fuzzyRow("A", 10, a1)}, ActionReuse, "A", "", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Decide(Observation{Identifiers: tt.values}, tt.rows, GreenboneMatchPolicy())
+			if err != nil || got.Action != tt.action || got.Stage != StageStrong || got.SelectedKey != tt.selected || len(got.PotentialMergeIndices) > 0 || len(got.PotentialMergeKeys) > 0 {
+				t.Fatalf("decision=%+v error=%v", got, err)
+			}
+			if tt.action == ActionConflict {
+				if got.NeedsNewKey || got.SelectedIndex != nil || got.Conflict == nil || got.Conflict.Reason == "" || len(got.Conflict.Identifiers) != 2 || !reflect.DeepEqual(got.Conflict.CandidateIndices, tt.indices) {
+					t.Fatalf("conflict invariants: %+v", got)
+				}
+				for _, v := range got.Conflict.Identifiers {
+					if v.Type != tt.conflictType {
+						t.Fatal("wrong conflict evidence")
+					}
+				}
+			} else if got.Conflict != nil || got.NeedsNewKey != (tt.action == ActionCreate) {
+				t.Fatal(got)
+			}
+		})
+	}
+}
+
+func TestDecideConflictEvidenceIsCanonicalAndOwned(t *testing.T) {
+	upper := IdentifierValue{Type: TypeBIOSUUID, Value: "00112233445566778899AABBCCDDEEFF", Scope: Scope{"realm": "r"}}
+	same := upper.Clone()
+	same.Value = "{00112233-4455-6677-8899-aabbccddeeff}"
+	other := upper.Clone()
+	other.Value = "11112233445566778899aabbccddeeff"
+	obs := Observation{Identifiers: []IdentifierValue{upper, same, other}}
+	rows := []Candidate{fuzzyRow("K", 10, upper)}
+	got, err := Decide(obs, rows, GreenboneMatchPolicy())
+	if err != nil || got.Action != ActionConflict || len(got.Conflict.Identifiers) != 2 {
+		t.Fatalf("semantic multiplicity: %+v %v", got, err)
+	}
+	if got.Conflict.Identifiers[0].Value != "00112233-4455-6677-8899-aabbccddeeff" {
+		t.Fatal("noncanonical evidence")
+	}
+	got.Conflict.Identifiers[0].Scope["realm"] = "changed"
+	got.Conflict.CandidateIndices[0] = 99
+	again, err := Decide(obs, rows, GreenboneMatchPolicy())
+	if err != nil || again.Conflict.Identifiers[0].Scope["realm"] != "r" || again.Conflict.CandidateIndices[0] != 0 || upper.Scope["realm"] != "r" {
+		t.Fatal("conflict evidence aliases input")
+	}
+	got, err = Decide(Observation{Identifiers: []IdentifierValue{upper, same}}, rows, GreenboneMatchPolicy())
+	if err != nil || got.Action != ActionReuse {
+		t.Fatalf("semantic duplicate caused conflict: %+v %v", got, err)
+	}
+}
+
+func TestDecideFuzzyMissingTimeUsesEpoch(t *testing.T) {
+	ip := fuzzyValue(TypeIP, "192.0.2.1")
+	tests := []struct {
+		name          string
+		first, second *time.Time
+		selected      string
+	}{
+		{"nil ties epoch retaining first", nil, new(time.Unix(0, 0)), "first"},
+		{"epoch ties nil retaining first", new(time.Unix(0, 0)), nil, "first"},
+		{"nil outranks pre epoch", new(time.Unix(-1, 999999999)), nil, "second"},
+		{"present post epoch outranks nil", nil, new(time.Unix(1, 0)), "second"},
+		{"both missing retain first", nil, nil, "first"},
+		{"present Go zero precedes epoch", new(time.Time{}), nil, "second"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rows := []Candidate{{AssetKey: "first", Identifiers: []IdentifierValue{ip}, LastSeen: tt.first}, {AssetKey: "second", Identifiers: []IdentifierValue{ip}, LastSeen: tt.second}}
+			before := make([]*time.Time, 2)
+			for i, row := range rows {
+				if row.LastSeen != nil {
+					before[i] = new(*row.LastSeen)
+				}
+			}
+			got, err := Decide(Observation{Identifiers: []IdentifierValue{ip}}, rows, GreenboneMatchPolicy())
+			if err != nil || got.SelectedKey != tt.selected || got.Action != ActionReview || got.NeedsNewKey || len(got.PotentialMergeIndices) != 1 {
+				t.Fatalf("fuzzy missing time: %+v %v", got, err)
+			}
+			for i, row := range rows {
+				if !reflect.DeepEqual(row.LastSeen, before[i]) {
+					t.Fatal("timestamp mutated")
+				}
+			}
+		})
+	}
+}
+
+func TestDecideRejectsEmptyKeysBeforeMatching(t *testing.T) {
+	for _, values := range [][]IdentifierValue{nil, {fuzzyValue(TypeGreenboneID, "g")}, {fuzzyValue(TypeIP, "192.0.2.1")}} {
+		got, err := Decide(Observation{Identifiers: values}, []Candidate{{AssetKey: ""}}, GreenboneMatchPolicy())
+		if !errors.Is(err, ErrEmptyCandidateKey) || !reflect.DeepEqual(got, Decision{}) {
+			t.Fatalf("empty key: %+v %v", got, err)
+		}
+	}
+	row := fuzzyRow("K", 10, fuzzyValue(TypeIP, "192.0.2.1"))
+	if _, err := Decide(Observation{}, []Candidate{row, row}, GreenboneMatchPolicy()); !errors.Is(err, ErrDuplicateCandidateKey) {
+		t.Fatalf("identical rows accepted: %v", err)
 	}
 }
 
@@ -191,5 +307,73 @@ func TestDecideImmutableInputs(t *testing.T) {
 	wg.Wait()
 	if !reflect.DeepEqual(ip, before) || !reflect.DeepEqual(policy, originalPolicy) {
 		t.Fatal("mutated input")
+	}
+}
+
+func TestDecideRejectsUnrepresentableWeightsBeforeMatching(t *testing.T) {
+	g := fuzzyValue(TypeGreenboneID, "g")
+	ip := fuzzyValue(TypeIP, "192.0.2.1")
+	for _, weight := range []float64{math.MaxFloat64, math.SmallestNonzeroFloat64} {
+		policy := GreenboneMatchPolicy()
+		policy.Fuzzy[0].Weight = weight
+		for _, values := range [][]IdentifierValue{nil, {g}, {ip}} {
+			got, err := Decide(Observation{Identifiers: values}, []Candidate{fuzzyRow("K", 0, g, ip)}, policy)
+			if !errors.Is(err, ErrInvalidMatchPolicy) || !reflect.DeepEqual(got, Decision{}) {
+				t.Fatalf("weight=%g values=%v: decision=%+v error=%v", weight, values, got, err)
+			}
+		}
+	}
+}
+
+func TestDecideValidatesAllCandidateTimestamps(t *testing.T) {
+	g := fuzzyValue(TypeGreenboneID, "g")
+	ip := fuzzyValue(TypeIP, "192.0.2.1")
+	other := fuzzyValue(TypeIP, "192.0.2.2")
+	invalidTimes := []time.Time{
+		time.Date(0, 12, 31, 23, 59, 59, 0, time.UTC),
+		time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(1, 1, 1, 0, 0, 0, 0, time.FixedZone("east", 3600)),
+	}
+	tests := []struct {
+		name        string
+		observation []IdentifierValue
+		candidates  []Candidate
+	}{
+		{"empty observation", nil, []Candidate{{AssetKey: "invalid", Identifiers: []IdentifierValue{ip}}}},
+		{"strong match", []IdentifierValue{g}, []Candidate{{AssetKey: "invalid", Identifiers: []IdentifierValue{g}}}},
+		{"strong no match", []IdentifierValue{g}, []Candidate{{AssetKey: "invalid", Identifiers: []IdentifierValue{ip}}}},
+		{"fuzzy match", []IdentifierValue{ip}, []Candidate{{AssetKey: "invalid", Identifiers: []IdentifierValue{ip}}}},
+		{"unselected candidate", []IdentifierValue{g}, []Candidate{fuzzyRow("selected", 0, g), {AssetKey: "invalid", Identifiers: []IdentifierValue{other}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, instant := range invalidTimes {
+				before := instant
+				tt.candidates[len(tt.candidates)-1].LastSeen = &instant
+				got, err := Decide(Observation{Identifiers: tt.observation}, tt.candidates, GreenboneMatchPolicy())
+				if !errors.Is(err, ErrInvalidObservationTime) || !reflect.DeepEqual(got, Decision{}) {
+					t.Fatalf("time=%v: decision=%+v error=%v", instant, got, err)
+				}
+				if instant != before {
+					t.Fatal("timestamp mutated")
+				}
+			}
+		})
+	}
+}
+
+func TestDecideAcceptsValidCandidateTimestamps(t *testing.T) {
+	for _, instant := range []time.Time{time.Unix(0, 0), time.Unix(-1, 999999999), time.Time{}, time.Unix(0, 0).In(time.FixedZone("east", 3600))} {
+		for _, value := range []IdentifierValue{fuzzyValue(TypeGreenboneID, "g"), fuzzyValue(TypeIP, "192.0.2.1")} {
+			before := instant
+			candidate := Candidate{AssetKey: "K", Identifiers: []IdentifierValue{value}, LastSeen: &instant}
+			got, err := Decide(Observation{Identifiers: []IdentifierValue{value}}, []Candidate{candidate}, GreenboneMatchPolicy())
+			if err != nil || got.Action != ActionReuse || got.SelectedKey != "K" {
+				t.Fatalf("time=%v: decision=%+v error=%v", instant, got, err)
+			}
+			if instant != before || candidate.LastSeen != &instant {
+				t.Fatal("timestamp mutated")
+			}
+		}
 	}
 }

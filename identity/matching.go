@@ -135,23 +135,20 @@ type StrongRankingCandidate struct {
 }
 
 // RankStrongCandidates orders input indices by newest UTC instant, missing last, then key bytes.
-// Duplicate or missing keys return ErrUnresolvedMatchingRule; no merges are authorized.
+// Duplicate and empty keys are invalid; no merges are authorized.
 func RankStrongCandidates(candidates []StrongRankingCandidate) ([]int, error) {
 	var order []int
 	seenAssetKeys := make(map[string]bool, len(candidates))
 	for i, candidate := range candidates {
 		if candidate.AssetKey == "" {
-			return nil, fmt.Errorf("%w: candidate %d: unkeyed row admission", ErrUnresolvedMatchingRule, i)
+			return nil, fmt.Errorf("%w: candidate %d: empty asset key", ErrEmptyCandidateKey, i)
 		}
 		if seenAssetKeys[candidate.AssetKey] {
-			return nil, fmt.Errorf("%w: candidate %d: duplicate asset key", ErrUnresolvedMatchingRule, i)
+			return nil, fmt.Errorf("%w: candidate %d: duplicate asset key", ErrDuplicateCandidateKey, i)
 		}
 		seenAssetKeys[candidate.AssetKey] = true
-		if candidate.LastSeen != nil {
-			year := candidate.LastSeen.UTC().Year()
-			if year < 1 || year > 9999 {
-				return nil, fmt.Errorf("candidate %d: %w: UTC year %d outside 1..9999", i, ErrInvalidObservationTime, year)
-			}
+		if err := validateLastSeen(candidate.LastSeen); err != nil {
+			return nil, fmt.Errorf("candidate %d: %w", i, err)
 		}
 		order = append(order, i)
 	}
@@ -169,4 +166,13 @@ func RankStrongCandidates(candidates []StrongRankingCandidate) ([]int, error) {
 		return left.AssetKey < right.AssetKey
 	})
 	return order, nil
+}
+
+func validateLastSeen(lastSeen *time.Time) error {
+	if lastSeen != nil {
+		if year := lastSeen.UTC().Year(); year < 1 || year > 9999 {
+			return fmt.Errorf("%w: UTC year %d outside 1..9999", ErrInvalidObservationTime, year)
+		}
+	}
+	return nil
 }

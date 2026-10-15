@@ -51,9 +51,9 @@ func TestMatchPolicyValidation(t *testing.T) {
 		{"duplicate fuzzy", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeIP, Weight: 1}, {Type: identity.TypeIP, Weight: 2}}}, identity.ErrInvalidMatchPolicy},
 		{"unknown fuzzy", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: "unknown", Weight: 1}}}, identity.ErrInvalidMatchPolicy},
 		{"overlap", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{identity.TypeIP}, Fuzzy: []identity.FuzzyMember{{Type: identity.TypeIP, Weight: 1}}}, identity.ErrInvalidMatchPolicy},
-		{"fqdn deferred", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeFQDN, Weight: 1}}}, identity.ErrUnresolvedMatchingRule},
+		{"fuzzy fqdn disabled", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeFQDN, Weight: 1}}}, identity.ErrInvalidMatchPolicy},
 	}
-	for _, weight := range []float64{-1, math.NaN(), math.Inf(1), math.Inf(-1)} {
+	for _, weight := range []float64{-1, math.Copysign(0, -1), math.NaN(), math.Inf(1), math.Inf(-1)} {
 		tests = append(tests, struct {
 			name   string
 			policy identity.MatchPolicy
@@ -65,7 +65,7 @@ func TestMatchPolicyValidation(t *testing.T) {
 			name   string
 			policy identity.MatchPolicy
 			err    error
-		}{"zero semantics deferred", identity.MatchPolicy{Fuzzy: members}, identity.ErrUnresolvedMatchingRule})
+		}{"zero weight invalid", identity.MatchPolicy{Fuzzy: members}, identity.ErrInvalidMatchPolicy})
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -82,6 +82,34 @@ func TestMatchPolicyValidation(t *testing.T) {
 				if member.Type != before.Fuzzy[i].Type || math.Float64bits(member.Weight) != math.Float64bits(before.Fuzzy[i].Weight) {
 					t.Fatal("validation mutated fuzzy input")
 				}
+			}
+		})
+	}
+}
+
+func TestMatchPolicyWeightRepresentability(t *testing.T) {
+	tests := []struct {
+		name    string
+		weight  float64
+		invalid bool
+	}{
+		{"float32 overflow", math.MaxFloat64, true},
+		{"float32 underflow", math.SmallestNonzeroFloat64, true},
+		{"unit weight", 1, false},
+		{"fractional weight", .4, false},
+		{"smallest positive float32", math.SmallestNonzeroFloat32, false},
+		{"largest finite float32", math.MaxFloat32, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeIP, Weight: tt.weight}}}
+			err := policy.Validate()
+			if tt.invalid {
+				if !errors.Is(err, identity.ErrInvalidMatchPolicy) {
+					t.Fatalf("error = %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
 			}
 		})
 	}
@@ -218,8 +246,8 @@ func TestRankStrongCandidates(t *testing.T) {
 		{"all missing lexical", []identity.StrongRankingCandidate{{AssetKey: "asset-2"}, {AssetKey: "asset-10"}}, []int{1, 0}, nil},
 		{"equal timestamps exact bytes", []identity.StrongRankingCandidate{{AssetKey: "a", LastSeen: &instant}, {AssetKey: "Z", LastSeen: &instant}}, []int{1, 0}, nil},
 		{"large range no UnixNano overflow", []identity.StrongRankingCandidate{{AssetKey: "A", LastSeen: &zero}, {AssetKey: "B", LastSeen: stamp(time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC))}}, []int{1, 0}, nil},
-		{"duplicate key deferred", []identity.StrongRankingCandidate{{AssetKey: "A"}, {AssetKey: "A", LastSeen: &instant}}, nil, identity.ErrUnresolvedMatchingRule},
-		{"unkeyed deferred", []identity.StrongRankingCandidate{{}}, nil, identity.ErrUnresolvedMatchingRule},
+		{"duplicate key invalid", []identity.StrongRankingCandidate{{AssetKey: "A"}, {AssetKey: "A", LastSeen: &instant}}, nil, identity.ErrDuplicateCandidateKey},
+		{"empty key invalid", []identity.StrongRankingCandidate{{}}, nil, identity.ErrEmptyCandidateKey},
 		{"invalid time", []identity.StrongRankingCandidate{{AssetKey: "A", LastSeen: stamp(time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC))}}, nil, identity.ErrInvalidObservationTime},
 	}
 	for _, tt := range tests {

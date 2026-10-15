@@ -42,7 +42,6 @@ func (p MatchPolicy) Clone() MatchPolicy {
 }
 
 // Validate checks foundation constraints without mutating policy.
-// Unresolved zero-weight or fuzzy FQDN behavior returns ErrUnresolvedMatchingRule.
 func (p MatchPolicy) Validate() error {
 	strong := make(map[IdentifierType]bool, len(p.StrongOrder))
 	for i, typ := range p.StrongOrder {
@@ -65,18 +64,18 @@ func (p MatchPolicy) Validate() error {
 		if strong[member.Type] {
 			return fmt.Errorf("%w: type %q participates in both stages", ErrInvalidMatchPolicy, member.Type)
 		}
-		if member.Weight < 0 || math.IsNaN(member.Weight) || math.IsInf(member.Weight, 0) {
-			return fmt.Errorf("%w: fuzzy member %d: weight must be finite and nonnegative", ErrInvalidMatchPolicy, i)
+		if member.Weight <= 0 || math.IsNaN(member.Weight) || math.IsInf(member.Weight, 0) {
+			return fmt.Errorf("%w: fuzzy member %d: weight must be finite and positive", ErrInvalidMatchPolicy, i)
+		}
+		weight := float32(member.Weight)
+		if math.IsInf(float64(weight), 0) || weight == 0 {
+			return fmt.Errorf("%w: fuzzy member %d: weight is not positive finite float32", ErrInvalidMatchPolicy, i)
 		}
 		fuzzy[member.Type] = true
 	}
-	// Report invalid configuration before deferred semantics.
 	for i, member := range p.Fuzzy {
-		if member.Weight == 0 {
-			return fmt.Errorf("%w: fuzzy member %d: zero weight semantics", ErrUnresolvedMatchingRule, i)
-		}
 		if member.Type == TypeFQDN {
-			return fmt.Errorf("%w: fuzzy member %d: FQDN projection and weighting", ErrUnresolvedMatchingRule, i)
+			return fmt.Errorf("%w: fuzzy member %d: fuzzy FQDN is disabled", ErrInvalidMatchPolicy, i)
 		}
 	}
 	return nil

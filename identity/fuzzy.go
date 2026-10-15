@@ -89,14 +89,14 @@ func prepareFuzzyCandidates(candidates []Candidate, weights map[IdentifierType]f
 	prepared := make([]fuzzyCandidateSet, len(candidates))
 	for i, candidate := range candidates {
 		if candidate.AssetKey == "" {
-			return nil, fmt.Errorf("%w: candidate %d: unkeyed row admission", ErrUnresolvedMatchingRule, i)
+			return nil, fmt.Errorf("%w: candidate %d: empty asset key", ErrEmptyCandidateKey, i)
 		}
-		if candidate.LastSeen == nil {
-			return nil, fmt.Errorf("%w: candidate %d: missing fuzzy LastSeen", ErrUnresolvedMatchingRule, i)
+		instant := time.Unix(0, 0).UTC()
+		if candidate.LastSeen != nil {
+			instant = candidate.LastSeen.UTC()
 		}
-		instant := candidate.LastSeen.UTC()
-		if year := instant.Year(); year < 1 || year > 9999 {
-			return nil, fmt.Errorf("candidate %d: %w: UTC year %d", i, ErrInvalidObservationTime, year)
+		if err := validateLastSeen(candidate.LastSeen); err != nil {
+			return nil, fmt.Errorf("candidate %d: %w", i, err)
 		}
 		values, err := fuzzyMatchingSet(candidate.Identifiers, weights)
 		if err != nil {
@@ -113,11 +113,7 @@ func fuzzyWeights(policy MatchPolicy) (map[IdentifierType]float32, error) {
 	}
 	weights := make(map[IdentifierType]float32, len(policy.Fuzzy))
 	for _, member := range policy.Fuzzy {
-		weight := float32(member.Weight)
-		if math.IsInf(float64(weight), 0) || weight == 0 {
-			return nil, fmt.Errorf("%w: type %q weight is not positive finite float32", ErrInvalidMatchPolicy, member.Type)
-		}
-		weights[member.Type] = weight
+		weights[member.Type] = float32(member.Weight)
 	}
 	return weights, nil
 }

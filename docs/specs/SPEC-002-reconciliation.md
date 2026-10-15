@@ -1,6 +1,6 @@
 # SPEC-002: Asset Reconciliation and Merge Decisions
 
-**Status:** Draft — caller-owned eligibility, configurable strong priority/ranking, strong-first fallback, and C fuzzy containment approved; remaining conflict rules require approval\
+**Status:** Draft — caller-owned eligibility, configurable strong priority/ranking, strong-first fallback, and C fuzzy containment, incoming strong multiplicity, and input validation approved\
 **Component:** asset-identity  
 **Parents:** [SPEC-001](SPEC-001-identifiers.md), [SPEC-001A](SPEC-001A-identifier-model.md), [SPEC-001B](SPEC-001B-normalization.md)  
 **Scope:** One native Go reconciliation function extending the gvmd C containment algorithm
@@ -31,8 +31,8 @@ different. Equal scoped identifiers establish correspondence only under the supp
 
 Approved behavior includes absolute configurable strong priority, same-priority freshness/key ranking, fuzzy entry only
 without eligible incoming configured strong evidence, C containment Cases A/B/C, and separation of potential merge
-targets from merge authorization. Strong contradiction definitions, same-type multiplicity, and independent merge
-safety remain pending where explicitly identified below; implementation must not invent them.
+targets from merge authorization. Incoming strong multiplicity is defined in section 4.3. Independent merge safety
+remains application-owned; no other contradiction or producer-trust rules are inferred.
 
 ## 2. Review of the authoritative C implementation
 
@@ -170,8 +170,9 @@ or reads the wall clock. LastSeen is caller supplied. Identifier normalization a
 Unknown, malformed, or unsupported values return the existing validation/normalization errors rather than guessed formats.
 
 Reject duplicate candidate asset keys in the complete supplied list before matching, even if those rows would not match.
-Do not union snapshots, deduplicate rows, select a representative, or renumber indices. Unkeyed-row admission remains an
-explicit unresolved case when required by matching. Keys are otherwise opaque exact strings.
+Reject empty asset keys with `ErrEmptyCandidateKey` and duplicate nonempty keys with `ErrDuplicateCandidateKey`,
+including identical rows. Do not union snapshots, skip unkeyed rows, select a representative, or renumber indices.
+Keys are otherwise opaque exact strings; both checks precede identifier matching, even for an empty observation.
 
 ### 3.1 Output invariants
 
@@ -191,8 +192,9 @@ SelectedIndex refers to the original supplied array and is nil without a survivo
 input order, exclude the survivor, and have parallel keys. All returned collections and pointers are independently owned.
 Inputs are not mutated or retained; concurrent calls are safe while callers do not mutate shared inputs.
 Invalid input/policy or an applicable unresolved rule returns an error and a zero, non-actionable Decision. A contradiction
-established by a defined approved rule returns CONFLICT with nil error. Undefined contradictions return
-`ErrUnresolvedMatchingRule`; no such contradiction rule is currently approved.
+established by the approved incoming-multiplicity rule returns CONFLICT with nil error. Conflict evidence contains
+canonical distinct incoming values of the implicated type and original matching candidate indices, if any.
+Neither candidate-only differences nor cross-priority disagreements establish additional contradictions.
 
 ## 4. Stage 1: Strong matching — APPROVED selection and ranking
 
@@ -212,8 +214,8 @@ A unique candidate at that priority reuses its existing key. Lower-priority matc
 automatic merge targets. Under the default policy, Machine ID matching A takes precedence over BIOS UUID matching B,
 even if B is newer. Reordered policy changes that precedence. Cross-priority matches alone are not a defined conflict.
 
-With eligible incoming configured strong evidence and no candidate match, return STRONG CREATE, absent unresolved strong
-conflict. Never run fuzzy on eligible strong no-match, ambiguity, or contradiction. Only absence of incoming configured
+With eligible incoming configured strong evidence and no candidate match, return STRONG CREATE unless incoming multiplicity establishes
+CONFLICT under section 4.3. Never run fuzzy on eligible strong no-match, ambiguity, or contradiction. Only absence of incoming configured
 strong evidence permits fuzzy entry. Ineligible evidence must already have been excluded from the caller's active view.
 
 ### 4.2 Same-priority ranking
@@ -233,17 +235,22 @@ Rank the complete matching set, not the first encountered row. Input order must 
 For example asset-10 sorts before asset-2. Newer lower-priority matches, fuzzy scores, or weak values cannot affect this
 ranking. Return REUSE with no potential merge targets; strong selection never automatically merges any other key.
 
-### 4.3 Unresolved strong contradictions
+### 4.3 Incoming strong multiplicity — APPROVED
 
-Same-type differing values may represent multiplicity, contradictions, or retained history. No generic rule is approved.
-The implementation conservatively returns `ErrUnresolvedMatchingRule` for multiple semantically distinct incoming values
-of the winning strong type, or of configured strong types on the no-match path. Semantic duplicates count once.
-It does not rank a union to resolve a substantive contradiction, invent CONFLICT, or escape through fuzzy fallback.
-Lower-priority matching evidence cannot override the approved winning-priority selection.
+Normalize and semantically deduplicate incoming identifiers, preserving complete scope equality. At the highest configured
+strong priority with an eligible candidate match, more than one distinct incoming value of that type produces STRONG
+CONFLICT. Count all incoming values at that priority, including values that match no candidate. A single incoming value
+matching multiple distinct candidate keys uses section 4.2 ranking; it is not a conflict.
 
-A producer trust engine, conflict callbacks, provenance abstractions, transitive candidate graph, and strong merge
-operation are not part of this design. Applications own source admission; a new contradiction rule still requires an
-explicit domain decision. CONFLICT remains reserved until such a rule is defined.
+A selected higher priority is unaffected by lower-priority multiplicity or disagreement. Multiplicity at an unmatched
+higher priority likewise does not veto a match at a lower priority. If no configured strong priority matches any candidate,
+multiple distinct incoming values of any configured strong type produce STRONG CONFLICT. Report the first such type in
+configured priority order; otherwise return STRONG CREATE. Neither path permits fuzzy fallback.
+
+Candidate-only differing values are not contradictions. CONFLICT has no selected key/index, new-key request, or potential
+merge targets. Its evidence identifies the distinct canonical incoming values and matching candidate indices at the
+winning priority; the no-match path has no implicated matching indices. No producer trust engine, conflict callbacks,
+provenance abstractions, transitive candidate graph, or automatic strong merge operation is introduced.
 
 ## 5. Stage 2: Fixed internal C fuzzy containment
 
@@ -253,7 +260,8 @@ Enter only when there is no incoming configured strong evidence in the caller-pr
 SPEC-001B and project to the configured fuzzy types. Tokens retain canonical type, canonical value, and complete scope.
 Deduplicate semantically equal tokens without changing observation history. Multiple distinct values participate separately.
 Known out-of-stage identifiers do not affect fuzzy subsets or scores; supported FQDN is unassigned by default.
-Do not coalesce hostname/FQDN, expand short names, or invent DNS aliases. Fuzzy FQDN projection remains unresolved.
+Fuzzy FQDN membership is rejected with `ErrInvalidMatchPolicy` initially. Explicit strong FQDN membership remains
+supported. Do not coalesce hostname/FQDN, expand short names, invent DNS aliases, or change normalization.
 
 Use a fixed internal kernel rather than public compatibility modes or another policy layer. Fuzzy entry order defines
 deterministic score accumulation. The Greenbone default supplies MAC, hostname, IP in C order, weighted 1.0, .4, .4.
@@ -264,15 +272,17 @@ Custom fuzzy entries use their supplied order; map iteration cannot determine su
 
 Use the established C float32 weighted intersection-count calculation: round counts, count-times-weight terms, and each
 cumulative sum as float32, comparing exact scores without epsilon. FuzzyMember.Weight is configuration storage, converted
-to float32 for scoring. Negative/NaN/infinite configuration is invalid; positive weights not representable as positive finite
-float32 cannot be evaluated. Computed nonfinite scores return errors and no actionable result. Zero-weight semantics
-remain unresolved; omission disables a type explicitly. No threshold, confidence model, or overlap-only match is added.
+to float32 for scoring. Zero (including negative zero), negative, NaN, and infinite weights are rejected with
+`ErrInvalidMatchPolicy`; omission disables a type. Positive weights not representable as positive finite float32 cannot
+be evaluated. Computed nonfinite scores return errors and no actionable result. No threshold, confidence model, or
+overlap-only match is added.
 
 All containing candidates have the same observation intersection score. Compare containing candidates by score descending,
 then UTC LastSeen at whole-second precision, then first original input row. Fractional timestamps in the same UTC second
 tie; conversion preserves their instant before whole-second comparison, including pre-epoch values. Strong ranking keeps
-its separate nanosecond behavior. Missing fuzzy LastSeen remains unresolved rather than implicitly mapping nil to epoch.
-A present zero time and pre-epoch timestamps remain valid.
+its separate nanosecond behavior. For fuzzy ranking only, nil LastSeen compares as Unix epoch zero without mutating
+the input. Nil ties a present epoch timestamp, outranks pre-epoch timestamps, and retains input-order ties.
+A present Go zero time is a valid pre-epoch time, not missing and not Unix epoch zero.
 
 ### 5.3 Cases A/B/C and potential merges
 
@@ -335,9 +345,9 @@ A type cannot participate in both stages. Reclassification requires removal from
 An empty policy is valid and yields no matching evidence. It does not silently restore defaults or suppress fuzzy entry.
 An empty fuzzy observation then follows C's CREATE guard.
 
-Validate before matching: reject duplicate strong or fuzzy entries, unknown types, overlap, and negative/NaN/infinite
-weights. Do not silently overwrite, deduplicate, infer membership, or normalize type names. Zero-weight semantics and
-fuzzy FQDN participation return `ErrUnresolvedMatchingRule`; no guessed projection or zero-as-disable behavior is allowed.
+Validate before matching: reject duplicate strong or fuzzy entries, unknown types, overlap, zero/negative/NaN/infinite
+weights, and explicit fuzzy FQDN membership with `ErrInvalidMatchPolicy`. Do not silently overwrite, deduplicate, infer
+membership, normalize type names, guess a DNS projection, or interpret zero as disabling a member.
 Input normalization remains independent of policy. Existing supported producer formats are unchanged.
 
 ## 8. Decision scenarios
@@ -359,7 +369,12 @@ Potential targets are informational; REVIEW never authorizes mutation.
 | Strong nanosecond distinction | G(g) | K1:G(g)@200s+1ns; K2:G(g)@200s+2ns | STRONG REUSE K2 |
 | Missing strong timestamp | G(g) | K1:G(g)@missing; K2:G(g)@-1 | STRONG REUSE K2 |
 | Eligible strong no-match | G(g),P(p1) | K1:P(p1) | STRONG CREATE; never fuzzy |
-| Multiple strong values | G(g1),G(g2) | K1:G(g1); K2:G(g2) | Unresolved-rule error; no invented conflict |
+| Multiple values at winning priority | G(g1),G(g2) | K1:G(g1); K2:G(g2) | STRONG CONFLICT; no key plan |
+| Only one winning value matches | G(g1),G(g2) | K1:G(g1) | STRONG CONFLICT |
+| Lower-priority multiplicity | G(g),A(a1),A(a2) | K1:G(g); K2:A(a1) | STRONG REUSE K1 |
+| Unmatched higher-priority multiplicity | G(g1),G(g2),A(a) | K1:A(a) | STRONG REUSE K1 |
+| No-match multiplicity | G(g1),G(g2),P(p1) | K1:P(p1) | STRONG CONFLICT; never fuzzy |
+| Candidate-only differences | G(g1) | K1:G(g1),G(g2) | STRONG REUSE K1 |
 | Fuzzy containing candidate | P(p1) | K1:P(p1),P(p2) | FUZZY REUSE K1 |
 | Fuzzy contained candidate | P(p1),P(p2) | K1:P(p1) | FUZZY REVIEW; new key proposed; target [K1] |
 | Partial overlap | P(p1),P(p3) | K1:P(p1),P(p2) | FUZZY CREATE |
@@ -373,7 +388,12 @@ Potential targets are informational; REVIEW never authorizes mutation.
 | Caller supplies equal eligible values | P(p1) | K1:P(p1) | FUZZY REUSE, with no scanner check |
 | Disabled strong membership | G(g),P(p1) | K1:P(p1); G omitted from policy | FUZZY REUSE K1 |
 | Duplicate candidate keys | Any | Two rows with key K | Duplicate-key input error before matching |
-| Missing fuzzy timestamp | P(p1) | K1:P(p1)@missing | Unresolved-rule error |
+| Empty candidate key | Any | One row with empty key | Empty-key input error before matching |
+| Missing fuzzy timestamp | P(p1) | K1:P(p1)@missing | FUZZY REUSE K1; nil ranks as epoch |
+| Nil versus epoch fuzzy tie | P(p1) | Z:P(p1)@missing; A:P(p1)@0 | REVIEW; Z survivor; target [A] |
+| Nil versus pre-epoch fuzzy time | P(p1) | Z:P(p1)@-1; A:P(p1)@missing | REVIEW; A survivor; target [Z] |
+| Zero fuzzy weight | Any | Any | Invalid-policy error; omit type to disable |
+| Explicit fuzzy FQDN | Any | Any | Invalid-policy error; strong FQDN remains supported |
 | Fuzzy subsecond tie | P(p1) | Z:P(p1)@200s; A:P(p1)@200s+999ns | REVIEW; Z survivor; target [A] |
 
 Pinned C regression fixtures additionally characterize multiple values, duplicates within sets, negative timestamps,
@@ -389,8 +409,13 @@ and duplicate-key input rejection are explicit limits on raw-C compatibility.
 - SPEC-001A/B semantics remain unchanged: complete scope equality, nil versus empty, canonicalization, and supported formats.
 - Strong configured membership determines stage entry before candidate correspondence; no-match never enables fuzzy.
 - Strong priority remains absolute; same-value ranking uses UTC nanoseconds, missing last, then exact key bytes.
-- Strong reuse returns no automatic potential merge list. Undefined contradictions return an unresolved-rule error.
-- Duplicate keys are rejected before matching; output indices reference the original supplied list without renumbering.
+- Strong reuse returns no potential merge list. Incoming multiplicity produces CONFLICT only under section 4.3.
+- Semantic duplicates count once; candidate-only differences and lower-priority disagreements cannot veto selection.
+- No-match multiplicity conflicts without fuzzy fallback; no-match single values require a new key.
+- Duplicate nonempty and empty keys are rejected before matching, including identical rows and empty observations.
+- Output indices reference the original supplied list without renumbering.
+- Zero/negative/NaN/infinite fuzzy weights and fuzzy FQDN membership are invalid policies.
+- Fuzzy nil LastSeen compares as Unix epoch zero; whole-second/input-order ties and input immutability are preserved.
 - Fuzzy numeric/time/input-order behavior and Cases A/B/C preserve the pinned C kernel after policy projection.
 - C empty-observation guard, empty subsets, one-row Case B, and merges without observation overlap are covered by tests.
 - Potential merge targets produce REVIEW with proposed key information intact; no merge authorization is encoded.
@@ -404,26 +429,29 @@ and duplicate-key input rejection are explicit limits on raw-C compatibility.
 
 The reference C source in section 2 remains authoritative for fuzzy subset relations, float scoring, whole-second
 freshness, input-order ties, and survivor/new-key proposals. Native Go adds the strong-first stage, SPEC-001B semantic
-normalization, complete scopes, configurable fuzzy membership, duplicate-key rejection, and explicit REVIEW.
+normalization, complete scopes, configurable fuzzy membership, incoming strong-multiplicity conflicts, key validation,
+and explicit REVIEW. C skips unkeyed rows and permits duplicate-key row semantics; Go rejects both before matching.
+Nil fuzzy LastSeen maps to the zero initialized by the C candidate constructor, while a present Go zero time remains
+pre-epoch. Zero weights and fuzzy FQDN are rejected configuration, not alternate containment behavior.
+C merge outputs become non-actionable potential targets in Go; survivor/new-key proposals retain their meanings.
 No scanner boundary filtering is introduced in either kernel. Candidate/evidence preparation belongs to applications.
 
 Compatibility is demonstrated only for canonical supported fuzzy values with equal scopes, equivalent supplied views,
 distinct keyed candidates, and present whole-second timestamps. Canonicalization can change duplicates or containment.
 The captured C fixtures and native Go tests demonstrate that domain; they do not certify producer trust or merge safety.
 
-## 11. Remaining domain decisions
+## 11. Remaining application decisions and extension limits
 
-1. Define contradictory strong evidence, same-type multiplicity, and permitted conflict outcomes. Cross-priority
-   precedence is resolved and cannot be overridden by invented diagnostics. CONFLICT requires a defined contradiction.
-2. Define independent merge-safety predicates before applications apply potential targets. Strong selection does not
-   authorize same-priority, lower-priority, graph-connected, or other candidate consolidation.
-3. Resolve zero-weight participation and explicitly configured fuzzy FQDN projection/weighting without double counting.
-4. Resolve missing fuzzy LastSeen and unkeyed candidate admission. No nil-to-epoch or silent row skipping is inferred.
-5. Refine conflict evidence only when an actual rule needs it; do not add a generic provenance/evidence framework.
+The minimal library rules above are approved and deterministic for valid caller-prepared eligible inputs. Producer trust,
+historical eligibility, scanner boundaries, qualification, discovery, and permission checks remain application-owned.
+Supplying syntactically valid identifiers alone does not establish those admission facts.
 
-Scanner boundaries, qualification, producer trust, historical eligibility, candidate discovery, and permission checks
-are application responsibilities, not pending library policy hooks. The fixed C numeric/order/empty-subset behavior,
-duplicate-key rejection, and caller-owned boundary design supersede the earlier compatibility-option proposals.
+Applications must define independent merge-safety predicates before applying potential targets. Strong selection and
+fuzzy containment authorize no same-priority, lower-priority, graph-connected, or other candidate consolidation.
+Any future contradiction rule beyond incoming multiplicity or fuzzy FQDN support requires an explicit domain decision;
+none is inferred from candidate-only differences, absence, or retained history. Do not introduce new policy hooks or a
+provenance framework to fill those gaps. `ErrUnresolvedMatchingRule` remains available for API compatibility, but the
+approved multiplicity, key validation, weight, FQDN rejection, and timestamp branches no longer return it.
 
 ## 12. Out of scope
 

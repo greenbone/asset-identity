@@ -38,8 +38,8 @@ separate Go tests exercise normalization, policy, scope, and caller-prepared vie
 
 The internal kernel now fixes C float32 scoring, whole-second ranking, and
 empty-subset behavior without a public compatibility profile. Applications own
-input eligibility. Missing fuzzy times, unkeyed rows, and independent merge safety
-remain unresolved; duplicate keys are rejected before reconciliation. These
+input eligibility and independent merge safety. Nil fuzzy times compare as Unix
+epoch zero; empty and duplicate keys are rejected before reconciliation. These
 fixtures verify containment analysis, not merge authorization or arbitrary gvmd
 input compatibility. The original C test suite was inspected; the standalone C
 kernel, rather than the gvmd test runner, was executed for this comparison.

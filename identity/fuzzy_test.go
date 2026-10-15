@@ -2,7 +2,6 @@ package identity
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"math"
 	"os"
@@ -111,15 +110,6 @@ func TestFuzzyKernelNormalizationAndConfiguration(t *testing.T) {
 		if err != nil || got.SelectedIndex != nil || len(got.PotentialMergeIndices) > 0 {
 			t.Fatalf("scopes collapsed: %+v, %v", got, err)
 		}
-	}
-}
-
-func TestFuzzyKernelRejectsMissingTime(t *testing.T) {
-	ip := fuzzyValue(TypeIP, "192.0.2.1")
-	row := Candidate{AssetKey: "K", Identifiers: []IdentifierValue{ip}}
-	got, err := matchFuzzyKernel(Observation{Identifiers: []IdentifierValue{ip}}, []Candidate{row}, GreenboneMatchPolicy())
-	if !errors.Is(err, ErrUnresolvedMatchingRule) || !reflect.DeepEqual(got, fuzzyKernelResult{}) {
-		t.Fatalf("missing time: %+v %v", got, err)
 	}
 }
 

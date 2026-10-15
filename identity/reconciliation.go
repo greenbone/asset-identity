@@ -59,8 +59,10 @@ type Decision struct {
 // ErrDuplicateCandidateKey identifies repeated asset keys in the supplied candidate list.
 var ErrDuplicateCandidateKey = errors.New("duplicate candidate asset key")
 
+// ErrEmptyCandidateKey identifies a candidate without an asset key.
+var ErrEmptyCandidateKey = errors.New("empty candidate asset key")
+
 // Decide matches caller-prepared eligible views without authorizing merges.
-// Undefined strong contradictions return ErrUnresolvedMatchingRule.
 func Decide(observation Observation, candidates []Candidate, policy MatchPolicy) (Decision, error) {
 	if err := policy.Validate(); err != nil {
 		return Decision{}, err
@@ -68,8 +70,14 @@ func Decide(observation Observation, candidates []Candidate, policy MatchPolicy)
 	seenKeys := make(map[string]int, len(candidates))
 	views := make([][]IdentifierValue, len(candidates))
 	for index, candidate := range candidates {
+		if candidate.AssetKey == "" {
+			return Decision{}, fmt.Errorf("%w: index %d", ErrEmptyCandidateKey, index)
+		}
 		if previous, exists := seenKeys[candidate.AssetKey]; exists {
 			return Decision{}, fmt.Errorf("%w: %q at indices %d and %d", ErrDuplicateCandidateKey, candidate.AssetKey, previous, index)
+		}
+		if err := validateLastSeen(candidate.LastSeen); err != nil {
+			return Decision{}, fmt.Errorf("candidate %d: %w", index, err)
 		}
 		seenKeys[candidate.AssetKey] = index
 		views[index] = candidate.Identifiers
@@ -87,14 +95,21 @@ func Decide(observation Observation, candidates []Candidate, policy MatchPolicy)
 			if match.Type != "" && typ != match.Type {
 				continue
 			}
-			count := 0
+			var conflictingValues []IdentifierValue
 			for _, value := range values {
 				if value.Type == typ {
-					count++
+					conflictingValues = append(conflictingValues, value)
 				}
 			}
-			if count > 1 {
-				return Decision{}, fmt.Errorf("%w: multiple incoming strong values for %q", ErrUnresolvedMatchingRule, typ)
+			if len(conflictingValues) > 1 {
+				return Decision{
+					Action: ActionConflict, Stage: StageStrong,
+					Conflict: &ConflictDetails{
+						Reason:           fmt.Sprintf("multiple incoming strong values for %q", typ),
+						CandidateIndices: match.CandidateIndices,
+						Identifiers:      conflictingValues,
+					},
+				}, nil
 			}
 		}
 		if len(match.CandidateIndices) == 0 {
