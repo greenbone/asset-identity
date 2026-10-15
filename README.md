@@ -1,112 +1,107 @@
 # Asset identity
 
-The Go `identity` package provides normalization and strong-first reconciliation.
-`libgvm_asset_identity.so` exposes the same `identity.Decide()` implementation through
-ABI 1 of the GLib C API. Applications own candidate filtering, scanner boundaries,
-producer eligibility, persistence, and merge authorization.
+A Go library for identifier normalization and strong-first asset reconciliation.
+`libgvm_asset_identity.so` exposes the same algorithm through a GLib C API (ABI 1).
+Applications supply eligible identifiers and candidates; they own scanner boundaries,
+authorization, persistence, and merge approval.
 
-## Build and test
-
-Linux builds need Go matching `go.mod`, a C compiler, pkg-config, and GLib development
-headers. Native tests additionally need CMake 3.18+ and Cgreen 1.7 or later. Cgreen is not
-linked into the production library. Install Cgreen from its
-[upstream release](https://github.com/cgreen-devs/cgreen/releases/tag/1.7.0) if your
-system does not provide it.
+## Go
 
 ```sh
-make build
-make test
-make test-c
-make test-install
+go get github.com/greenbone/asset-identity
 ```
 
-For a Cgreen installation outside standard paths, use
-`make test CMAKE_ARGS=-DCMAKE_PREFIX_PATH=/path/to/cgreen` (also for `test-install`).
-CMake discovers Cgreen's package configuration or pkg-config metadata. CTest sets
-`CGREEN_NO_FORK=1`: forking after initialization of the Go runtime is unsupported.
-CTest also clears loader overrides so another installed library cannot replace the
-built or staged artifact during tests.
+```go
+package main
 
-Additional checks:
+import (
+	"github.com/greenbone/asset-identity/identity"
+	"log"
+)
+
+func main() {
+	observation := identity.Observation{Identifiers: []identity.IdentifierValue{
+		{Type: identity.TypeIP, Value: "192.0.2.10"},
+	}}
+	decision, err := identity.Decide(observation, nil, identity.GreenboneMatchPolicy())
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print(decision.Action) // CREATE
+}
+```
+
+Pass caller-prepared active views; normalization does not establish producer trust.
+Identifier scopes remain significant, including absent versus explicitly empty scope.
+
+| Action | Meaning |
+| --- | --- |
+| CREATE | A new key is required. |
+| REUSE | Use the selected existing key. |
+| REVIEW | Non-actionable survivor/new-key proposal with potential merge targets. |
+| CONFLICT | Contradictory incoming strong values; no actionable key plan. |
+
+No result authorizes a database merge. Candidate indices refer to the supplied array.
+
+## C build, test, and install
+
+Linux builds require Go matching [go.mod](go.mod), a C compiler, pkg-config, and GLib
+development headers. C tests also require CMake 3.18+ and Cgreen 1.7+.
 
 ```sh
-go test -race ./...
-CGO_ENABLED=0 go test ./...
-go vet ./...
-go test ./identity -run TestFuzzyKernelCReferenceFixtures -count=1
+make build                       # dist/libgvm_asset_identity.so
+make test                        # Go and native C tests
+make test-install                # staged install, consumer tests, uninstall
+make install                     # /opt/gvm
+make uninstall                   # same PREFIX/LIBDIR/INCLUDEDIR as install
 ```
 
-The 78 captured C differential fixtures remain Go regression tests. Native C tests
-exercise the actual shared library. No CI workflow is included.
+Use `PREFIX`, `LIBDIR`, and `INCLUDEDIR` to change installation paths, or `DESTDIR`
+for staging. For a nonstandard Cgreen location, pass
+`CMAKE_ARGS=-DCMAKE_PREFIX_PATH=/path/to/cgreen`. `make clean` removes `dist/` and `build/`.
 
-## Install and consume
+Save this example as `example.c`:
 
-```sh
-make install                     # /opt/gvm; requires directory write access
-make install DESTDIR=/tmp/gvm-asset-identity-stage
-make install PREFIX=/usr/local LIBDIR=/usr/local/lib INCLUDEDIR=/usr/local/include
+```c
+#include <gvm_asset_identity.h>
+
+int main(void) {
+    GError *error = NULL;
+    gvm_asset_identity_policy_t *policy = gvm_asset_identity_policy_new_default(&error);
+    if (!policy) { g_clear_error(&error); return 1; }
+    gvm_asset_identity_observation_t *observation = gvm_asset_identity_observation_new();
+    g_ptr_array_add(observation->identifiers,
+        gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_IP, "192.0.2.10"));
+    GPtrArray *candidates = g_ptr_array_new();
+    gvm_asset_identity_decision_t *decision = NULL;
+    gboolean ok = gvm_asset_identity_decide(observation, candidates, policy, &decision, &error);
+    if (ok) g_print("New key: %d\n", decision->needs_new_key);
+    else g_printerr("%s\n", error->message);
+    gvm_asset_identity_decision_free(decision);
+    g_clear_error(&error);
+    g_ptr_array_unref(candidates);
+    gvm_asset_identity_observation_free(observation);
+    gvm_asset_identity_policy_free(policy);
+    return ok ? 0 : 1;
+}
 ```
-
-Install creates the public header, `gvm-asset-identity.pc`, and the verified SONAME
-layout `libgvm_asset_identity.so -> .so.1 -> .so.1.0.0`. `DESTDIR` is staging only;
-it is never embedded in pkg-config metadata or the shared library. `make uninstall`
-accepts the same path overrides and removes only this project's installed files.
-`make clean` removes the generated `dist/` and `build/` directories.
 
 ```sh
 export PKG_CONFIG_PATH=/opt/gvm/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}
-cc tests/c/consumer.c $(pkg-config --cflags --libs gvm-asset-identity) \
-    -Wl,-rpath,/opt/gvm/lib -o consumer
-./consumer
+cc example.c $(pkg-config --cflags --libs libgvm_asset_identity) \
+    -Wl,-rpath,/opt/gvm/lib -o example
+./example
 ```
 
-Production consumers can set RUNPATH as above or configure the system loader;
-`LD_LIBRARY_PATH` is not required. The staged installation test compiles and runs
-this consumer outside the repository, runs the Cgreen suites against installed
-artifacts, and checks uninstall without touching the real `/opt/gvm`. Only the
-installed public header, shared library, and GLib development files are needed;
-Go source, cgo-generated headers, and Cgreen are not needed by consumers.
+Constructors return owned objects; parents own their children. `decide` borrows
+immutable inputs and returns an independently owned decision. Free functions accept
+NULL; errors use `GError`. Consumers need only the installed header/library and GLib.
+See the [public header](include/gvm_asset_identity.h) and
+[C contract](docs/specs/SPEC-002-reconciliation.md#32-c-adapter-contract) for details.
 
-## GLib API and ownership
+## Technical reference
 
-See [gvm_asset_identity.h](include/gvm_asset_identity.h) and the small
-[consumer](tests/c/consumer.c). Constructors create independently owned objects.
-
-- Observation/candidate `identifiers` are `GPtrArray` collections of typed identifiers.
-  Insert constructor-created identifiers with `g_ptr_array_add`; the parent owns them.
-- Identifier `scope` is an owned string-to-string `GHashTable`. Create it with
-  `g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free)` and owned strings.
-  NULL means absent; an empty table means explicitly present and empty.
-- Candidate arrays are caller-owned. Use `g_ptr_array_new_with_free_func` with
-  `gvm_asset_identity_candidate_free` to own the candidates. Empty collections must
-  be real GLib arrays, not NULL. Policy arrays use the element types in the header.
-- `policy_new_default()` obtains defaults from Go; callers may edit its owned arrays.
-  `policy_new()` creates an explicitly empty policy. No defaults are inferred.
-- `decide()` borrows inputs without mutation. A successful result and all nested
-  strings/containers are independent of inputs; release it with `decision_free()`.
-  Other constructors have matching NULL-safe free functions. Do not free borrowed
-  child pointers separately. Shared inputs must not be concurrently mutated.
-- Errors use `GVM_ASSET_IDENTITY_ERROR` with INVALID_INPUT, INVALID_POLICY, or INTERNAL
-  codes. Pass a NULL-initialized `GError *` and release it with `g_clear_error()`.
-  An error leaves the decision NULL; output slots must not alias inputs or each other.
-- Timestamp `present` distinguishes missing from epoch; seconds are signed Unix
-  seconds, and nanoseconds must be 0..999999999. Present instants must be within UTC
-  years 1..9999. Absent timestamps have zero-valued seconds/nanoseconds.
-
-CREATE requests a new key; REUSE selects an existing key. CONFLICT supplies evidence
-and no actionable key plan. REVIEW preserves a proposed survivor or new-key flag
-and informational `GArray` indices/`GPtrArray` keys. **REVIEW authorizes no writes or
-merges.** Indices always refer to the candidate array supplied to that call.
-
-Strings are NUL-terminated `gchar` byte strings, not necessarily UTF-8; embedded NUL
-bytes are outside this GLib API. No case folding or trimming is added by the adapter.
-Inputs are limited to 1,048,576 entries per collection, 16 MiB per string, and 64 MiB
-of private wire arrays/string bytes per call; excess input is rejected, not truncated.
-Pointers must reference live, correctly aligned objects of the declared types. As
-with other C APIs, dangling pointers and fabricated GLib objects cannot be verified.
-Go panics become INTERNAL errors; process-fatal runtime failures and GLib allocation
-failure retain their normal process behavior. No Go pointer crosses the ABI.
-
-Locally verified: Linux amd64, glibc 2.39, GLib 2.80, Cgreen 1.7. Native arm64 and
-other libc combinations have not been tested. Builds target the host by default;
-`GOARCH`/`CC` overrides require a matching target C compiler, GLib, and sysroot.
+- [SPEC-001](docs/specs/SPEC-001-identifiers.md): identifier requirements.
+- [SPEC-001A](docs/specs/SPEC-001A-identifier-model.md): model, scope, timestamps, ownership.
+- [SPEC-001B](docs/specs/SPEC-001B-normalization.md): formats, normalization, equality.
+- [SPEC-002](docs/specs/SPEC-002-reconciliation.md): reconciliation and C compatibility.

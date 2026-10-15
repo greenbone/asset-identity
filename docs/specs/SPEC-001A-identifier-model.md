@@ -43,10 +43,6 @@ TypeHostname          IdentifierType = "hostname"
 Approved names are exact and case-sensitive. Validation does not trim, lowercase, or accept aliases for type names. The
 empty string is an unknown type.
 
-**Rationale:** String constants are readable, work across language boundaries, and avoid dependence on enum numbering.
-Existing names remain stable; future library versions can add constants and their type contracts. There is no runtime
-registry.
-
 The declaration order follows the parent's default strong priority for readability only. It must not be used as a
 priority mechanism. Classification and configurable priority remain separate from these data types.
 
@@ -82,10 +78,6 @@ a type.
 accepted encodings for particular types remains subject to separate approval. This model does not choose SSH key, TLS
 hash, UUID, or address encodings.
 
-**Rationale:** Separate structs keep observation metadata out of value equality. Ordinary slices support multiple values
-without an additional collection framework. Copying an identifier into each observation avoids index references and
-their integrity rules.
-
 ### 3.1 Structured scopes
 
 Use named string dimensions rather than a single concatenated namespace string. For example, a cloud scope could be:
@@ -111,10 +103,6 @@ Approved generic scope rules:
 - Absent scope (`nil`) and explicitly present empty scope (`Scope{}`) remain distinct. Neither denotes a wildcard or
   asserts global uniqueness.
 
-**Rationale:** Named dimensions accommodate different namespace structures without fixing provider, tenant, network, or
-agent-specific fields into the core struct. Keeping absence distinct from explicit emptiness preserves information until
-type-specific scope semantics are approved.
-
 ### 3.2 Observation timestamps
 
 Use an optional `*time.Time`:
@@ -130,11 +118,6 @@ Use an optional `*time.Time`:
   must not change precision or supply a missing timestamp.
 - Observation order and validity do not depend on whether timestamps are missing, equal, or chronological. No freshness
   rule is implied.
-
-**Rationale:** A pointer provides idiomatic explicit optionality without reserving an instant as a sentinel. Nanosecond
-precision avoids premature truncation. The approved bounded year range permits conventional timestamp representations
-while still preserving a present zero time. This document approves the range and precision; external timestamp encoding
-remains open.
 
 UTC conversion removes Go's process-local monotonic reading; that reading is not observation-history data. See
 the [Go time documentation](https://pkg.go.dev/time#hdr-Monotonic_Clocks). External timestamp encoding remains open.
@@ -173,9 +156,6 @@ differently formatted IP strings might later normalize to the same value under a
 and semantic deduplication remain deferred until the applicable type contracts are approved. No generic `Equal`
 operation claiming semantic equality is approved at this stage.
 
-**Rationale:** Exact representation comparison is testable without silently resolving normalization. A separate name
-makes its limited guarantee explicit.
-
 ## 5. Observation history and multiple values
 
 Represent supplied history as an ordered slice of observations. Preserve supplied sequence order without interpreting it
@@ -195,9 +175,6 @@ An ordinary `[]IdentifierValue` does not enforce uniqueness by itself. Consumers
 representations or repeated observations as additional identity evidence. It is possible to identify exact duplicate
 representations now; semantic duplicates require the later approved normalization contracts. No matching or
 evidence-counting algorithm is defined here.
-
-**Rationale:** Retaining observations avoids losing timestamps while keeping distinct-value semantics separate. It also
-avoids imposing first-seen/last-seen summaries or an event store on the core model.
 
 ## 6. Approved validation and error behavior
 
@@ -226,11 +203,6 @@ Provide errors identifiable with `errors.Is`:
 Batch validation must return the first error in slice order with its entry index, without returning a partially accepted
 batch or mutating caller data. Where multiple scope keys are invalid, diagnostics must not depend on map iteration
 order. Invalid input returns an error rather than causing a panic.
-
-**Rationale:** Strict unknown-type handling catches integration mistakes without introducing runtime registration.
-Recognizable errors avoid string matching. Rejecting a batch at the validation boundary avoids accidental silent data
-loss; callers can explicitly validate individual entries if needed. These resolve the parent's unknown-input and model
-error-behavior decisions for this package.
 
 ### 6.1 Minimal public operations
 
@@ -325,37 +297,14 @@ C-specific fields belong in these Go types.
 
 ## 9. Testable acceptance criteria
 
-These criteria are requirements for the approved native Go model. Logical export/import here means exercising
-field-preserving model copies, not implementing an external encoding or C adapter.
+Test the contracts in sections 2–6 with table-driven cases covering exact type names, scope dimension/presence changes,
+repeated history entries, missing/present-zero timestamps, UTC offsets and range boundaries. Structural comparison must
+be reflexive, symmetric, and transitive without claiming semantic equality.
 
-- [ ] Each of the eleven type constants has exactly the approved stable string value; unknown, empty, mixed-case, and
-  whitespace-altered names fail model validation.
-- [ ] Two values of the same type and two equal payloads in different scopes coexist in a collection without
-  replacement.
-- [ ] Scope dimensions compare independently of insertion order; changed, missing, or extra dimensions change
-  representation equality.
-- [ ] Absent scope differs from explicitly empty scope; an empty dimension value differs from an absent dimension; empty
-  dimension names fail validation.
-- [ ] `SameRepresentation` tests type, value bytes, and scope only; case and whitespace in payloads are preserved rather
-  than normalized.
-- [ ] Structural comparison is reflexive, symmetric, and transitive; it makes no semantic claim about differently
-  formatted values.
-- [ ] Repeated observations with different, equal, or missing timestamps leave identifier-value comparison unchanged and
-  preserve every supplied history entry during construction and copying without imposing unlimited caller retention.
-- [ ] Newer observations of different values do not remove older values or history entries.
-- [ ] A nil timestamp differs from a present zero time; UTC epoch and pre-epoch times are accepted.
-- [ ] Offset conversion preserves the instant and nanoseconds; different timezone offsets pass validation without
-  mutation, and out-of-range UTC instants fail validation without supplying missing timestamps.
-- [ ] Retaining data copies maps and timestamp values; mutating caller-owned inputs cannot alter retained data, and
-  scope missingness survives copying.
-- [ ] Validation errors support `errors.Is`; batch failures identify the first invalid entry and produce no partial
-  result or input mutation.
-- [ ] Adding a supported type in a later version requires no changes to the generic structs or structural comparison
-  rules and exposes no runtime registration API.
-- [ ] A logical export/import test preserves every value, scope dimension and presence state, history entry, and
-  timestamp presence/precision at range boundaries, without requiring C bindings.
-- [ ] The model package builds and its tests pass with `CGO_ENABLED=0`, using no C, GLib, database, or
-  application-specific dependency.
+Copy/export-import tests preserve every field and nil/empty distinction, entry order, timestamp presence, and nanosecond
+precision. Mutating caller maps, slices, or timestamps must not affect owned results. Validation reports the first
+indexed error via `errors.Is`, with no partial batch or input mutation. Verify the package with
+`CGO_ENABLED=0`; tests require no C adapter or application infrastructure.
 
 ## 10. Remaining open decisions
 

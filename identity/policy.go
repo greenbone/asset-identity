@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	// ErrInvalidMatchPolicy identifies an invalid foundation policy configuration.
+	// ErrInvalidMatchPolicy identifies an invalid matching policy.
 	ErrInvalidMatchPolicy = errors.New("invalid matching policy")
 	// ErrUnresolvedMatchingRule identifies an operation blocked by a pending domain rule.
 	ErrUnresolvedMatchingRule = errors.New("unresolved matching rule")
@@ -41,7 +41,7 @@ func (p MatchPolicy) Clone() MatchPolicy {
 	return p
 }
 
-// Validate checks foundation constraints without mutating policy.
+// Validate checks membership and weights without mutating policy.
 func (p MatchPolicy) Validate() error {
 	strong := make(map[IdentifierType]bool, len(p.StrongOrder))
 	for i, typ := range p.StrongOrder {

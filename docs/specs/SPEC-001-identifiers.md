@@ -142,24 +142,10 @@ lifetime rules belong to a separate specification; native Go memory layouts are 
 
 ## 3. Acceptance Criteria
 
-- [ ] All defined identifier types can be represented using stable string type identifiers.
-- [ ] Multiple values of the same identifier type are supported.
-- [ ] Identifier scopes can be represented, including values in different scopes.
-- [ ] UTC observation timestamps and explicitly missing timestamps can be represented distinctly.
-- [ ] Identifier-value equality is independent of observation timestamps and history.
-- [ ] Equivalent values of the same type and scope do not become distinct identifier values solely through duplication.
-- [ ] Observation history is represented separately without silently discarding timestamp information under an
-  unapproved aggregation rule.
-- [ ] Different values are not discarded solely because newer observations contain different values.
-- [ ] Strong identifier priorities are configurable, absolute, and independent of input order.
-- [ ] The default priority exactly matches the authoritative order in REQ-002.
-- [ ] Duplicate and unknown type entries in priority configurations are rejected.
-- [ ] A new supported type can be added without changing the generic identifier model or future matching algorithms.
-- [ ] Runtime identifier registration is not implemented.
-- [ ] Once approved, type-specific validation rejects invalid inputs and normalization can be tested independently for
-  determinism, idempotence, equality, and preserved distinctions.
-- [ ] All required data has a lossless mapping suitable for a future C adapter without defining bindings here.
-- [ ] The core builds and its tests run with `CGO_ENABLED=0`, without C, GLib, or database dependencies.
+Verify REQ-001–009 through the model tests in [SPEC-001A](SPEC-001A-identifier-model.md#9-testable-acceptance-criteria),
+normalization tests in [SPEC-001B](SPEC-001B-normalization.md#9-testable-acceptance-criteria), and reconciliation tests
+in [SPEC-002](SPEC-002-reconciliation.md#9-verification-and-c-reference-fixtures). The native core must build and test
+with `CGO_ENABLED=0`, without C, GLib, or database dependencies.
 
 ## 4. Out of Scope
 
@@ -177,21 +163,14 @@ lifetime rules belong to a separate specification; native Go memory layouts are 
 
 Any future work in these areas requires separate specifications or approval.
 
-## 5. Open Decisions
+## 5. Follow-up contracts
 
-- Exact stable string identifiers for the supported types.
-- Exact type-specific validation, normalization, and canonical representations, including accepted input encodings.
-- Scope structure and comparison, absent versus empty scope, and namespace requirements for each type, including Agent
-  ID and cloud identifiers.
-- Observation-history representation and handling of repeated observations, including explicitly missing timestamps.
-- Timestamp precision, supported range, and external encoding.
-- Treatment of omitted types in priority configurations, disabling types, and classification overrides.
-- Handling unknown identifier types in identifier input; priority configurations must reject them.
-- Validation and handling of invalid BIOS UUIDs or placeholder values.
-- SSH host key representation, including key material versus fingerprints and algorithm information.
-- TLS certificate public-key hash definition, including hashed material, digest algorithm, and encoding.
-- IP address forms, IPv4-mapped IPv6 treatment, and zone handling; DNS case, trailing-dot, and internationalized-name
-  rules; MAC forms; hostname semantics.
-- Error reporting and batch rejection versus partial acceptance for invalid input.
+The detailed decisions originally deferred here are tracked in:
 
-Do not silently resolve these decisions during implementation.
+- [SPEC-001A](SPEC-001A-identifier-model.md): stable names, scopes, timestamps, history, structural validation and
+  errors.
+- [SPEC-001B](SPEC-001B-normalization.md): payload formats, normalization, semantic equality, and unresolved producer
+  formats.
+- [SPEC-002](SPEC-002-reconciliation.md): classification, omitted/disabled types, priority, and reconciliation.
+
+These references retain their own approval boundaries; unspecified producer semantics must not be guessed.

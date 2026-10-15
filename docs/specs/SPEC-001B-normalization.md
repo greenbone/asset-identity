@@ -33,9 +33,8 @@ The existing eleven string type names, structs, observations/history, and public
 - Nil versus empty scopes, defensive copies, explicit timestamp missingness, and caller-controlled history retention are
   preserved.
 
-Strong types remain `greenbone_id`, `agent_id`, `machine_id`, `bios_uuid`, `ssh_host_key`,
-`tls_certificate_public_key_hash`, and `cloud_identifier`. Other types remain `mac`, `ip`, `hostname`, and `fqdn`. The
-parent's configurable, absolute default strong order is unchanged and is not implemented here.
+Matching classification and priority are defined separately
+in [SPEC-002](SPEC-002-reconciliation.md#7-policy-defaults-and-validation).
 
 ### 1.1 FQDN compatibility
 
@@ -371,32 +370,14 @@ implemented or required by SPEC-001B tests.
 
 ## 9. Testable acceptance criteria
 
-- [ ] Eleven SPEC-001A type names and all existing public contracts remain unchanged; existing tests continue to pass
-  unchanged.
-- [ ] Syntactic validity, semantic equality, and matching eligibility have distinct documented expectations; only the
-  first two are exposed here.
-- [ ] Well-formed zero/broadcast/multicast MACs and unspecified/multicast/broadcast/loopback IPs normalize successfully.
-- [ ] Missing Greenbone/agent/hostname namespaces, missing network/scanner scopes, and unzoned link-local IPv6 do not
-  cause syntax errors.
-- [ ] Supplied scopes are copied defensively and preserved exactly, including extra dimensions, empty values, nil versus
-  empty presence, and case; map insertion order does not affect equality.
-- [ ] Normalization preserves type, emits valid canonical output, is deterministic/idempotent, and does not mutate
-  inputs, timestamps, or history.
-- [ ] Equality is reflexive/symmetric/transitive over valid fixtures and agrees with structural comparison after
-  normalization.
-- [ ] Unknown types and malformed/unsupported inputs produce recognizable deterministic errors, even when operands have
-  different types or scopes.
-- [ ] Opaque case/whitespace distinctions are preserved; DNS/hex changes occur only under the approved type grammar.
-- [ ] Linux/Windows lineage stays distinct; no payload-shape guessing or implicit scope population is introduced.
-- [ ] Qualified names are supported under hostname and FQDN without retagging or cross-type equality; short hostname
-  inputs require no namespace.
-- [ ] SSH fixtures verify exact key-format/material parsing, canonical wire serialization, comment removal, and
-  unsupported producer forms without a speculative fingerprint grammar.
-- [ ] TLS fixtures verify the explicit SPKI/SHA-256 scheme and strict hex representation; extraction provenance and
-  matching eligibility remain separate responsibilities.
-- [ ] No policy exclusions, priority/scoring/freshness rules, candidate selection, matching, merging, runtime
-  registration, database operations, or C adapter are implemented.
-- [ ] Any future implementation and parser dependencies are native Go and work with `CGO_ENABLED=0`.
+Exercise the section 8 matrix with fixed fixtures, keeping syntax/equality expectations separate from eligibility.
+Verify deterministic, idempotent normalization and reflexive/symmetric/transitive equality consistent with section 6.
+Tests must cover defensive scope copying, nil/empty distinctions, preserved opaque bytes and machine lineage,
+malformed/unsupported operands, error precedence, SSH canonical wire material, and tagged TLS digests.
+
+Existing structural APIs must retain their acceptance and timestamp-only normalization contracts. Normalization must not
+mutate input, timestamps, or history, infer namespaces, retag DNS types, or perform eligibility checks. Parser code and
+tests remain native Go and work with `CGO_ENABLED=0`.
 
 ## 10. Unresolved producer-specific questions
 

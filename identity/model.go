@@ -1,4 +1,4 @@
-// Package identity provides identifier models, normalization, and matching foundations.
+// Package identity provides identifier normalization and asset reconciliation.
 package identity
 
 import (
@@ -40,7 +40,6 @@ var (
 type Scope map[string]string
 
 // IdentifierValue preserves its payload bytes and scope without normalization.
-// Its map makes it unsuitable for comparison with Go's == operator.
 type IdentifierValue struct {
 	Type  IdentifierType
 	Value string
@@ -54,8 +53,7 @@ type IdentifierObservation struct {
 	ObservedAt *time.Time
 }
 
-// ObservationHistory is an in-memory sequence, not a retention system.
-// Callers control persistence, pruning, and lifetime.
+// ObservationHistory preserves observation order; callers own retention.
 type ObservationHistory []IdentifierObservation
 
 // Validate checks only the supported type and generic scope structure.
@@ -75,7 +73,6 @@ func (v IdentifierValue) Validate() error {
 }
 
 // Clone returns an independent copy, preserving absent versus empty scope.
-// It does not validate or normalize.
 func (v IdentifierValue) Clone() IdentifierValue {
 	v.Scope = maps.Clone(v.Scope)
 	return v
@@ -103,8 +100,7 @@ func (o IdentifierObservation) Validate() error {
 	return nil
 }
 
-// Clone returns independent scope and timestamp storage without normalization
-// or validation. Timestamp presence and timezone are preserved.
+// Clone copies scope and timestamp storage, preserving presence and timezone.
 func (o IdentifierObservation) Clone() IdentifierObservation {
 	o.Identifier = o.Identifier.Clone()
 	if o.ObservedAt != nil {
@@ -124,8 +120,7 @@ func (o IdentifierObservation) Normalize() IdentifierObservation {
 	return o
 }
 
-// NewObservation normalizes a defensive copy and validates it at the input
-// boundary. On failure it returns a zero observation and the validation error.
+// NewObservation copies, normalizes timestamps, and validates; errors return a zero observation.
 func NewObservation(v IdentifierValue, observedAt *time.Time) (IdentifierObservation, error) {
 	o := (IdentifierObservation{Identifier: v, ObservedAt: observedAt}).Normalize()
 	if err := o.Validate(); err != nil {
@@ -145,8 +140,7 @@ func (h ObservationHistory) Validate() error {
 	return nil
 }
 
-// Clone copies the slice, each scope, and each timestamp without normalization
-// or validation. Nil versus non-nil empty histories are preserved.
+// Clone deep-copies history, preserving nil versus non-nil empty slices.
 func (h ObservationHistory) Clone() ObservationHistory {
 	if h == nil {
 		return nil

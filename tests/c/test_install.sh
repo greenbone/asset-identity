@@ -5,7 +5,7 @@ trap 'rm -rf "$stage"' EXIT HUP INT TERM
 make install DESTDIR="$stage" PREFIX="$PREFIX" LIBDIR="$LIBDIR" INCLUDEDIR="$INCLUDEDIR"
 lib="$stage$LIBDIR"
 include="$stage$INCLUDEDIR"
-pc="$lib/pkgconfig/gvm-asset-identity.pc"
+pc="$lib/pkgconfig/libgvm_asset_identity.pc"
 test -f "$lib/libgvm_asset_identity.so.1.0.0"
 test "$(readlink "$lib/libgvm_asset_identity.so")" = libgvm_asset_identity.so.1
 test "$(readlink "$lib/libgvm_asset_identity.so.1")" = libgvm_asset_identity.so.1.0.0
@@ -14,7 +14,7 @@ test -f "$pc"
 if grep -F "$stage" "$pc"; then exit 1; fi
 original_pkg_config_path=${PKG_CONFIG_PATH:-}
 export PKG_CONFIG_PATH="$lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-flags=$(PKG_CONFIG_ALLOW_SYSTEM_LIBS=1 PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1 pkg-config --cflags --libs gvm-asset-identity)
+flags=$(PKG_CONFIG_ALLOW_SYSTEM_LIBS=1 PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1 pkg-config --cflags --libs libgvm_asset_identity)
 printf '%s\n' "$flags" | grep -F -- "-I$INCLUDEDIR"
 printf '%s\n' "$flags" | grep -F -- "-L$LIBDIR"
 cp tests/c/consumer.c "$stage/consumer.c"
