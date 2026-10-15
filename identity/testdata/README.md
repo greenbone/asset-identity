@@ -33,12 +33,13 @@ small. The generation universe contains three canonical IPs, two hostnames, and
 two MACs; generated observations and candidates independently include each value
 with probability .5, with 0–5 candidate rows and LastSeen sampled from
 `[-100, -1, 0, 10, 20, 20]`. Candidate keys are distinct. C's default accumulation
-order is MAC, hostname, IP. Scope and boundary admission are held equivalent;
-separate Go tests exercise intentional normalization, policy, and boundary changes.
+order is MAC, hostname, IP. Scope and caller-supplied eligibility are held equivalent;
+separate Go tests exercise normalization, policy, scope, and caller-prepared views.
 
-These fixtures do not approve production empty-set eligibility, missing-time
-handling, duplicate/unkeyed candidate admission, or independent merge safety.
-They are a differential oracle for non-actionable containment analysis within the
-explicit `LegacyCCompatibility` fixture profile, not an end-to-end reconciliation
-compatibility claim. The original C test suite was inspected; the standalone C
+The internal kernel now fixes C float32 scoring, whole-second ranking, and
+empty-subset behavior without a public compatibility profile. Applications own
+input eligibility. Missing fuzzy times, unkeyed rows, and independent merge safety
+remain unresolved; duplicate keys are rejected before reconciliation. These
+fixtures verify containment analysis, not merge authorization or arbitrary gvmd
+input compatibility. The original C test suite was inspected; the standalone C
 kernel, rather than the gvmd test runner, was executed for this comparison.

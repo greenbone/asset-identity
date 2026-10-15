@@ -1,31 +1,27 @@
 # Identity matching
 
-Native Go identifier models, normalization, and matching helpers. Contracts and
-open domain decisions are in [SPEC-002](../docs/specs/SPEC-002-reconciliation.md).
+`Decide(observation, candidates, policy)` matches caller-prepared eligible views.
+Applications own boundaries/equivalence, discovery, filtering, permissions, active
+identifier views, producer admission, and applying results. Scope remains part of
+identifier identity and is never discarded for scanner filtering.
 
-- `GreenboneMatchPolicy()` returns independent defaults; `Validate()` checks
-  foundation configuration, not a complete production policy.
-- `CompareBoundaries()` compares caller-resolved qualified keys. `ScannerID` is
-  provenance only; empty boundary keys are UNKNOWN.
-- `FuzzyBoundaryMode.Admit()` governs fuzzy selection and merge evaluation.
-- `MatchingIdentifiers()` returns distinct canonical semantic matches.
-- `EvaluateStrongPriority()` reports matches at the highest matching priority.
-- `RankStrongCandidates()` ranks an admitted, conflict-checked same-value set.
-- `MatchFuzzyKernel()` reports a proposed survivor and potential merge targets.
-  Its result is non-actionable and grants no merge authorization.
+`MatchPolicy` contains `StrongOrder` and ordered `Fuzzy` type/weight entries.
+Greenbone defaults use the approved strong priority and C fuzzy accumulation order
+MAC/hostname/IP with weights 1/.4/.4. Policies and clones own their slices.
 
-Callers supply admitted matching views and partition history by boundary. Before
-fuzzy evaluation, they must satisfy the strong-stage entry gate. No helper infers
-producer trust, strong cross-boundary eligibility, or independent merge safety.
+Strong matching runs first, ranks same-value candidates by newest UTC nanosecond
+LastSeen, missing last, then key bytes. Strong no-match creates a key without fuzzy
+fallback. Undefined strong contradictions remain `ErrUnresolvedMatchingRule`;
+CONFLICT is reserved for a defined rule, not inferred from differing values.
 
-The fuzzy kernel requires explicit `LegacyCCompatibility` and `AccumulationOrder`.
-This profile uses float32 scoring, present whole-second timestamps, input-order
-ties, and literal empty subsets. C's default score order is MAC, hostname, IP.
-See [reference fixtures](testdata/README.md) for compatibility limits and provenance.
+The internal fuzzy kernel uses C float32 scoring, whole-second timestamp ranking,
+input-order ties, and literal empty subsets. No public compatibility modes remain.
+Potential targets produce non-actionable REVIEW with proposed survivor/new-key
+information preserved. No result authorizes merges or mutates database state.
 
-Pending zero-weight/FQDN semantics, duplicate/unkeyed rows, and unsupported fuzzy
-timestamp cases return `ErrUnresolvedMatchingRule`. `Decide()`, conflict resolution,
-history eligibility, merge authorization, and the C adapter remain deferred.
+Zero weights, fuzzy FQDN projection, missing fuzzy timestamps, and unkeyed rows
+remain explicit unresolved cases. Duplicate keys are rejected. Inputs are not
+mutated or retained; callers synchronize concurrent mutation.
 
-Helpers do not mutate or retain inputs. Concurrent callers must synchronize input
-mutation; returned maps, slices, and pointers are independently owned.
+See [SPEC-002](../docs/specs/SPEC-002-reconciliation.md) and the
+[C reference fixtures](testdata/README.md) for contracts and compatibility limits.

@@ -14,30 +14,27 @@ var (
 	ErrUnresolvedMatchingRule = errors.New("unresolved matching rule")
 )
 
-// FuzzyMember configures a fuzzy type and weight; it does not define scoring precision.
+// FuzzyMember configures a fuzzy type and weight; entry order controls score accumulation.
 type FuzzyMember struct {
 	Type   IdentifierType
 	Weight float64
 }
 
-// MatchPolicy configures matching membership, priority, and fuzzy boundary admission.
-// It does not grant evidence eligibility or merge authorization.
+// MatchPolicy configures strong priority and ordered fuzzy weights.
 type MatchPolicy struct {
-	StrongOrder       []IdentifierType
-	Fuzzy             []FuzzyMember
-	FuzzyBoundaryMode FuzzyBoundaryMode
+	StrongOrder []IdentifierType
+	Fuzzy       []FuzzyMember
 }
 
 // GreenboneMatchPolicy returns independently owned Greenbone defaults.
 func GreenboneMatchPolicy() MatchPolicy {
 	return MatchPolicy{
-		StrongOrder:       []IdentifierType{TypeGreenboneID, TypeAgentID, TypeMachineID, TypeBIOSUUID, TypeSSHHostKey, TypeTLSPublicKeyHash, TypeCloudIdentifier},
-		Fuzzy:             []FuzzyMember{{Type: TypeMAC, Weight: 1}, {Type: TypeIP, Weight: .4}, {Type: TypeHostname, Weight: .4}},
-		FuzzyBoundaryMode: FuzzyBoundaryStrict,
+		StrongOrder: []IdentifierType{TypeGreenboneID, TypeAgentID, TypeMachineID, TypeBIOSUUID, TypeSSHHostKey, TypeTLSPublicKeyHash, TypeCloudIdentifier},
+		Fuzzy:       []FuzzyMember{{Type: TypeMAC, Weight: 1}, {Type: TypeHostname, Weight: .4}, {Type: TypeIP, Weight: .4}},
 	}
 }
 
-// Clone returns independent membership slices, preserving nil versus empty.
+// Clone copies membership slices, preserving nil versus empty.
 func (p MatchPolicy) Clone() MatchPolicy {
 	p.StrongOrder = slices.Clone(p.StrongOrder)
 	p.Fuzzy = slices.Clone(p.Fuzzy)
@@ -47,9 +44,6 @@ func (p MatchPolicy) Clone() MatchPolicy {
 // Validate checks foundation constraints without mutating policy.
 // Unresolved zero-weight or fuzzy FQDN behavior returns ErrUnresolvedMatchingRule.
 func (p MatchPolicy) Validate() error {
-	if err := p.FuzzyBoundaryMode.Validate(); err != nil {
-		return err
-	}
 	strong := make(map[IdentifierType]bool, len(p.StrongOrder))
 	for i, typ := range p.StrongOrder {
 		if err := (IdentifierValue{Type: typ}).Validate(); err != nil {

@@ -17,8 +17,8 @@ func TestGreenboneMatchPolicy(t *testing.T) {
 	if !reflect.DeepEqual(p.StrongOrder, want) {
 		t.Fatalf("strong order = %v", p.StrongOrder)
 	}
-	fuzzy := []identity.FuzzyMember{{Type: identity.TypeMAC, Weight: 1}, {Type: identity.TypeIP, Weight: .4}, {Type: identity.TypeHostname, Weight: .4}}
-	if !reflect.DeepEqual(p.Fuzzy, fuzzy) || p.FuzzyBoundaryMode != identity.FuzzyBoundaryStrict {
+	fuzzy := []identity.FuzzyMember{{Type: identity.TypeMAC, Weight: 1}, {Type: identity.TypeHostname, Weight: .4}, {Type: identity.TypeIP, Weight: .4}}
+	if !reflect.DeepEqual(p.Fuzzy, fuzzy) {
 		t.Fatalf("defaults = %+v", p)
 	}
 	if err := p.Validate(); err != nil {
@@ -43,31 +43,29 @@ func TestMatchPolicyValidation(t *testing.T) {
 		policy identity.MatchPolicy
 		err    error
 	}{
-		{"disabled stages", identity.MatchPolicy{FuzzyBoundaryMode: identity.FuzzyBoundaryStrict}, nil},
-		{"reordered", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{identity.TypeAgentID, identity.TypeGreenboneID}, FuzzyBoundaryMode: identity.FuzzyBoundaryLegacy}, nil},
-		{"reclassified", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{identity.TypeIP, identity.TypeFQDN}, Fuzzy: []identity.FuzzyMember{{Type: identity.TypeGreenboneID, Weight: 2}}, FuzzyBoundaryMode: identity.FuzzyBoundaryStrict}, nil},
-		{"duplicate strong", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{identity.TypeAgentID, identity.TypeAgentID}, FuzzyBoundaryMode: identity.FuzzyBoundaryStrict}, identity.ErrInvalidMatchPolicy},
-		{"unknown strong", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{"unknown"}, FuzzyBoundaryMode: identity.FuzzyBoundaryStrict}, identity.ErrInvalidMatchPolicy},
-		{"duplicate fuzzy", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeIP, Weight: 1}, {Type: identity.TypeIP, Weight: 2}}, FuzzyBoundaryMode: identity.FuzzyBoundaryStrict}, identity.ErrInvalidMatchPolicy},
-		{"unknown fuzzy", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: "unknown", Weight: 1}}, FuzzyBoundaryMode: identity.FuzzyBoundaryStrict}, identity.ErrInvalidMatchPolicy},
-		{"overlap", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{identity.TypeIP}, Fuzzy: []identity.FuzzyMember{{Type: identity.TypeIP, Weight: 1}}, FuzzyBoundaryMode: identity.FuzzyBoundaryStrict}, identity.ErrInvalidMatchPolicy},
-		{"missing mode", identity.MatchPolicy{}, identity.ErrInvalidMatchPolicy},
-		{"unknown mode", identity.MatchPolicy{FuzzyBoundaryMode: "wildcard"}, identity.ErrInvalidMatchPolicy},
-		{"fqdn deferred", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeFQDN, Weight: 1}}, FuzzyBoundaryMode: identity.FuzzyBoundaryStrict}, identity.ErrUnresolvedMatchingRule},
+		{"disabled stages", identity.MatchPolicy{}, nil},
+		{"reordered", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{identity.TypeAgentID, identity.TypeGreenboneID}}, nil},
+		{"reclassified", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{identity.TypeIP, identity.TypeFQDN}, Fuzzy: []identity.FuzzyMember{{Type: identity.TypeGreenboneID, Weight: 2}}}, nil},
+		{"duplicate strong", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{identity.TypeAgentID, identity.TypeAgentID}}, identity.ErrInvalidMatchPolicy},
+		{"unknown strong", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{"unknown"}}, identity.ErrInvalidMatchPolicy},
+		{"duplicate fuzzy", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeIP, Weight: 1}, {Type: identity.TypeIP, Weight: 2}}}, identity.ErrInvalidMatchPolicy},
+		{"unknown fuzzy", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: "unknown", Weight: 1}}}, identity.ErrInvalidMatchPolicy},
+		{"overlap", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{identity.TypeIP}, Fuzzy: []identity.FuzzyMember{{Type: identity.TypeIP, Weight: 1}}}, identity.ErrInvalidMatchPolicy},
+		{"fqdn deferred", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeFQDN, Weight: 1}}}, identity.ErrUnresolvedMatchingRule},
 	}
 	for _, weight := range []float64{-1, math.NaN(), math.Inf(1), math.Inf(-1)} {
 		tests = append(tests, struct {
 			name   string
 			policy identity.MatchPolicy
 			err    error
-		}{"invalid weight", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeMAC, Weight: weight}}, FuzzyBoundaryMode: identity.FuzzyBoundaryStrict}, identity.ErrInvalidMatchPolicy})
+		}{"invalid weight", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeMAC, Weight: weight}}}, identity.ErrInvalidMatchPolicy})
 	}
 	for _, members := range [][]identity.FuzzyMember{{{Type: identity.TypeIP, Weight: 0}}, {{Type: identity.TypeIP, Weight: 0}, {Type: identity.TypeMAC, Weight: 1}}} {
 		tests = append(tests, struct {
 			name   string
 			policy identity.MatchPolicy
 			err    error
-		}{"zero semantics deferred", identity.MatchPolicy{Fuzzy: members, FuzzyBoundaryMode: identity.FuzzyBoundaryStrict}, identity.ErrUnresolvedMatchingRule})
+		}{"zero semantics deferred", identity.MatchPolicy{Fuzzy: members}, identity.ErrUnresolvedMatchingRule})
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -77,7 +75,7 @@ func TestMatchPolicyValidation(t *testing.T) {
 				t.Fatalf("error = %v, want %v", err, tt.err)
 			}
 			// Compare float bits to preserve NaN and signed-zero representations.
-			if !reflect.DeepEqual(tt.policy.StrongOrder, before.StrongOrder) || tt.policy.FuzzyBoundaryMode != before.FuzzyBoundaryMode || len(tt.policy.Fuzzy) != len(before.Fuzzy) {
+			if !reflect.DeepEqual(tt.policy.StrongOrder, before.StrongOrder) || len(tt.policy.Fuzzy) != len(before.Fuzzy) {
 				t.Fatal("validation mutated input")
 			}
 			for i, member := range tt.policy.Fuzzy {
@@ -86,51 +84,6 @@ func TestMatchPolicyValidation(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestBoundaryFoundations(t *testing.T) {
-	// Boundary keys are asserted caller-resolved fixtures, not a qualification grammar.
-	tests := []struct {
-		name string
-		a, b identity.BoundaryContext
-		want identity.BoundaryCompatibility
-	}{
-		{"same", identity.BoundaryContext{BoundaryID: "realm/b1"}, identity.BoundaryContext{BoundaryID: "realm/b1"}, identity.BoundaryCompatible},
-		{"two scanners", identity.BoundaryContext{BoundaryID: "realm/b1", ScannerID: "s1"}, identity.BoundaryContext{BoundaryID: "realm/b1", ScannerID: "s2"}, identity.BoundaryCompatible},
-		{"same scanner different namespace", identity.BoundaryContext{BoundaryID: "realm/b1", ScannerID: "s1"}, identity.BoundaryContext{BoundaryID: "realm/b2", ScannerID: "s1"}, identity.BoundaryIncompatible},
-		{"qualified realm differs", identity.BoundaryContext{BoundaryID: "realm/b1"}, identity.BoundaryContext{BoundaryID: "other/b1"}, identity.BoundaryIncompatible},
-		{"one missing", identity.BoundaryContext{BoundaryID: "realm/b1"}, identity.BoundaryContext{}, identity.BoundaryUnknown},
-		{"both missing same scanner", identity.BoundaryContext{ScannerID: "s1"}, identity.BoundaryContext{ScannerID: "s1"}, identity.BoundaryUnknown},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			a, b := tt.a, tt.b
-			if got := identity.CompareBoundaries(a, b); got != tt.want {
-				t.Fatalf("compatibility = %s", got)
-			}
-			if got := identity.CompareBoundaries(b, a); got != tt.want {
-				t.Fatal("asymmetric")
-			}
-			if a != tt.a || b != tt.b {
-				t.Fatal("mutated boundaries")
-			}
-			for _, mode := range []identity.FuzzyBoundaryMode{identity.FuzzyBoundaryStrict, identity.FuzzyBoundaryLegacy} {
-				got, err := mode.Admit(tt.want)
-				want := tt.want == identity.BoundaryCompatible || (mode == identity.FuzzyBoundaryLegacy && tt.want == identity.BoundaryUnknown)
-				if err != nil || got != want {
-					t.Fatalf("mode %s: %v, %v", mode, got, err)
-				}
-			}
-		})
-	}
-	for _, tt := range []struct {
-		mode   identity.FuzzyBoundaryMode
-		compat identity.BoundaryCompatibility
-	}{{"", identity.BoundaryCompatible}, {"invalid", identity.BoundaryUnknown}, {identity.FuzzyBoundaryLegacy, "invalid"}} {
-		if admitted, err := tt.mode.Admit(tt.compat); err == nil || admitted {
-			t.Fatal("invalid admission must return error and false")
-		}
 	}
 }
 
@@ -213,7 +166,7 @@ func TestStrongPriorityEvaluation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := identity.MatchPolicy{StrongOrder: tt.order, FuzzyBoundaryMode: identity.FuzzyBoundaryStrict}
+			p := identity.MatchPolicy{StrongOrder: tt.order}
 			got, err := identity.EvaluateStrongPriority(p, tt.incoming, tt.candidates)
 			if err != nil || got.Type != tt.typ || got.Priority != tt.priority || !reflect.DeepEqual(got.CandidateIndices, tt.indices) || got.HasIncomingStrong != tt.strong {
 				t.Fatalf("result = %+v, %v", got, err)
@@ -233,7 +186,7 @@ func TestStrongPriorityEvaluation(t *testing.T) {
 		t.Fatalf("correspondence = %+v %v", result, err)
 	}
 	// Policy errors precede matching; malformed evidence has no partial result.
-	if _, err := identity.EvaluateStrongPriority(identity.MatchPolicy{}, nil, nil); !errors.Is(err, identity.ErrInvalidMatchPolicy) {
+	if _, err := identity.EvaluateStrongPriority(identity.MatchPolicy{StrongOrder: []identity.IdentifierType{"unknown"}}, nil, nil); !errors.Is(err, identity.ErrInvalidMatchPolicy) {
 		t.Fatal(err)
 	}
 	if result, err := identity.EvaluateStrongPriority(identity.GreenboneMatchPolicy(), []identity.IdentifierValue{{Type: identity.TypeGreenboneID, Value: ""}}, nil); err == nil || result.HasIncomingStrong {
