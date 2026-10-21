@@ -28,7 +28,7 @@ func Decide(observation Observation, candidates []Candidate, policy MatchPolicy)
 ```
 
 | Action | NeedsNewKey | Selected key/index |
-|--------|-------------|--------------------|
+| ------ | ----------- | ------------------ |
 | CREATE | true        | Absent             |
 | REUSE  | false       | Present            |
 
@@ -116,7 +116,7 @@ satisfy the structural and normalization contracts, even for types outside the s
 Here G/A mean Greenbone/Agent ID and P means IP; scopes are equal unless stated.
 
 | Observation     | Candidates                     | Result                                 |
-|-----------------|--------------------------------|----------------------------------------|
+| --------------- | ------------------------------ | -------------------------------------- |
 | G(g), A(a)      | K1:G(g), K2:A(a) newer         | STRONG REUSE K1: default priority wins |
 | G(g1), G(g2)    | K1:G(g1) older, K2:G(g2) newer | STRONG REUSE K2                        |
 | G(g), P(p)      | K1:P(p)                        | STRONG CREATE: no fuzzy fallback       |
@@ -129,8 +129,8 @@ Here G/A mean Greenbone/Agent ID and P means IP; scopes are equal unless stated.
 ## C API
 
 The public header is [`gvm_asset_identity.h`](../../include/gvm_asset_identity.h). ABI 1 installs
-`libgvm_asset_identity.so -> .so.1 -> .so.1.0.0`, the header, and pkg-config metadata. Consumers need GLib development
-files; Go and Cgreen are build/test dependencies, not consumer dependencies.
+`libgvm_asset_identity.so -> .so.1 -> .so.<version>-<arch>`, the header, and pkg-config metadata. Consumers need GLib
+development files; Go and Cgreen are build/test dependencies, not consumer dependencies.
 
 - Constructors return owned objects; parents own their nested data. Matching free functions accept NULL.
 - `decide` borrows immutable inputs and returns an independent decision. Output slots must not alias inputs or each

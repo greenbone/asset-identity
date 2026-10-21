@@ -11,11 +11,12 @@ make install DESTDIR="$stage" PREFIX="$PREFIX" LIBDIR="$LIBDIR" INCLUDEDIR="$INC
 lib="$stage$LIBDIR"
 include="$stage$INCLUDEDIR"
 pc="$lib/pkgconfig/libgvm_asset_identity.pc"
-test -f "$lib/libgvm_asset_identity.so.1.0.0"
+test -f "$lib/libgvm_asset_identity.so.$VERSION-$GOARCH"
 test "$(readlink "$lib/libgvm_asset_identity.so")" = libgvm_asset_identity.so.1
-test "$(readlink "$lib/libgvm_asset_identity.so.1")" = libgvm_asset_identity.so.1.0.0
+test "$(readlink "$lib/libgvm_asset_identity.so.1")" = "libgvm_asset_identity.so.$VERSION-$GOARCH"
 cmp include/gvm_asset_identity.h "$include/gvm_asset_identity.h"
 test -f "$pc"
+test "$(pkg-config --modversion "$pc")" = "$VERSION"
 if grep -F "$stage" "$pc"; then exit 1; fi
 original_pkg_config_path=${PKG_CONFIG_PATH:-}
 export PKG_CONFIG_PATH="$lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
@@ -32,7 +33,7 @@ ${CTEST:-ctest} --test-dir "$stage/tests" --output-on-failure
 printf 'unrelated\n' > "$lib/unrelated-file"
 make uninstall DESTDIR="$stage" PREFIX="$PREFIX" LIBDIR="$LIBDIR" INCLUDEDIR="$INCLUDEDIR"
 test -f "$lib/unrelated-file"
-test ! -e "$lib/libgvm_asset_identity.so.1.0.0"
+test ! -e "$lib/libgvm_asset_identity.so.$VERSION-$GOARCH"
 test ! -L "$lib/libgvm_asset_identity.so"
 test ! -L "$lib/libgvm_asset_identity.so.1"
 test ! -e "$include/gvm_asset_identity.h"
