@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Greenbone AG
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 #include "test_helpers.h"
 
 Ensure(results_outlive_inputs_and_other_results) {

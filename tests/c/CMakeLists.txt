@@ -1,14 +1,18 @@
+# SPDX-FileCopyrightText: 2026 Greenbone AG
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 cmake_minimum_required(VERSION 3.18)
 project(gvm_asset_identity_tests C)
 include(CTest)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0)
-find_package(cgreen 1.7 CONFIG QUIET)
+find_package(cgreen 1.6.4 CONFIG QUIET)
 if(cgreen_FOUND)
     find_library(CGREEN_LIBRARY NAMES cgreen HINTS "${cgreen_DIR}/../.." REQUIRED)
     set(CGREEN_LINK_TARGET "${CGREEN_LIBRARY}")
 else()
-    pkg_check_modules(CGREEN REQUIRED IMPORTED_TARGET cgreen>=1.7)
+    pkg_check_modules(CGREEN REQUIRED IMPORTED_TARGET cgreen>=1.6.4)
     set(CGREEN_LINK_TARGET PkgConfig::CGREEN)
 endif()
 set(IDENTITY_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../dist" CACHE PATH "Installed library root")

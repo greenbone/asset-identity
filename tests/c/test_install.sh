@@ -1,4 +1,9 @@
 #!/bin/sh
+
+# SPDX-FileCopyrightText: 2026 Greenbone AG
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 set -eu
 stage=$(mktemp -d "${TMPDIR:-/tmp}/gvm-asset-identity-install.XXXXXX")
 trap 'rm -rf "$stage"' EXIT HUP INT TERM

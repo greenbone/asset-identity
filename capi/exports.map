@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Greenbone AG
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 GVM_ASSET_IDENTITY_1 {
     global: gvm_asset_identity_*;
     local: *;

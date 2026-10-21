@@ -1,9 +1,8 @@
 # Asset identity
 
 A Go library for identifier normalization and strong-first asset reconciliation.
-`libgvm_asset_identity.so` exposes the same algorithm through a GLib C API (ABI 1).
-Applications supply eligible identifiers and candidates; they own scanner boundaries,
-authorization, persistence, and merge approval.
+`libgvm_asset_identity.so` exposes the same algorithm through a GLib C API (ABI 1). Applications supply eligible
+identifiers and candidates; they own scanner boundaries, authorization, persistence, and merge approval.
 
 ## Go
 
@@ -31,22 +30,22 @@ func main() {
 }
 ```
 
-Pass caller-prepared active views; normalization does not establish producer trust.
-Identifier scopes remain significant, including absent versus explicitly empty scope.
+Pass caller-prepared active views; normalization does not establish producer trust. Identifier scopes remain
+significant, including absent versus explicitly empty scope.
 
-| Action | Meaning |
-| --- | --- |
-| CREATE | A new key is required. |
-| REUSE | Use the selected existing key. |
-| REVIEW | Non-actionable survivor/new-key proposal with potential merge targets. |
-| CONFLICT | Contradictory incoming strong values; no actionable key plan. |
+| Action   | Meaning                                                                |
+|----------|------------------------------------------------------------------------|
+| CREATE   | A new key is required.                                                 |
+| REUSE    | Use the selected existing key.                                         |
+| REVIEW   | Non-actionable survivor/new-key proposal with potential merge targets. |
+| CONFLICT | Contradictory incoming strong values; no actionable key plan.          |
 
 No result authorizes a database merge. Candidate indices refer to the supplied array.
 
 ## C build, test, and install
 
-Linux builds require Go matching [go.mod](go.mod), a C compiler, pkg-config, and GLib
-development headers. C tests also require CMake 3.18+ and Cgreen 1.7+.
+Linux builds require Go matching [go.mod](go.mod), a C compiler, pkg-config, and GLib development headers. C tests also
+require CMake 3.18+ and Cgreen 1.6.4+.
 
 ```sh
 make build                       # dist/libgvm_asset_identity.so
@@ -93,10 +92,9 @@ cc example.c $(pkg-config --cflags --libs libgvm_asset_identity) \
 ./example
 ```
 
-Constructors return owned objects; parents own their children. `decide` borrows
-immutable inputs and returns an independently owned decision. Free functions accept
-NULL; errors use `GError`. Consumers need only the installed header/library and GLib.
-See the [public header](include/gvm_asset_identity.h) and
+Constructors return owned objects; parents own their children. `decide` borrows immutable inputs and returns an
+independently owned decision. Free functions accept NULL; errors use `GError`. Consumers need only the installed
+header/library and GLib. See the [public header](include/gvm_asset_identity.h) and
 [C contract](docs/specs/SPEC-002-reconciliation.md#32-c-adapter-contract) for details.
 
 ## Technical reference
@@ -105,3 +103,10 @@ See the [public header](include/gvm_asset_identity.h) and
 - [SPEC-001A](docs/specs/SPEC-001A-identifier-model.md): model, scope, timestamps, ownership.
 - [SPEC-001B](docs/specs/SPEC-001B-normalization.md): formats, normalization, equality.
 - [SPEC-002](docs/specs/SPEC-002-reconciliation.md): reconciliation and C compatibility.
+
+## License
+
+Copyright (C) 2026 Greenbone AG.
+
+Licensed under the GNU Affero General Public License v3.0 only
+(`AGPL-3.0-only`). See [LICENSE](LICENSE) for the full license text.

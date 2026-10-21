@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Greenbone AG
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 #include "gvm_asset_identity.h"
 #include "wire.h"
 #include <string.h>

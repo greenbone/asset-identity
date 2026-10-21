@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Greenbone AG
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 #ifndef TEST_HELPERS_H
 #define TEST_HELPERS_H
 #include <cgreen/cgreen.h>

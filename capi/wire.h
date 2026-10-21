@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Greenbone AG
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 #ifndef GAI_WIRE_H
 #define GAI_WIRE_H
 
