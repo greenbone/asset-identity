@@ -278,11 +278,11 @@ func TestSSHNormalization(t *testing.T) {
 	for _, fixture := range sshFixtures() {
 		t.Run(fixture.algorithm, func(t *testing.T) {
 			canonical := fixture.algorithm + " " + base64.StdEncoding.EncodeToString(fixture.blob)
-			for _, suffix := range []string{"", " comment", "\tcomment\r\n", "\n"} {
-				v := identity.IdentifierValue{Type: identity.TypeSSHHostKey, Value: canonical + suffix}
+			for _, input := range []string{canonical, canonical + " comment", canonical + "\tcomment\r\n", canonical + "\n", "22 " + canonical, "65535\t" + canonical + " comment\r\n"} {
+				v := identity.IdentifierValue{Type: identity.TypeSSHHostKey, Value: input}
 				got, err := identity.NormalizeIdentifier(v)
 				if err != nil || got.Value != canonical {
-					t.Fatalf("%q: %+v %v", suffix, got, err)
+					t.Fatalf("%q: %+v %v", input, got, err)
 				}
 				if err := identity.ValidateIdentifier(got); err != nil {
 					t.Fatal(err)
@@ -295,7 +295,7 @@ func TestSSHNormalization(t *testing.T) {
 					t.Fatal("SSH comments change equality")
 				}
 			}
-			for _, bad := range []string{canonical + "\n\n", canonical + "\r", canonical + "\n" + canonical, fixture.algorithm + " " + base64.StdEncoding.EncodeToString(append(bytes.Clone(fixture.blob), 0)), fixture.algorithm + " !!!!", "ssh-rsa " + base64.StdEncoding.EncodeToString(sshWire([]byte("ssh-ed25519"), make([]byte, 32)))} {
+			for _, bad := range []string{"0 " + canonical, "65536 " + canonical, "22x " + canonical, "22 " + canonical + "\n\n", canonical + "\n\n", canonical + "\r", canonical + "\n" + canonical, fixture.algorithm + " " + base64.StdEncoding.EncodeToString(append(bytes.Clone(fixture.blob), 0)), fixture.algorithm + " !!!!", "ssh-rsa " + base64.StdEncoding.EncodeToString(sshWire([]byte("ssh-ed25519"), make([]byte, 32)))} {
 				// The mismatch fixture is invalid even in the RSA subtest.
 				if err := identity.ValidateIdentifier(identity.IdentifierValue{Type: identity.TypeSSHHostKey, Value: bad}); !errors.Is(err, identity.ErrInvalidIdentifierValue) {
 					t.Fatalf("bad key accepted: %v", err)
@@ -303,7 +303,7 @@ func TestSSHNormalization(t *testing.T) {
 			}
 		})
 	}
-	for _, bad := range []string{"SHA256:AAAA", "ssh-ed25519 SHA256:AAAA", "ssh-dss AAAA", "ssh-ed25519-cert-v01@openssh.com AAAA", "-----BEGIN PRIVATE KEY-----", "host ssh-ed25519 AAAA", "no-port-forwarding ssh-ed25519 AAAA"} {
+	for _, bad := range []string{"22", "22 ", "-22 ssh-ed25519 AAAA", "SHA256:AAAA", "ssh-ed25519 SHA256:AAAA", "ssh-dss AAAA", "ssh-ed25519-cert-v01@openssh.com AAAA", "-----BEGIN PRIVATE KEY-----", "host ssh-ed25519 AAAA", "no-port-forwarding ssh-ed25519 AAAA"} {
 		if err := identity.ValidateIdentifier(identity.IdentifierValue{Type: identity.TypeSSHHostKey, Value: bad}); !errors.Is(err, identity.ErrUnsupportedIdentifierFormat) && !errors.Is(err, identity.ErrInvalidIdentifierValue) {
 			t.Fatalf("unsupported key accepted: %v", err)
 		}

@@ -8,12 +8,13 @@ import (
 	"bytes"
 	"crypto/rsa"
 	"encoding/base64"
+	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
 )
 
-// Only public-key lines are supported; fingerprints and certificates need producer contracts.
+// Public-key lines may include the scanner's leading port number.
 func canonicalSSHKey(value string) (string, error) {
 	if strings.HasSuffix(value, "\n") {
 		value = strings.TrimSuffix(value, "\n")
@@ -27,12 +28,24 @@ func canonicalSSHKey(value string) (string, error) {
 		return "", ErrUnsupportedIdentifierFormat
 	}
 	algorithm := value[:separatorIndex]
+	keyData := strings.TrimLeft(value[separatorIndex:], " \t")
+	if len(algorithm) > 0 && algorithm[0] >= '0' && algorithm[0] <= '9' {
+		port, err := strconv.ParseUint(algorithm, 10, 16)
+		if err != nil || port == 0 {
+			return "", ErrInvalidIdentifierValue
+		}
+		separatorIndex = strings.IndexAny(keyData, " \t")
+		if separatorIndex < 0 {
+			return "", ErrUnsupportedIdentifierFormat
+		}
+		algorithm = keyData[:separatorIndex]
+		keyData = strings.TrimLeft(keyData[separatorIndex:], " \t")
+	}
 	switch algorithm {
 	case ssh.KeyAlgoED25519, ssh.KeyAlgoRSA, ssh.KeyAlgoECDSA256, ssh.KeyAlgoECDSA384, ssh.KeyAlgoECDSA521:
 	default:
 		return "", ErrUnsupportedIdentifierFormat
 	}
-	keyData := strings.TrimLeft(value[separatorIndex:], " \t")
 	encodedKey := keyData
 	if i := strings.IndexAny(keyData, " \t"); i >= 0 {
 		encodedKey = keyData[:i]

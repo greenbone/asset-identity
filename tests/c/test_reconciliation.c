@@ -178,6 +178,105 @@ Ensure(scoped_semantic_equality_preserves_absent_and_empty) {
     gvm_asset_identity_observation_free(input); g_ptr_array_unref(rows); gvm_asset_identity_policy_free(policy);
 }
 
+static void check_raw_strong_match(gvm_asset_identity_identifier_type_t type,
+    const gchar *raw, const gchar *canonical) {
+    gvm_asset_identity_policy_t *policy = default_policy();
+    gvm_asset_identity_observation_t *views[] = {observation(type, raw), observation(type, canonical)};
+    for (guint i = 0; i < G_N_ELEMENTS(views); i++) {
+        GPtrArray *rows = candidates_new();
+        g_ptr_array_add(rows, candidate("existing", views[1 - i]));
+        gvm_asset_identity_decision_t *result = decide(views[i], rows, policy);
+        assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_REUSE));
+        assert_that(result->stage, is_equal_to(GVM_ASSET_IDENTITY_STAGE_STRONG));
+        assert_that(result->selected_key, is_equal_to_string("existing"));
+        assert_that(result->selected_index, is_equal_to(0));
+        assert_that(result->needs_new_key, is_false);
+        gvm_asset_identity_decision_free(result);
+        g_ptr_array_unref(rows);
+    }
+    assert_that(((gvm_asset_identity_identifier_t *)g_ptr_array_index(views[0]->identifiers, 0))->value,
+        is_equal_to_string(raw));
+    assert_that(((gvm_asset_identity_identifier_t *)g_ptr_array_index(views[1]->identifiers, 0))->value,
+        is_equal_to_string(canonical));
+    gvm_asset_identity_observation_free(views[0]);
+    gvm_asset_identity_observation_free(views[1]);
+    gvm_asset_identity_policy_free(policy);
+}
+
+Ensure(raw_ssh_scanner_value_matches_public_key) {
+    const gchar *key = "ecdsa-sha2-nistp256 "
+        "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOLm5YQrOjEEK90g2FjNicABlxgBFRANn3KkM72mM3sDIyN/"
+        "q8Y6f9avo/1dMv847Y+mT2f4po92qekby06dbiU=";
+    gchar *raw = g_strdup_printf("22 %s", key);
+    check_raw_strong_match(GVM_ASSET_IDENTITY_SSH_HOST_KEY, raw, key);
+    g_free(raw);
+}
+
+Ensure(raw_tls_scanner_value_matches_public_key_hash) {
+    gchar *raw = NULL;
+    GError *error = NULL;
+    gboolean loaded = g_file_get_contents(TLS_SCANNER_CERTIFICATE_PATH, &raw, NULL, &error);
+    assert_that(loaded, is_true);
+    assert_that(error, is_null);
+    if (loaded) {
+        g_strchomp(raw); /* Remove the fixture file's line ending only. */
+        check_raw_strong_match(GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, raw,
+            "spki-sha256:1667ab37ba6f84c9c7053970c7557507deccefdbb09c454d9d0ca0e4fe1c3319");
+    }
+    g_free(raw);
+    g_clear_error(&error);
+}
+
+Ensure(malformed_scanner_values_return_input_errors) {
+    gvm_asset_identity_policy_t *policy = default_policy();
+    GPtrArray *rows = candidates_new();
+    const gvm_asset_identity_identifier_type_t types[] = {
+        GVM_ASSET_IDENTITY_SSH_HOST_KEY, GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH
+    };
+    const gchar *values[] = {"22 ecdsa-sha2-nistp256 !!!!", "x509:!!!!"};
+    for (guint i = 0; i < G_N_ELEMENTS(types); i++) {
+        gvm_asset_identity_observation_t *input = observation(types[i], values[i]);
+        expect_failure(input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT);
+        gvm_asset_identity_observation_free(input);
+    }
+    g_ptr_array_unref(rows);
+    gvm_asset_identity_policy_free(policy);
+}
+
+Ensure(tls_requires_equal_public_key_sets) {
+    const gchar *a = "spki-sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const gchar *b = "spki-sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const gchar *c = "spki-sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    gvm_asset_identity_policy_t *policy = default_policy();
+    gvm_asset_identity_observation_t *input = observation(GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, a);
+    g_ptr_array_add(input->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, b));
+    GPtrArray *rows = candidates_new();
+    gvm_asset_identity_candidate_t *row = candidate("K", input);
+    g_ptr_array_add(rows, row);
+    gvm_asset_identity_decision_t *result = decide(input, rows, policy);
+    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_REUSE));
+    gvm_asset_identity_decision_free(result);
+    g_ptr_array_remove_index(row->identifiers, 1);
+    result = decide(input, rows, policy);
+    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_CREATE));
+    assert_that(result->needs_new_key, is_true);
+    gvm_asset_identity_decision_free(result);
+    g_ptr_array_add(row->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, b));
+    g_ptr_array_add(row->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, c));
+    result = decide(input, rows, policy);
+    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_CREATE));
+    gvm_asset_identity_decision_free(result);
+    g_ptr_array_remove_index(row->identifiers, 2);
+    g_ptr_array_add(row->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, a));
+    result = decide(input, rows, policy);
+    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_REUSE));
+    assert_that(result->selected_key, is_equal_to_string("K"));
+    gvm_asset_identity_decision_free(result);
+    gvm_asset_identity_observation_free(input);
+    g_ptr_array_unref(rows);
+    gvm_asset_identity_policy_free(policy);
+}
+
 int main(void) {
     TestSuite *suite = create_test_suite();
     add_test(suite, create_and_strong_reuse);
@@ -187,5 +286,9 @@ int main(void) {
     add_test(suite, fuzzy_containment_selects_keys_without_merges);
     add_test(suite, fuzzy_time_uses_epoch_whole_seconds_and_input_order);
     add_test(suite, scoped_semantic_equality_preserves_absent_and_empty);
+    add_test(suite, raw_ssh_scanner_value_matches_public_key);
+    add_test(suite, raw_tls_scanner_value_matches_public_key_hash);
+    add_test(suite, malformed_scanner_values_return_input_errors);
+    add_test(suite, tls_requires_equal_public_key_sets);
     return run_test_suite(suite, create_text_reporter());
 }

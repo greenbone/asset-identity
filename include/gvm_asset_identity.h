@@ -85,7 +85,10 @@ typedef struct {
     gsize selected_index;
 } gvm_asset_identity_decision_t;
 
-/* Constructors return full ownership; child fields are owned by their parent. */
+/* Constructors return full ownership; child fields are owned by their parent.
+ * Identifier values are copied as supplied and normalized by decide.
+ * SSH values may start with a scanner port, e.g. "22 ecdsa-sha2-nistp256 ...".
+ * TLS values may be "x509:<base64-DER-certificate>"; the SPKI hash is computed internally. */
 gvm_asset_identity_identifier_t *gvm_asset_identity_identifier_new(
     gvm_asset_identity_identifier_type_t type, const gchar *value);
 void gvm_asset_identity_identifier_free(gvm_asset_identity_identifier_t *identifier);

@@ -115,15 +115,3 @@ func canonicalDNS(value string, fqdn bool) (string, error) {
 	}
 	return canonical, nil
 }
-
-func canonicalSPKIHash(value string) (string, error) {
-	const prefix = "spki-sha256:"
-	if !strings.HasPrefix(value, prefix) {
-		return "", ErrUnsupportedIdentifierFormat
-	}
-	digest, err := canonicalHex(strings.TrimPrefix(value, prefix), 64)
-	if err != nil {
-		return "", err
-	}
-	return prefix + digest, nil
-}

@@ -6,6 +6,7 @@ package identity
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"time"
 )
@@ -72,7 +73,8 @@ type StrongPriorityMatch struct {
 }
 
 // EvaluateStrongPriority reports all matches at the first matching configured priority.
-// Callers must supply admitted views; any incoming value of a type may match.
+// Callers must supply admitted views. TLS requires equal normalized key sets;
+// other strong types match any incoming value.
 func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidates [][]IdentifierValue) (StrongPriorityMatch, error) {
 	empty := StrongPriorityMatch{Priority: -1}
 	if err := p.Validate(); err != nil {
@@ -117,6 +119,9 @@ func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidate
 					break
 				}
 			}
+			if matched && typ == TypeTLSPublicKeyHash {
+				matched = sameTLSIdentifiers(incomingValues, view)
+			}
 			if matched {
 				indices = append(indices, i)
 			}
@@ -129,6 +134,20 @@ func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidate
 		}
 	}
 	return result, nil
+}
+
+// Inputs are canonical. Mutual membership ignores order and duplicate representations.
+func sameTLSIdentifiers(left, right []IdentifierValue) bool {
+	for _, pair := range [][2][]IdentifierValue{{left, right}, {right, left}} {
+		for _, value := range pair[0] {
+			if value.Type == TypeTLSPublicKeyHash && !slices.ContainsFunc(pair[1], func(other IdentifierValue) bool {
+				return SameRepresentation(value, other)
+			}) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // StrongRankingCandidate belongs to the matching set at the winning strong priority.

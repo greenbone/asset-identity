@@ -29,8 +29,8 @@ methods and observation constructors do not normalize payloads.
 | Machine ID, `kind=linux_machine_id`      | Exactly 32 hex digits                                                         | Lowercase compact hex                                    |
 | Machine ID, `kind=windows_machine_guid`  | UUID text as defined below                                                    | Lowercase hyphenated UUID                                |
 | BIOS UUID                                | UUID text as defined below                                                    | Lowercase hyphenated UUID                                |
-| SSH host key                             | Supported algorithm and base64 public-key blob, with optional comment         | Algorithm and canonical padded base64 blob               |
-| TLS public-key hash                      | `spki-sha256:` followed by 64 hex digits                                      | Same exact tag and lowercase digest                      |
+| SSH host key                             | Public-key line, optionally prefixed by a scanner port                        | Algorithm and canonical padded base64 blob               |
+| TLS public-key hash                      | `x509:<base64-DER>` or `spki-sha256:<64 hex digits>`                          | Same exact tag and lowercase digest                      |
 | MAC                                      | 48-bit colon, hyphen, dotted, or compact hex                                  | Six lowercase colon-separated octets                     |
 | IP                                       | IPv4 or IPv6 address, with optional IPv6 zone                                 | Canonical address text; preserve address family and zone |
 | Hostname                                 | Short or qualified ASCII DNS hostname                                         | Lowercase; remove final dot only for multi-label names   |
@@ -47,7 +47,8 @@ UUIDs and zero machine IDs remain syntactically valid.
 
 ### SSH keys
 
-Accept one `<algorithm> <base64-blob> [comment]` line with space/tab separators and an optional final LF or CRLF.
+Accept one `[port] <algorithm> <base64-blob> [comment]` line with space/tab separators and an optional final LF or CRLF.
+The optional scanner port is decimal, in 1–65535, and is removed during normalization; it is not part of key identity.
 Supported algorithms are `ssh-ed25519`, `ssh-rsa`, and `ecdsa-sha2-nistp256/384/521`.
 
 Require strict padded standard base64, agreement between the outer and embedded algorithm, complete parsing, and
@@ -58,9 +59,14 @@ strength, ownership, and trust are outside normalization.
 ### TLS hashes
 
 The digest represents SHA-256 over the certificate's exact DER SubjectPublicKeyInfo (`RawSubjectPublicKeyInfo` in Go).
-The library accepts the tagged digest; it does not extract certificates or verify what the producer hashed. Bare/base64
-digests, other tags, and certificate inputs are unsupported. Certificate names, trust, and validity are application
-concerns. An all-zero digest is syntactically valid.
+Callers may pass either the tagged digest or `x509:` followed by one certificate encoded as strict padded standard
+base64 DER on a single line. For a certificate, the library parses DER and calculates the SPKI hash internally. Output
+is always `spki-sha256:<lowercase hex>`, so raw certificates and their canonical hashes compare equally. Certificate
+renewal with the same public key preserves the identifier.
+
+Certificate names, signatures, trust, and validity are not verified. A supplied tagged digest cannot prove what the
+producer hashed. Bare/base64 digests, certificate fingerprints, PEM, other tags, malformed DER, and trailing DER data
+are unsupported. An all-zero tagged digest is syntactically valid.
 
 ### MAC and IP addresses
 

@@ -32,6 +32,9 @@ foreach(suite reconciliation policy memory)
     set_tests_properties(${suite} PROPERTIES ENVIRONMENT "CGREEN_NO_FORK=1" TIMEOUT 60)
 endforeach()
 
+target_compile_definitions(test_reconciliation PRIVATE
+    TLS_SCANNER_CERTIFICATE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../../identity/testdata/tls_scanner_certificate.txt")
+
 set(IDENTITY_CONSUMER_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/consumer.c" CACHE FILEPATH "Standalone C consumer")
 add_executable(test_consumer "${IDENTITY_CONSUMER_SOURCE}")
 target_compile_features(test_consumer PRIVATE c_std_11)

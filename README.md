@@ -43,8 +43,42 @@ timestamps use asset-key ordering. Multiple incoming values of that type partici
 evidence exists but no candidate matches, return CREATE without fuzzy fallback. Otherwise fuzzy matching returns REUSE
 for a selected containing candidate, or CREATE if none exists.
 
+At the TLS priority, the observation and candidate must have identical normalized public-key sets. Order and duplicate
+values do not matter, but an extra or missing TLS key prevents a TLS match: `{A,B}` matches `{B,A}`, not `{A}` or
+`{A,B,C}`. Other strong types retain any-value matching. Priority still applies: higher-priority identifiers can select
+an asset independently, and a TLS mismatch allows later configured strong types to be checked.
+
 Candidate indices refer to the supplied array. No conflict detection or merge proposals are performed. No result
 authorizes a database merge.
+
+## Scanner identifier values
+
+Pass scanner values directly in `IdentifierValue.Value`:
+
+| Type | Scanner value |
+|------|---------------|
+| `TypeSSHHostKey` | `22 ecdsa-sha2-nistp256 <base64-public-key>` |
+| `TypeTLSPublicKeyHash` | `x509:<base64-DER-certificate>` |
+
+The library removes the SSH port and normalizes the public key. For TLS, it parses the certificate and calculates the
+public-key hash internally. Callers do not need to calculate hashes or strip these value prefixes. `Decide` performs
+this normalization automatically. Existing SSH public-key lines and `spki-sha256:` values remain accepted.
+Certificate fingerprints and `SSLDetails`/`SSLInfo` metadata alone cannot supply a public key.
+
+In C, pass the same values to `gvm_asset_identity_identifier_new` and add them to the observation
+(or a candidate's identifiers):
+
+```c
+/* ssh_value is "22 ecdsa-sha2-nistp256 ..."; tls_value is "x509:...". */
+g_ptr_array_add(observation->identifiers,
+    gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_SSH_HOST_KEY, ssh_value));
+g_ptr_array_add(observation->identifiers,
+    gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, tls_value));
+```
+
+`gvm_asset_identity_decide` performs parsing and normalization through the same Go implementation.
+Constructors copy the supplied values; malformed values produce `GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT`
+when deciding. No caller-side key extraction or hashing is required.
 
 ## Formatting and linting
 

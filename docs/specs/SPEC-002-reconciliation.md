@@ -75,15 +75,19 @@ finite float32. Omit a type to disable it. Default policies and clones own their
 
 1. Normalize identifiers using [SPEC-001B](SPEC-001B-normalization.md).
 2. Check configured strong types in priority order. At the first type with matches, collect every candidate matching any
-   incoming value of that type, with equal scope.
+   incoming value of that type, with equal scope. For TLS, require equality of the complete normalized public-key sets.
 3. Choose the candidate with the newest present `LastSeen`. Missing times rank last. Compare UTC instants at nanosecond
    precision; equal or all-missing times use the smallest asset key by byte order.
 4. Return REUSE for that candidate.
 5. If incoming configured strong evidence exists but no type matches, return CREATE without fuzzy fallback. Only absence
    of incoming configured strong evidence permits fuzzy matching.
 
-Multiple values of the same strong type use the same ranking. Unmatched values, lower-priority matches, and fuzzy
-differences do not veto the winning priority.
+TLS equality ignores order and duplicate normalized keys. `{A,B}` matches `{B,A}` but not `{A}` or `{A,B,C}`;
+scope differences remain significant. If TLS sets differ, continue to later configured strong types. TLS mismatch alone
+does not veto a higher-priority match. If no strong type matches, return CREATE without fuzzy fallback.
+
+Other strong types still match any incoming value. All qualifying candidates use the same ranking. Lower-priority
+matches and fuzzy differences do not veto the winning priority.
 
 ## Fuzzy matching
 
@@ -127,6 +131,11 @@ Here G/A mean Greenbone/Agent ID and P means IP; scopes are equal unless stated.
 | G(g), nil scope | K1:G(g), empty scope           | STRONG CREATE                          |
 
 ## C API
+
+C callers may pass raw scanner values directly to `gvm_asset_identity_identifier_new`: SSH accepts a leading port,
+and TLS accepts `x509:<base64-DER-certificate>`. `gvm_asset_identity_decide` normalizes observation and candidate values
+internally. Constructors copy values without parsing; invalid values return INVALID_INPUT from `decide`.
+
 
 The public header is [`gvm_asset_identity.h`](../../include/gvm_asset_identity.h). ABI 1 installs
 `libgvm_asset_identity.so -> .so.1 -> .so.<version>-<arch>`, the header, and pkg-config metadata. Consumers need GLib
