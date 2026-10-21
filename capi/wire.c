@@ -12,18 +12,6 @@ static void free_string(gai_wire_string_t value) {
     free((void *)value.data);
 }
 
-static void free_identifiers(const gai_wire_identifier_t *values, size_t count) {
-    for (size_t i = 0; values && i < count; i++) {
-        free_string(values[i].value);
-        for (size_t j = 0; values[i].scope.dimensions && j < values[i].scope.count; j++) {
-            free_string(values[i].scope.dimensions[j].name);
-            free_string(values[i].scope.dimensions[j].value);
-        }
-        free((void *)values[i].scope.dimensions);
-    }
-    free((void *)values);
-}
-
 gai_wire_status_t gai_wire_decide(
     const gai_wire_observation_t *observation,
     const gai_wire_candidate_t *candidates, size_t candidate_count,
@@ -42,16 +30,6 @@ gai_wire_status_t gai_wire_default_policy(
 void gai_wire_decision_free(gai_wire_decision_t *decision) {
     if (!decision) return;
     free_string(decision->selected_key);
-    free((void *)decision->potential_merge_indices);
-    for (size_t i = 0; decision->potential_merge_keys && i < decision->potential_merge_count; i++)
-        free_string(decision->potential_merge_keys[i]);
-    free((void *)decision->potential_merge_keys);
-    if (decision->conflict) {
-        free_string(decision->conflict->reason);
-        free((void *)decision->conflict->candidate_indices);
-        free_identifiers(decision->conflict->identifiers, decision->conflict->identifier_count);
-        free((void *)decision->conflict);
-    }
     free(decision);
 }
 

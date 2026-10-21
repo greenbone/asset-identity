@@ -37,7 +37,7 @@ func TestDecideStrongSelection(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := Decide(Observation{Identifiers: tt.values}, tt.rows, MatchPolicy{StrongOrder: tt.order})
-			if err != nil || got.Stage != StageStrong || got.Conflict != nil || len(got.PotentialMergeIndices) > 0 {
+			if err != nil || got.Stage != StageStrong {
 				t.Fatalf("decision=%+v error=%v", got, err)
 			}
 			if tt.selected < 0 {
@@ -75,21 +75,20 @@ func TestDecideFuzzyCases(t *testing.T) {
 		action   DecisionAction
 		newKey   bool
 		selected int
-		targets  []int
 	}{
-		{"candidate contains observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionReuse, false, 0, nil},
-		{"observation contains candidate", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K", 10, ip1)}, ActionReview, true, -1, []int{0}},
-		{"partial overlap", []IdentifierValue{ip1, ip3}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionCreate, true, -1, nil},
-		{"subset of survivor need not overlap observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("selected", 20, ip1, host), fuzzyRow("potential", 10, host)}, ActionReview, false, 0, []int{1}},
-		{"input order breaks fuzzy ties", []IdentifierValue{ip1}, []Candidate{fuzzyRow("Z", 20, ip1), fuzzyRow("A", 20, ip1)}, ActionReview, false, 0, []int{1}},
-		{"empty observation guard", nil, []Candidate{fuzzyRow("K", 10, ip1)}, ActionCreate, true, -1, nil},
-		{"empty candidate subset", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K", 10)}, ActionReview, true, -1, []int{0}},
-		{"indices refer to supplied list", []IdentifierValue{ip1}, []Candidate{fuzzyRow("unrelated", 1, ip3), fuzzyRow("selected", 20, ip1, host), fuzzyRow("potential", 10, host)}, ActionReview, false, 1, []int{2}},
+		{"candidate contains observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionReuse, false, 0},
+		{"observation contains candidate", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K", 10, ip1)}, ActionCreate, true, -1},
+		{"partial overlap", []IdentifierValue{ip1, ip3}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionCreate, true, -1},
+		{"subset of survivor need not overlap observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("selected", 20, ip1, host), fuzzyRow("potential", 10, host)}, ActionReuse, false, 0},
+		{"input order breaks fuzzy ties", []IdentifierValue{ip1}, []Candidate{fuzzyRow("Z", 20, ip1), fuzzyRow("A", 20, ip1)}, ActionReuse, false, 0},
+		{"empty observation guard", nil, []Candidate{fuzzyRow("K", 10, ip1)}, ActionCreate, true, -1},
+		{"empty candidate subset", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K", 10)}, ActionCreate, true, -1},
+		{"indices refer to supplied list", []IdentifierValue{ip1}, []Candidate{fuzzyRow("unrelated", 1, ip3), fuzzyRow("selected", 20, ip1, host), fuzzyRow("potential", 10, host)}, ActionReuse, false, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := Decide(Observation{Identifiers: tt.values}, tt.rows, GreenboneMatchPolicy())
-			if err != nil || got.Action != tt.action || got.Stage != StageFuzzy || got.NeedsNewKey != tt.newKey || !reflect.DeepEqual(got.PotentialMergeIndices, tt.targets) {
+			if err != nil || got.Action != tt.action || got.Stage != StageFuzzy || got.NeedsNewKey != tt.newKey {
 				t.Fatalf("decision=%+v error=%v", got, err)
 			}
 			if tt.selected < 0 {
@@ -97,13 +96,6 @@ func TestDecideFuzzyCases(t *testing.T) {
 					t.Fatal(got)
 				}
 			} else if got.SelectedIndex == nil || *got.SelectedIndex != tt.selected || got.SelectedKey != tt.rows[tt.selected].AssetKey {
-				t.Fatal(got)
-			}
-			var keys []string
-			for _, index := range tt.targets {
-				keys = append(keys, tt.rows[index].AssetKey)
-			}
-			if !reflect.DeepEqual(got.PotentialMergeKeys, keys) {
 				t.Fatal(got)
 			}
 		})
@@ -131,7 +123,7 @@ func TestDecidePreservesScopeIdentity(t *testing.T) {
 			left := IdentifierValue{Type: typ, Value: value}
 			right := IdentifierValue{Type: typ, Value: value, Scope: scope}
 			got, err := Decide(Observation{Identifiers: []IdentifierValue{left}}, []Candidate{fuzzyRow("K", 10, right)}, GreenboneMatchPolicy())
-			if err != nil || got.Action != ActionCreate || got.SelectedIndex != nil || len(got.PotentialMergeIndices) > 0 {
+			if err != nil || got.Action != ActionCreate || got.SelectedIndex != nil {
 				t.Fatalf("scope identity changed: %+v %v", got, err)
 			}
 		}
@@ -155,71 +147,55 @@ func TestDecideStrongMultiplicity(t *testing.T) {
 	a2 := fuzzyValue(TypeAgentID, "a2")
 	ip := fuzzyValue(TypeIP, "192.0.2.1")
 	tests := []struct {
-		name         string
-		values       []IdentifierValue
-		rows         []Candidate
-		action       DecisionAction
-		selected     string
-		conflictType IdentifierType
-		indices      []int
+		name     string
+		values   []IdentifierValue
+		rows     []Candidate
+		action   DecisionAction
+		selected string
 	}{
-		{"lower priority multiplicity cannot veto", []IdentifierValue{g1, a1, a2}, []Candidate{fuzzyRow("G", 10, g1), fuzzyRow("A1", 20, a1), fuzzyRow("A2", 30, a2)}, ActionReuse, "G", "", nil},
-		{"winning priority multiplicity", []IdentifierValue{g1, g2, a1}, []Candidate{fuzzyRow("G1", 10, g1), fuzzyRow("G2", 20, g2), fuzzyRow("A", 30, a1)}, ActionConflict, "", TypeGreenboneID, []int{0, 1}},
-		{"unmatched value at winning priority still conflicts", []IdentifierValue{g1, g2}, []Candidate{fuzzyRow("G", 10, g1)}, ActionConflict, "", TypeGreenboneID, []int{0}},
-		{"single value multiple candidates ranks", []IdentifierValue{g1}, []Candidate{fuzzyRow("old", 10, g1), fuzzyRow("new", 20, g1)}, ActionReuse, "new", "", nil},
-		{"no match multiplicity conflicts without fuzzy", []IdentifierValue{g1, g2, ip}, []Candidate{fuzzyRow("weak", 10, ip)}, ActionConflict, "", TypeGreenboneID, nil},
-		{"no candidates multiplicity conflicts", []IdentifierValue{g1, g2}, nil, ActionConflict, "", TypeGreenboneID, nil},
-		{"no match lower type multiplicity conflicts", []IdentifierValue{g1, a1, a2}, nil, ActionConflict, "", TypeAgentID, nil},
-		{"no match single value creates without fuzzy", []IdentifierValue{g1, ip}, []Candidate{fuzzyRow("weak", 10, ip)}, ActionCreate, "", "", nil},
-		{"candidate only differing values do not conflict", []IdentifierValue{g1}, []Candidate{fuzzyRow("K", 10, g1, g2)}, ActionReuse, "K", "", nil},
-		{"unmatched higher multiplicity does not veto lower match", []IdentifierValue{g1, g2, a1}, []Candidate{fuzzyRow("A", 10, a1)}, ActionReuse, "A", "", nil},
+		{"lower priority multiplicity cannot veto", []IdentifierValue{g1, a1, a2}, []Candidate{fuzzyRow("G", 10, g1), fuzzyRow("A1", 20, a1), fuzzyRow("A2", 30, a2)}, ActionReuse, "G"},
+		{"winning priority multiplicity", []IdentifierValue{g1, g2, a1}, []Candidate{fuzzyRow("G1", 10, g1), fuzzyRow("G2", 20, g2), fuzzyRow("A", 30, a1)}, ActionReuse, "G2"},
+		{"unmatched value at winning priority does not veto", []IdentifierValue{g1, g2}, []Candidate{fuzzyRow("G", 10, g1)}, ActionReuse, "G"},
+		{"different values lexical tie", []IdentifierValue{g1, g2}, []Candidate{fuzzyRow("Z", 20, g1), fuzzyRow("A", 20, g2)}, ActionReuse, "A"},
+		{"different values missing times", []IdentifierValue{g1, g2}, []Candidate{{AssetKey: "Z", Identifiers: []IdentifierValue{g1}}, {AssetKey: "A", Identifiers: []IdentifierValue{g2}}}, ActionReuse, "A"},
+		{"single value multiple candidates ranks", []IdentifierValue{g1}, []Candidate{fuzzyRow("old", 10, g1), fuzzyRow("new", 20, g1)}, ActionReuse, "new"},
+		{"no match multiplicity creates without fuzzy", []IdentifierValue{g1, g2, ip}, []Candidate{fuzzyRow("weak", 10, ip)}, ActionCreate, ""},
+		{"no candidates multiplicity creates", []IdentifierValue{g1, g2}, nil, ActionCreate, ""},
+		{"no match lower type multiplicity creates", []IdentifierValue{g1, a1, a2}, nil, ActionCreate, ""},
+		{"no match single value creates without fuzzy", []IdentifierValue{g1, ip}, []Candidate{fuzzyRow("weak", 10, ip)}, ActionCreate, ""},
+		{"candidate only differing values do not conflict", []IdentifierValue{g1}, []Candidate{fuzzyRow("K", 10, g1, g2)}, ActionReuse, "K"},
+		{"unmatched higher multiplicity does not veto lower match", []IdentifierValue{g1, g2, a1}, []Candidate{fuzzyRow("A", 10, a1)}, ActionReuse, "A"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := Decide(Observation{Identifiers: tt.values}, tt.rows, GreenboneMatchPolicy())
-			if err != nil || got.Action != tt.action || got.Stage != StageStrong || got.SelectedKey != tt.selected || len(got.PotentialMergeIndices) > 0 || len(got.PotentialMergeKeys) > 0 {
+			if err != nil || got.Action != tt.action || got.Stage != StageStrong || got.SelectedKey != tt.selected {
 				t.Fatalf("decision=%+v error=%v", got, err)
 			}
-			if tt.action == ActionConflict {
-				if got.NeedsNewKey || got.SelectedIndex != nil || got.Conflict == nil || got.Conflict.Reason == "" || len(got.Conflict.Identifiers) != 2 || !reflect.DeepEqual(got.Conflict.CandidateIndices, tt.indices) {
-					t.Fatalf("conflict invariants: %+v", got)
-				}
-				for _, v := range got.Conflict.Identifiers {
-					if v.Type != tt.conflictType {
-						t.Fatal("wrong conflict evidence")
-					}
-				}
-			} else if got.Conflict != nil || got.NeedsNewKey != (tt.action == ActionCreate) {
+			if got.NeedsNewKey != (tt.action == ActionCreate) || (got.SelectedIndex == nil) != got.NeedsNewKey {
 				t.Fatal(got)
 			}
 		})
 	}
 }
 
-func TestDecideConflictEvidenceIsCanonicalAndOwned(t *testing.T) {
+func TestDecideStrongMultipleValuesPreserveNormalizationAndInputs(t *testing.T) {
 	upper := IdentifierValue{Type: TypeBIOSUUID, Value: "00112233445566778899AABBCCDDEEFF", Scope: Scope{"realm": "r"}}
 	same := upper.Clone()
 	same.Value = "{00112233-4455-6677-8899-aabbccddeeff}"
 	other := upper.Clone()
 	other.Value = "11112233445566778899aabbccddeeff"
 	obs := Observation{Identifiers: []IdentifierValue{upper, same, other}}
-	rows := []Candidate{fuzzyRow("K", 10, upper)}
+	rows := []Candidate{fuzzyRow("K", 10, upper), fuzzyRow("newer", 20, other)}
+	before := upper.Clone()
 	got, err := Decide(obs, rows, GreenboneMatchPolicy())
-	if err != nil || got.Action != ActionConflict || len(got.Conflict.Identifiers) != 2 {
-		t.Fatalf("semantic multiplicity: %+v %v", got, err)
+	if err != nil || got.Action != ActionReuse || got.SelectedKey != "newer" {
+		t.Fatalf("multiple canonical values: %+v %v", got, err)
 	}
-	if got.Conflict.Identifiers[0].Value != "00112233-4455-6677-8899-aabbccddeeff" {
-		t.Fatal("noncanonical evidence")
-	}
-	got.Conflict.Identifiers[0].Scope["realm"] = "changed"
-	got.Conflict.CandidateIndices[0] = 99
+	*got.SelectedIndex = 99
 	again, err := Decide(obs, rows, GreenboneMatchPolicy())
-	if err != nil || again.Conflict.Identifiers[0].Scope["realm"] != "r" || again.Conflict.CandidateIndices[0] != 0 || upper.Scope["realm"] != "r" {
-		t.Fatal("conflict evidence aliases input")
-	}
-	got, err = Decide(Observation{Identifiers: []IdentifierValue{upper, same}}, rows, GreenboneMatchPolicy())
-	if err != nil || got.Action != ActionReuse {
-		t.Fatalf("semantic duplicate caused conflict: %+v %v", got, err)
+	if err != nil || *again.SelectedIndex != 1 || !reflect.DeepEqual(upper, before) {
+		t.Fatal("result or normalization mutates inputs")
 	}
 }
 
@@ -247,7 +223,7 @@ func TestDecideFuzzyMissingTimeUsesEpoch(t *testing.T) {
 				}
 			}
 			got, err := Decide(Observation{Identifiers: []IdentifierValue{ip}}, rows, GreenboneMatchPolicy())
-			if err != nil || got.SelectedKey != tt.selected || got.Action != ActionReview || got.NeedsNewKey || len(got.PotentialMergeIndices) != 1 {
+			if err != nil || got.SelectedKey != tt.selected || got.Action != ActionReuse || got.NeedsNewKey {
 				t.Fatalf("fuzzy missing time: %+v %v", got, err)
 			}
 			for i, row := range rows {
@@ -303,8 +279,6 @@ func TestDecideImmutableInputs(t *testing.T) {
 					return
 				}
 				*got.SelectedIndex = 100
-				got.PotentialMergeIndices[0] = 100
-				got.PotentialMergeKeys[0] = "changed"
 			}
 		})
 	}
@@ -367,7 +341,7 @@ func TestDecideValidatesAllCandidateTimestamps(t *testing.T) {
 }
 
 func TestDecideAcceptsValidCandidateTimestamps(t *testing.T) {
-	for _, instant := range []time.Time{time.Unix(0, 0), time.Unix(-1, 999999999), time.Time{}, time.Unix(0, 0).In(time.FixedZone("east", 3600))} {
+	for _, instant := range []time.Time{time.Unix(0, 0), time.Unix(-1, 999999999), {}, time.Unix(0, 0).In(time.FixedZone("east", 3600))} {
 		for _, value := range []IdentifierValue{fuzzyValue(TypeGreenboneID, "g"), fuzzyValue(TypeIP, "192.0.2.1")} {
 			before := instant
 			candidate := Candidate{AssetKey: "K", Identifiers: []IdentifierValue{value}, LastSeen: &instant}

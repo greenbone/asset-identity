@@ -11,12 +11,8 @@ import (
 	"slices"
 )
 
-var (
-	// ErrInvalidMatchPolicy identifies an invalid matching policy.
-	ErrInvalidMatchPolicy = errors.New("invalid matching policy")
-	// ErrUnresolvedMatchingRule identifies an operation blocked by a pending domain rule.
-	ErrUnresolvedMatchingRule = errors.New("unresolved matching rule")
-)
+// ErrInvalidMatchPolicy identifies an invalid matching policy.
+var ErrInvalidMatchPolicy = errors.New("invalid matching policy")
 
 // FuzzyMember configures a fuzzy type and weight; entry order controls score accumulation.
 type FuzzyMember struct {

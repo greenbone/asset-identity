@@ -60,7 +60,6 @@ Ensure(strong_ranking_keeps_nanoseconds_missing_and_key_ties) {
     g_ptr_array_add(rows, a); g_ptr_array_add(rows, b); g_ptr_array_add(rows, c);
     gvm_asset_identity_decision_t *result = decide(input, rows, policy);
     assert_that(result->selected_key, is_equal_to_string("C"));
-    assert_that(result->potential_merge_indices->len, is_equal_to(0));
     gvm_asset_identity_decision_free(result);
     b->last_seen.nanoseconds = 2;
     result = decide(input, rows, policy);
@@ -73,7 +72,7 @@ Ensure(strong_ranking_keeps_nanoseconds_missing_and_key_ties) {
     gvm_asset_identity_observation_free(input); g_ptr_array_unref(rows); gvm_asset_identity_policy_free(policy);
 }
 
-Ensure(strong_no_match_and_multiplicity_conflict) {
+Ensure(strong_no_match_and_multiple_values) {
     gvm_asset_identity_policy_t *policy = default_policy();
     gvm_asset_identity_observation_t *input = observation(GVM_ASSET_IDENTITY_GREENBONE_ID, "g");
     gvm_asset_identity_observation_t *weak = observation(GVM_ASSET_IDENTITY_IP, "192.0.2.1");
@@ -85,21 +84,30 @@ Ensure(strong_no_match_and_multiplicity_conflict) {
     g_ptr_array_add(rows, candidate("strong", input));
     g_ptr_array_add(input->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_GREENBONE_ID, "other"));
     result = decide(input, rows, policy);
-    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_CONFLICT));
-    assert_that(result->selected_key, is_null);
+    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_REUSE));
+    assert_that(result->selected_key, is_equal_to_string("strong"));
+    assert_that(result->selected_index, is_equal_to(1));
     assert_that(result->needs_new_key, is_false);
-    assert_that(result->conflict->identifiers->len, is_equal_to(2));
-    assert_that(g_array_index(result->conflict->candidate_indices, gsize, 0), is_equal_to(1));
     gvm_asset_identity_decision_free(result);
+    gvm_asset_identity_observation_t *other = observation(GVM_ASSET_IDENTITY_GREENBONE_ID, "other");
+    gvm_asset_identity_candidate_t *newer = candidate("newer", other);
+    newer->last_seen = (gvm_asset_identity_timestamp_t){TRUE, 20, 0};
+    g_ptr_array_add(rows, newer);
+    result = decide(input, rows, policy);
+    assert_that(result->selected_key, is_equal_to_string("newer"));
+    assert_that(result->selected_index, is_equal_to(2));
+    gvm_asset_identity_decision_free(result);
+    gvm_asset_identity_observation_free(other);
     g_ptr_array_set_size(rows, 0);
     result = decide(input, rows, policy);
-    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_CONFLICT));
+    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_CREATE));
+    assert_that(result->needs_new_key, is_true);
     gvm_asset_identity_decision_free(result);
     gvm_asset_identity_observation_free(input); gvm_asset_identity_observation_free(weak);
     g_ptr_array_unref(rows); gvm_asset_identity_policy_free(policy);
 }
 
-Ensure(fuzzy_containment_and_review_keep_c_key_semantics) {
+Ensure(fuzzy_containment_selects_keys_without_merges) {
     gvm_asset_identity_policy_t *policy = default_policy();
     gvm_asset_identity_observation_t *input = observation(GVM_ASSET_IDENTITY_IP, "192.0.2.1");
     GPtrArray *rows = candidates_new();
@@ -112,16 +120,14 @@ Ensure(fuzzy_containment_and_review_keep_c_key_semantics) {
     gvm_asset_identity_decision_free(result);
     g_ptr_array_add(rows, narrow);
     result = decide(input, rows, policy);
-    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_REVIEW));
+    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_REUSE));
     assert_that(result->needs_new_key, is_false);
     assert_that(result->selected_key, is_equal_to_string("wide"));
-    assert_that(g_array_index(result->potential_merge_indices, gsize, 0), is_equal_to(1));
-    assert_that(g_ptr_array_index(result->potential_merge_keys, 0), is_equal_to_string("narrow"));
     gvm_asset_identity_decision_free(result);
     g_ptr_array_remove_index(rows, 0);
     g_ptr_array_add(input->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_IP, "192.0.2.2"));
     result = decide(input, rows, policy);
-    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_REVIEW));
+    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_CREATE));
     assert_that(result->needs_new_key, is_true);
     assert_that(result->has_selected_index, is_false);
     gvm_asset_identity_decision_free(result);
@@ -177,8 +183,8 @@ int main(void) {
     add_test(suite, create_and_strong_reuse);
     add_test(suite, custom_priority_preserves_original_indices);
     add_test(suite, strong_ranking_keeps_nanoseconds_missing_and_key_ties);
-    add_test(suite, strong_no_match_and_multiplicity_conflict);
-    add_test(suite, fuzzy_containment_and_review_keep_c_key_semantics);
+    add_test(suite, strong_no_match_and_multiple_values);
+    add_test(suite, fuzzy_containment_selects_keys_without_merges);
     add_test(suite, fuzzy_time_uses_epoch_whole_seconds_and_input_order);
     add_test(suite, scoped_semantic_equality_preserves_absent_and_empty);
     return run_test_suite(suite, create_text_reporter());

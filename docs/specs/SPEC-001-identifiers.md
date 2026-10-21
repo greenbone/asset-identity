@@ -1,176 +1,33 @@
 # SPEC-001: Asset Identifiers
 
-**Status:** Draft  
-**Component:** asset-identity  
-**Scope:** Identifier representation, equality, observation history, and classification policy
+The `identity` package provides a native Go identifier model, normalization, and asset-key selection. The GLib C API
+calls the same reconciliation implementation.
 
-## 1. Purpose
+## Requirements
 
-Define a reusable, extensible asset identifier model for the Greenbone asset identity library.
+- Support multiple types and multiple values per type.
+- Identify values by type, canonical payload, and complete scope. Repeated values do not add evidence.
+- Keep observation timestamps and history separate from identifier equality.
+- Use configurable strong-ID priority, followed by fuzzy containment when no strong evidence is supplied.
+- Return `CREATE` or `REUSE`; invalid input returns an error.
+- Preserve caller data and return independent copies where data is retained or returned.
+- Keep the Go core independent of C, GLib, databases, and network services.
 
-The core must be a native Go package usable by gvmd-lite and suitable for use by gvmd through a future, separate C
-adapter.
+The library does not generate keys, discover candidates, verify producer trust, manage persistence, retain history, or
+plan merges. Applications supply eligible active identifiers and candidates and apply the result.
 
-This specification does not define asset matching or merging. Identifier-value equality alone does not establish asset
-identity.
+## Contracts
 
-## 2. Requirements
+| Specification                              | Defines                                                                  |
+|--------------------------------------------|--------------------------------------------------------------------------|
+| [SPEC-001A](SPEC-001A-identifier-model.md) | Types, scopes, timestamps, history, ownership, and structural validation |
+| [SPEC-001B](SPEC-001B-normalization.md)    | Supported payload formats, normalization, and semantic equality          |
+| [SPEC-002](SPEC-002-reconciliation.md)     | Policy, strong/fuzzy matching, decisions, and the C API                  |
 
-### REQ-001: Multiple identifiers
+Type names and normalization do not establish global uniqueness or matching eligibility. New formats or matching rules
+require an explicit contract; unsupported inputs are not guessed.
 
-An asset observation or candidate may contain multiple identifier types.
+## Verification
 
-Each identifier type may have multiple values.
-
-Equivalent values of the same type and scope must not be treated as distinct identifier values or create additional
-identity evidence solely through duplication. Repeated observations are handled separately under REQ-005 and REQ-008;
-this requirement does not define matching scores or evidence weighting.
-
-### REQ-002: Strong identifiers
-
-The authoritative Greenbone default strong identifier priority, highest first, is:
-
-1. Greenbone ID
-2. Agent ID
-3. Machine ID
-4. BIOS UUID
-5. SSH host key
-6. TLS certificate public-key hash
-7. Cloud identifier
-
-The priority order must be configurable and absolute within the selected policy. It must not depend on input order or
-the order in which identifier types are defined.
-
-Priority must be represented by policy rather than hardcoded into future reconciliation logic. Priority configurations
-must reject duplicate type entries and unknown identifier types. A known type is one supported by the library version in
-use.
-
-The treatment of omitted types and classification overrides remains an open decision. The meaning of priority when
-matching or conflicting evidence is encountered belongs to a subsequent specification.
-
-### REQ-003: Other identifiers
-
-Support these additional identifiers:
-
-- IP
-- FQDN
-- MAC
-- Hostname
-
-These identifiers are designated for weak/fuzzy matching under a separate policy. That policy's behavior is outside this
-specification.
-
-### REQ-004: Extensibility
-
-Identifier types must use stable string identifiers rather than require callers to rely on numeric enum positions. The
-exact string identifiers remain an open decision.
-
-Adding a supported identifier type in a future library version must not require changing the generic identifier model or
-rewriting future matching algorithms.
-
-Each supported type must have an explicit value, scope, validation, normalization, and equality contract. Identifier
-classification and priority must be defined by policy rather than by hardcoded matching logic.
-
-Runtime identifier registration is not part of this specification and must not be implemented for now. Handling unknown
-types in identifier input, separately from priority configuration, remains an open decision.
-
-### REQ-005: Identifier observations and history
-
-An identifier value must support:
-
-- Identifier type
-- Identifier value
-- Identifier scope or namespace, where applicable
-
-Each observation of an identifier value must support an observation timestamp or an explicitly missing timestamp.
-Present timestamps must represent UTC instants and denote when the identifier was observed, rather than when it was
-ingested. Missing timestamps must not be inferred from a sentinel instant or replaced with the current time.
-
-Observation history must be kept separate from identifier-value equality. Repeated observations of the same identifier
-value may carry different timestamps without becoming distinct identifier values. The history representation and
-handling of repeated observations remain open decisions.
-
-Identifier values must not be discarded solely because newer observations contain different values.
-
-### REQ-006: Normalization
-
-Identifier-value comparison must use semantically correct equality as defined under REQ-008.
-
-Exact type-specific normalization rules remain open for separate approval. No implementation may silently choose those
-rules. Before a type's normalization is implemented, its contract must explicitly define accepted inputs, validation,
-canonical representation, scope handling, and equality behavior.
-
-Normalization must be deterministic, idempotent, and independently testable, and must preserve meaningful distinctions
-between values.
-
-Do not assume that identifiers are globally unique.
-
-Do not automatically normalize opaque identifiers using generic lowercase or whitespace transformations.
-
-### REQ-007: Independence
-
-The identifier model must not depend on:
-
-- PostgreSQL or other databases
-- GLib
-- gvmd
-- gvmd-ng (gvmd-lite)
-- HTTP or gRPC
-- C
-- cgo
-
-The core must remain a native Go package.
-
-### REQ-008: Identifier-value equality
-
-Identifier-value equality must account for the stable type identifier, the value under that type's approved
-normalization rules, and the scope under that type's approved scope rules.
-
-Observation timestamps and observation history must not participate in identifier-value equality.
-
-The representation and comparison of scopes, including absent versus empty scope, remain open decisions. An absent scope
-must not silently assert global uniqueness.
-
-### REQ-009: Future C adapter compatibility
-
-The model must allow a future, separate C adapter to preserve stable type identifiers, all required identifier values
-and scopes, observation history, and UTC timestamps including explicitly missing timestamps without loss of meaning or
-required precision.
-
-The core must not expose a C dependency to achieve this compatibility. C bindings, ABI layout, memory ownership, and
-lifetime rules belong to a separate specification; native Go memory layouts are not a C ABI contract.
-
-## 3. Acceptance Criteria
-
-Verify REQ-001–009 through the model tests in [SPEC-001A](SPEC-001A-identifier-model.md#9-testable-acceptance-criteria),
-normalization tests in [SPEC-001B](SPEC-001B-normalization.md#9-testable-acceptance-criteria), and reconciliation tests
-in [SPEC-002](SPEC-002-reconciliation.md#9-verification-and-c-reference-fixtures). The native core must build and test
-with `CGO_ENABLED=0`, without C, GLib, or database dependencies.
-
-## 4. Out of Scope
-
-- Candidate selection
-- Strong identifier matching
-- Weak/fuzzy matching
-- Matching scores or evidence weighting
-- Conflict-resolution rules
-- Freshness-based selection
-- Asset merging
-- Asset counting
-- Database operations and persistence implementation
-- Runtime identifier registration
-- C bindings
-
-Any future work in these areas requires separate specifications or approval.
-
-## 5. Follow-up contracts
-
-The detailed decisions originally deferred here are tracked in:
-
-- [SPEC-001A](SPEC-001A-identifier-model.md): stable names, scopes, timestamps, history, structural validation and
-  errors.
-- [SPEC-001B](SPEC-001B-normalization.md): payload formats, normalization, semantic equality, and unresolved producer
-  formats.
-- [SPEC-002](SPEC-002-reconciliation.md): classification, omitted/disabled types, priority, and reconciliation.
-
-These references retain their own approval boundaries; unspecified producer semantics must not be guessed.
+Model, normalization, and reconciliation tests live in [`identity`](../../identity). The core must build and test with
+`CGO_ENABLED=0`.

@@ -63,7 +63,7 @@ func canonicalMatchingView(input []IdentifierValue) ([]IdentifierValue, error) {
 	return out, nil
 }
 
-// StrongPriorityMatch reports correspondence at one priority without resolving conflicts.
+// StrongPriorityMatch reports correspondence at one configured priority.
 type StrongPriorityMatch struct {
 	Type              IdentifierType
 	Priority          int   // zero-based; -1 when no candidate matches
@@ -72,7 +72,7 @@ type StrongPriorityMatch struct {
 }
 
 // EvaluateStrongPriority reports all matches at the first matching configured priority.
-// Callers must supply admitted views; conflicting values require separate checks.
+// Callers must supply admitted views; any incoming value of a type may match.
 func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidates [][]IdentifierValue) (StrongPriorityMatch, error) {
 	empty := StrongPriorityMatch{Priority: -1}
 	if err := p.Validate(); err != nil {
@@ -131,8 +131,7 @@ func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidate
 	return result, nil
 }
 
-// StrongRankingCandidate belongs to an admitted, conflict-checked same-value set
-// at the winning strong priority.
+// StrongRankingCandidate belongs to the matching set at the winning strong priority.
 type StrongRankingCandidate struct {
 	AssetKey string
 	LastSeen *time.Time

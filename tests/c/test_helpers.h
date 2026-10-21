@@ -46,6 +46,9 @@ static inline gvm_asset_identity_decision_t *decide(const gvm_asset_identity_obs
     GError *error = NULL;
     assert_that(gvm_asset_identity_decide(input, candidates, policy, &result, &error), is_true);
     assert_that(error, is_null);
+    if (result) {
+        assert_that(result->action == GVM_ASSET_IDENTITY_CREATE || result->action == GVM_ASSET_IDENTITY_REUSE, is_true);
+    }
     g_clear_error(&error);
     return result;
 }

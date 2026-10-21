@@ -68,22 +68,13 @@ typedef struct {
 
 typedef enum {
     GVM_ASSET_IDENTITY_CREATE = 1,
-    GVM_ASSET_IDENTITY_REUSE,
-    GVM_ASSET_IDENTITY_REVIEW,
-    GVM_ASSET_IDENTITY_CONFLICT
+    GVM_ASSET_IDENTITY_REUSE
 } gvm_asset_identity_action_t;
 
 typedef enum {
-    GVM_ASSET_IDENTITY_STAGE_NONE,
-    GVM_ASSET_IDENTITY_STAGE_STRONG,
+    GVM_ASSET_IDENTITY_STAGE_STRONG = 1,
     GVM_ASSET_IDENTITY_STAGE_FUZZY
 } gvm_asset_identity_stage_t;
-
-typedef struct {
-    gchar *reason;
-    GArray *candidate_indices; /* gsize entries in original candidate order. */
-    GPtrArray *identifiers;
-} gvm_asset_identity_conflict_t;
 
 typedef struct {
     gvm_asset_identity_action_t action;
@@ -92,9 +83,6 @@ typedef struct {
     gchar *selected_key;
     gboolean has_selected_index;
     gsize selected_index;
-    GArray *potential_merge_indices; /* gsize entries; never authorized merges. */
-    GPtrArray *potential_merge_keys; /* Owned strings, parallel to indices. */
-    gvm_asset_identity_conflict_t *conflict;
 } gvm_asset_identity_decision_t;
 
 /* Constructors return full ownership; child fields are owned by their parent. */
@@ -110,7 +98,7 @@ gvm_asset_identity_policy_t *gvm_asset_identity_policy_new_default(GError **erro
 void gvm_asset_identity_policy_free(gvm_asset_identity_policy_t *policy);
 
 /* Inputs are borrowed, immutable during this call; output is independently owned.
- * On failure *decision is NULL. REVIEW, including its key proposal, is non-actionable. */
+ * On success action is CREATE or REUSE. On failure *decision is NULL. */
 gboolean gvm_asset_identity_decide(
     const gvm_asset_identity_observation_t *observation,
     const GPtrArray *candidates, const gvm_asset_identity_policy_t *policy,

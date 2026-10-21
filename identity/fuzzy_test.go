@@ -10,7 +10,6 @@ import (
 	"math"
 	"os"
 	"reflect"
-	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -34,24 +33,23 @@ func TestFuzzyKernelContainment(t *testing.T) {
 		observation []IdentifierValue
 		candidates  []Candidate
 		selected    int
-		targets     []int
 		score       float32
 	}{
-		{"candidate contains observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 10, ip1, ip2)}, 0, nil, .4},
-		{"observation contains one", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K1", 10, ip1)}, -1, []int{0}, 0},
-		{"partial overlap", []IdentifierValue{ip1, ip3}, []Candidate{fuzzyRow("K1", 10, ip1, ip2)}, -1, nil, 0},
-		{"multiple containing same score newest", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 10, ip1), fuzzyRow("K2", 20, ip1, host)}, 1, []int{0}, .4},
-		{"multiple contained", []IdentifierValue{ip1, ip2, host}, []Candidate{fuzzyRow("K1", 10, ip1), fuzzyRow("K2", 20, host), fuzzyRow("K3", 30, ip1, ip3)}, -1, []int{0, 1}, 0},
-		{"equal score time first row not lexical", []IdentifierValue{ip1}, []Candidate{fuzzyRow("Z", 20, ip1), fuzzyRow("A", 20, ip1)}, 0, []int{1}, .4},
-		{"multiple distinct values", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K1", 10, ip1, ip2, ip3)}, 0, nil, .8},
-		{"empty observation guard", nil, []Candidate{fuzzyRow("K1", 10, ip1)}, -1, nil, 0},
-		{"empty candidate literal subset", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 10)}, -1, []int{0}, 0},
-		{"no candidates", []IdentifierValue{ip1}, nil, -1, nil, 0},
-		{"candidate merge without observation overlap", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 20, ip1, host), fuzzyRow("K2", 10, host)}, 0, []int{1}, .4},
-		{"first negative timestamp accepted", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", -10, ip1), fuzzyRow("K2", -20, ip1)}, 0, []int{1}, .4},
-		{"pre epoch versus epoch", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", -1, ip1), fuzzyRow("K2", 0, ip1)}, 1, []int{0}, .4},
-		{"hostname weight", []IdentifierValue{host}, []Candidate{fuzzyRow("K1", 10, host)}, 0, nil, .4},
-		{"mac weight", []IdentifierValue{mac}, []Candidate{fuzzyRow("K1", 10, mac)}, 0, nil, 1},
+		{"candidate contains observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 10, ip1, ip2)}, 0, .4},
+		{"observation contains one", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K1", 10, ip1)}, -1, 0},
+		{"partial overlap", []IdentifierValue{ip1, ip3}, []Candidate{fuzzyRow("K1", 10, ip1, ip2)}, -1, 0},
+		{"multiple containing same score newest", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 10, ip1), fuzzyRow("K2", 20, ip1, host)}, 1, .4},
+		{"multiple contained", []IdentifierValue{ip1, ip2, host}, []Candidate{fuzzyRow("K1", 10, ip1), fuzzyRow("K2", 20, host), fuzzyRow("K3", 30, ip1, ip3)}, -1, 0},
+		{"equal score time first row not lexical", []IdentifierValue{ip1}, []Candidate{fuzzyRow("Z", 20, ip1), fuzzyRow("A", 20, ip1)}, 0, .4},
+		{"multiple distinct values", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K1", 10, ip1, ip2, ip3)}, 0, .8},
+		{"empty observation guard", nil, []Candidate{fuzzyRow("K1", 10, ip1)}, -1, 0},
+		{"empty candidate literal subset", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 10)}, -1, 0},
+		{"no candidates", []IdentifierValue{ip1}, nil, -1, 0},
+		{"candidate merge without observation overlap", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 20, ip1, host), fuzzyRow("K2", 10, host)}, 0, .4},
+		{"first negative timestamp accepted", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", -10, ip1), fuzzyRow("K2", -20, ip1)}, 0, .4},
+		{"pre epoch versus epoch", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", -1, ip1), fuzzyRow("K2", 0, ip1)}, 1, .4},
+		{"hostname weight", []IdentifierValue{host}, []Candidate{fuzzyRow("K1", 10, host)}, 0, .4},
+		{"mac weight", []IdentifierValue{mac}, []Candidate{fuzzyRow("K1", 10, mac)}, 0, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -60,7 +58,7 @@ func TestFuzzyKernelContainment(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got.NeedsNewKey != (tt.selected < 0) || !reflect.DeepEqual(got.PotentialMergeIndices, tt.targets) || got.SelectedScore != tt.score {
+			if got.NeedsNewKey != (tt.selected < 0) || got.SelectedScore != tt.score {
 				t.Fatalf("result = %+v", got)
 			}
 			if tt.selected < 0 {
@@ -69,13 +67,6 @@ func TestFuzzyKernelContainment(t *testing.T) {
 				}
 			} else if got.SelectedIndex == nil || *got.SelectedIndex != tt.selected || got.SelectedKey != tt.candidates[tt.selected].AssetKey {
 				t.Fatal("wrong survivor")
-			}
-			var keys []string
-			for _, i := range tt.targets {
-				keys = append(keys, tt.candidates[i].AssetKey)
-			}
-			if !reflect.DeepEqual(got.PotentialMergeKeys, keys) {
-				t.Fatalf("keys = %v", got.PotentialMergeKeys)
 			}
 		})
 	}
@@ -111,7 +102,7 @@ func TestFuzzyKernelNormalizationAndConfiguration(t *testing.T) {
 		candidate := ip.Clone()
 		candidate.Scope = scope
 		got, err := matchFuzzyKernel(Observation{Identifiers: []IdentifierValue{ip}}, []Candidate{fuzzyRow("K1", 10, candidate)}, GreenboneMatchPolicy())
-		if err != nil || got.SelectedIndex != nil || len(got.PotentialMergeIndices) > 0 {
+		if err != nil || got.SelectedIndex != nil {
 			t.Fatalf("scopes collapsed: %+v, %v", got, err)
 		}
 	}
@@ -135,8 +126,6 @@ func TestFuzzyKernelImmutableAndConcurrent(t *testing.T) {
 					return
 				}
 				*got.SelectedIndex = 100
-				got.PotentialMergeIndices[0] = 100
-				got.PotentialMergeKeys[0] = "changed"
 			}
 		})
 	}
@@ -145,12 +134,13 @@ func TestFuzzyKernelImmutableAndConcurrent(t *testing.T) {
 		t.Fatal("input mutated")
 	}
 	got, err := matchFuzzyKernel(obs, rows, p)
-	if err != nil || *got.SelectedIndex != 0 || !reflect.DeepEqual(got.PotentialMergeIndices, []int{1}) || got.PotentialMergeKeys[0] != "potential" {
+	if err != nil || *got.SelectedIndex != 0 {
 		t.Fatalf("result aliases retained state: %+v %v", got, err)
 	}
 }
 
-// Expected fields were captured by executing the pinned, unmodified C source.
+// Key selection and score fields were captured from the pinned, unmodified C source.
+// Reference C merge outputs are ignored; the library only selects keys.
 // This regression test consumes data only; Go builds never depend on C or GLib.
 func TestFuzzyKernelCReferenceFixtures(t *testing.T) {
 	file, err := os.Open("testdata/fuzzy_c_compat.jsonl")
@@ -169,11 +159,10 @@ func TestFuzzyKernelCReferenceFixtures(t *testing.T) {
 				LastSeen    int64
 				Identifiers []IdentifierValue
 			}
-			NeedsNewKey           bool
-			SelectedIndex         int
-			SelectedKey           string
-			SelectedScoreBits     uint32
-			PotentialMergeIndices []int
+			NeedsNewKey       bool
+			SelectedIndex     int
+			SelectedKey       string
+			SelectedScoreBits uint32
 		}
 		if err := decoder.Decode(&fixture); err == io.EOF {
 			break
@@ -190,29 +179,19 @@ func TestFuzzyKernelCReferenceFixtures(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var expectedKeys []string
-			for _, index := range fixture.PotentialMergeIndices {
-				expectedKeys = append(expectedKeys, fixture.Candidates[index].AssetKey)
-			}
-			if !slices.Equal(got.PotentialMergeKeys, expectedKeys) {
-				t.Fatalf("potential merge keys differ: %v versus %v", got.PotentialMergeKeys, expectedKeys)
-			}
-
 			decision, err := Decide(Observation{Identifiers: fixture.Observation}, rows, GreenboneMatchPolicy())
 			expectedAction := ActionCreate
-			if len(fixture.PotentialMergeIndices) > 0 {
-				expectedAction = ActionReview
-			} else if fixture.SelectedIndex >= 0 {
+			if fixture.SelectedIndex >= 0 {
 				expectedAction = ActionReuse
 			}
-			if err != nil || decision.Action != expectedAction || decision.Stage != StageFuzzy || decision.NeedsNewKey != fixture.NeedsNewKey || decision.SelectedKey != fixture.SelectedKey || !slices.Equal(decision.PotentialMergeIndices, fixture.PotentialMergeIndices) {
+			if err != nil || decision.Action != expectedAction || decision.Stage != StageFuzzy || decision.NeedsNewKey != fixture.NeedsNewKey || decision.SelectedKey != fixture.SelectedKey {
 				t.Fatalf("Decide differs from C fixture: %+v %v", decision, err)
 			}
 			selected := -1
 			if got.SelectedIndex != nil {
 				selected = *got.SelectedIndex
 			}
-			if got.NeedsNewKey != fixture.NeedsNewKey || selected != fixture.SelectedIndex || got.SelectedKey != fixture.SelectedKey || math.Float32bits(got.SelectedScore) != fixture.SelectedScoreBits || !slices.Equal(got.PotentialMergeIndices, fixture.PotentialMergeIndices) {
+			if got.NeedsNewKey != fixture.NeedsNewKey || selected != fixture.SelectedIndex || got.SelectedKey != fixture.SelectedKey || math.Float32bits(got.SelectedScore) != fixture.SelectedScoreBits {
 				t.Fatalf("Go result %+v differs from C fixture %+v", got, fixture)
 			}
 		})

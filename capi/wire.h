@@ -97,25 +97,14 @@ typedef struct {
 typedef uint32_t gai_wire_action_t;
 enum {
     GAI_WIRE_CREATE = 1,
-    GAI_WIRE_REUSE,
-    GAI_WIRE_REVIEW,
-    GAI_WIRE_CONFLICT
+    GAI_WIRE_REUSE
 };
 
 typedef uint32_t gai_wire_stage_t;
 enum {
-    GAI_WIRE_STAGE_NONE = 0,
-    GAI_WIRE_STAGE_STRONG,
+    GAI_WIRE_STAGE_STRONG = 1,
     GAI_WIRE_STAGE_FUZZY
 };
-
-typedef struct {
-    gai_wire_string_t reason;
-    const size_t *candidate_indices;
-    size_t candidate_count;
-    const gai_wire_identifier_t *identifiers;
-    size_t identifier_count;
-} gai_wire_conflict_t;
 
 typedef struct {
     gai_wire_action_t action;
@@ -124,10 +113,6 @@ typedef struct {
     gai_wire_string_t selected_key;
     uint32_t has_selected_index;
     size_t selected_index;
-    const size_t *potential_merge_indices;
-    const gai_wire_string_t *potential_merge_keys;
-    size_t potential_merge_count;
-    const gai_wire_conflict_t *conflict;
 } gai_wire_decision_t;
 
 typedef struct {
@@ -135,7 +120,7 @@ typedef struct {
 } gai_wire_error_t;
 
 /* Inputs are borrowed for the call; output slots must not alias inputs.
- * Output slots are cleared on entry. error is optional. REVIEW authorizes no writes. */
+ * Output slots are cleared on entry. error is optional. */
 gai_wire_status_t gai_wire_decide(
     const gai_wire_observation_t *observation,
     const gai_wire_candidate_t *candidates, size_t candidate_count,

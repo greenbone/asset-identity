@@ -15,7 +15,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 	"unsafe"
 
@@ -227,54 +226,16 @@ func encodedString(value string) C.gai_wire_string_t {
 	return C.gai_wire_string_t{data: (*C.char)(ptr), length: C.size_t(len(value))}
 }
 
-func encodedIndices(values []int) *C.size_t {
-	ptr := (*C.size_t)(allocate(len(values), unsafe.Sizeof(C.size_t(0))))
-	for i, value := range values {
-		unsafe.Slice(ptr, len(values))[i] = C.size_t(value)
-	}
-	return ptr
-}
-
-func encodeIdentifiers(values []identity.IdentifierValue, ptr *C.gai_wire_identifier_t) {
-	for i, value := range values {
-		output := &unsafe.Slice(ptr, len(values))[i]
-		output._type = encodedType(value.Type)
-		output.value = encodedString(value.Value)
-		if value.Scope == nil {
-			continue
-		}
-		output.scope.present = 1
-		output.scope.count = C.size_t(len(value.Scope))
-		output.scope.dimensions = (*C.gai_wire_scope_dimension_t)(allocate(len(value.Scope), C.sizeof_gai_wire_scope_dimension_t))
-		names := make([]string, 0, len(value.Scope))
-		for name := range value.Scope {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for j, name := range names {
-			dimension := &unsafe.Slice(output.scope.dimensions, len(names))[j]
-			dimension.name = encodedString(name)
-			dimension.value = encodedString(value.Scope[name])
-		}
-	}
-}
-
 func encodeDecision(value identity.Decision, output *C.gai_wire_decision_t) {
 	switch value.Action {
 	case identity.ActionCreate:
 		output.action = C.GAI_WIRE_CREATE
 	case identity.ActionReuse:
 		output.action = C.GAI_WIRE_REUSE
-	case identity.ActionReview:
-		output.action = C.GAI_WIRE_REVIEW
-	case identity.ActionConflict:
-		output.action = C.GAI_WIRE_CONFLICT
 	default:
 		panic("unsupported decision action")
 	}
 	switch value.Stage {
-	case identity.StageNone:
-		output.stage = C.GAI_WIRE_STAGE_NONE
 	case identity.StageStrong:
 		output.stage = C.GAI_WIRE_STAGE_STRONG
 	case identity.StageFuzzy:
@@ -289,22 +250,6 @@ func encodeDecision(value identity.Decision, output *C.gai_wire_decision_t) {
 	if value.SelectedIndex != nil {
 		output.has_selected_index = 1
 		output.selected_index = C.size_t(*value.SelectedIndex)
-	}
-	output.potential_merge_count = C.size_t(len(value.PotentialMergeIndices))
-	output.potential_merge_indices = encodedIndices(value.PotentialMergeIndices)
-	output.potential_merge_keys = (*C.gai_wire_string_t)(allocate(len(value.PotentialMergeKeys), C.sizeof_gai_wire_string_t))
-	for i, key := range value.PotentialMergeKeys {
-		unsafe.Slice(output.potential_merge_keys, len(value.PotentialMergeKeys))[i] = encodedString(key)
-	}
-	if value.Conflict != nil {
-		conflict := (*C.gai_wire_conflict_t)(allocate(1, C.sizeof_gai_wire_conflict_t))
-		output.conflict = conflict
-		conflict.reason = encodedString(value.Conflict.Reason)
-		conflict.candidate_count = C.size_t(len(value.Conflict.CandidateIndices))
-		conflict.candidate_indices = encodedIndices(value.Conflict.CandidateIndices)
-		conflict.identifier_count = C.size_t(len(value.Conflict.Identifiers))
-		conflict.identifiers = (*C.gai_wire_identifier_t)(allocate(len(value.Conflict.Identifiers), C.sizeof_gai_wire_identifier_t))
-		encodeIdentifiers(value.Conflict.Identifiers, conflict.identifiers)
 	}
 }
 
@@ -368,7 +313,7 @@ func gvmAssetIdentityDecide(observation *C.gai_wire_observation_t, candidates *C
 	value, err := identity.Decide(identity.Observation{Identifiers: identifiers}, convertedCandidates, convertedPolicy)
 	if err != nil {
 		reportError(failure, err.Error())
-		if errors.Is(err, identity.ErrInvalidMatchPolicy) || errors.Is(err, identity.ErrUnresolvedMatchingRule) {
+		if errors.Is(err, identity.ErrInvalidMatchPolicy) {
 			return C.GAI_WIRE_INVALID_POLICY
 		}
 		return C.GAI_WIRE_INVALID_INPUT

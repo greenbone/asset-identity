@@ -33,14 +33,29 @@ func main() {
 Pass caller-prepared active views; normalization does not establish producer trust. Identifier scopes remain
 significant, including absent versus explicitly empty scope.
 
-| Action   | Meaning                                                                |
-|----------|------------------------------------------------------------------------|
-| CREATE   | A new key is required.                                                 |
-| REUSE    | Use the selected existing key.                                         |
-| REVIEW   | Non-actionable survivor/new-key proposal with potential merge targets. |
-| CONFLICT | Contradictory incoming strong values; no actionable key plan.          |
+| Action | Meaning                        |
+|--------|--------------------------------|
+| CREATE | A new key is required.         |
+| REUSE  | Use the selected existing key. |
 
-No result authorizes a database merge. Candidate indices refer to the supplied array.
+Strong types are checked in configured priority order. At the first type with matches, the newest candidate wins; equal
+timestamps use asset-key ordering. Multiple incoming values of that type participate in the same ranking. If strong
+evidence exists but no candidate matches, return CREATE without fuzzy fallback. Otherwise fuzzy matching returns REUSE
+for a selected containing candidate, or CREATE if none exists.
+
+Candidate indices refer to the supplied array. No conflict detection or merge proposals are performed. No result
+authorizes a database merge.
+
+## Formatting and linting
+
+With golangci-lint v2 installed:
+
+```sh
+make format  # gofmt and goimports using .golangci.yml
+make lint    # run the configured linters
+```
+
+Set `GOLANGCI_LINT` to override the executable path.
 
 ## C build, test, and install
 
@@ -95,7 +110,7 @@ cc example.c $(pkg-config --cflags --libs libgvm_asset_identity) \
 Constructors return owned objects; parents own their children. `decide` borrows immutable inputs and returns an
 independently owned decision. Free functions accept NULL; errors use `GError`. Consumers need only the installed
 header/library and GLib. See the [public header](include/gvm_asset_identity.h) and
-[C contract](docs/specs/SPEC-002-reconciliation.md#32-c-adapter-contract) for details.
+[C contract](docs/specs/SPEC-002-reconciliation.md#c-api) for details.
 
 ## Technical reference
 
@@ -108,5 +123,5 @@ header/library and GLib. See the [public header](include/gvm_asset_identity.h) a
 
 Copyright (C) 2026 Greenbone AG.
 
-Licensed under the GNU Affero General Public License v3.0 only
-(`AGPL-3.0-only`). See [LICENSE](LICENSE) for the full license text.
+Licensed under the GNU Affero General Public License v3.0 only (`AGPL-3.0-only`). See [LICENSE](LICENSE) for the full
+license text.

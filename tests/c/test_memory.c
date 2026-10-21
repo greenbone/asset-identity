@@ -26,7 +26,7 @@ Ensure(results_outlive_inputs_and_other_results) {
     gvm_asset_identity_decision_free(second);
 }
 
-Ensure(repeated_conflict_cleanup_owns_nested_glib_containers) {
+Ensure(repeated_multiple_strong_values_keep_inputs_owned) {
     gvm_asset_identity_policy_t *policy = default_policy();
     gvm_asset_identity_observation_t *input = observation(GVM_ASSET_IDENTITY_GREENBONE_ID, "g1");
     g_ptr_array_add(input->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_GREENBONE_ID, "g2"));
@@ -39,11 +39,7 @@ Ensure(repeated_conflict_cleanup_owns_nested_glib_containers) {
         gvm_asset_identity_decision_t *result = NULL;
         GError *error = NULL;
         if (!gvm_asset_identity_decide(input, rows, policy, &result, &error)) valid = FALSE;
-        if (!result || !result->conflict || result->action != GVM_ASSET_IDENTITY_CONFLICT) valid = FALSE;
-        if (result && result->conflict) {
-            gvm_asset_identity_identifier_t *copy = g_ptr_array_index(result->conflict->identifiers, 0);
-            if (copy->scope == id->scope || g_strcmp0(g_hash_table_lookup(copy->scope, "issuer"), "realm")) valid = FALSE;
-        }
+        if (!result || result->action != GVM_ASSET_IDENTITY_CREATE) valid = FALSE;
         gvm_asset_identity_decision_free(result); g_clear_error(&error);
     }
     assert_that(valid, is_true);
@@ -51,7 +47,7 @@ Ensure(repeated_conflict_cleanup_owns_nested_glib_containers) {
     gvm_asset_identity_observation_free(input); g_ptr_array_unref(rows); gvm_asset_identity_policy_free(policy);
 }
 
-Ensure(repeated_review_and_error_cleanup) {
+Ensure(repeated_reuse_and_error_cleanup) {
     gvm_asset_identity_policy_t *policy = default_policy();
     gvm_asset_identity_observation_t *input = observation(GVM_ASSET_IDENTITY_IP, "192.0.2.1");
     GPtrArray *rows = candidates_new();
@@ -61,7 +57,7 @@ Ensure(repeated_review_and_error_cleanup) {
         gvm_asset_identity_decision_t *result = NULL;
         GError *error = NULL;
         if (!gvm_asset_identity_decide(input, rows, policy, &result, &error)) valid = FALSE;
-        if (!result || result->action != GVM_ASSET_IDENTITY_REVIEW || result->potential_merge_keys->len != 1) valid = FALSE;
+        if (!result || result->action != GVM_ASSET_IDENTITY_REUSE) valid = FALSE;
         gvm_asset_identity_decision_free(result); g_clear_error(&error);
         result = NULL;
         if (gvm_asset_identity_decide(NULL, rows, policy, &result, &error) || result || !error) valid = FALSE;
@@ -85,8 +81,8 @@ Ensure(default_policy_containers_are_independent) {
 int main(void) {
     TestSuite *suite = create_test_suite();
     add_test(suite, results_outlive_inputs_and_other_results);
-    add_test(suite, repeated_conflict_cleanup_owns_nested_glib_containers);
-    add_test(suite, repeated_review_and_error_cleanup);
+    add_test(suite, repeated_multiple_strong_values_keep_inputs_owned);
+    add_test(suite, repeated_reuse_and_error_cleanup);
     add_test(suite, default_policy_containers_are_independent);
     return run_test_suite(suite, create_text_reporter());
 }

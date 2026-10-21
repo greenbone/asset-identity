@@ -11,12 +11,10 @@ import (
 )
 
 type fuzzyKernelResult struct {
-	NeedsNewKey           bool
-	SelectedKey           string
-	SelectedIndex         *int // original input index; nil when no survivor
-	SelectedScore         float32
-	PotentialMergeIndices []int // original input order, parallel to PotentialMergeKeys
-	PotentialMergeKeys    []string
+	NeedsNewKey   bool
+	SelectedKey   string
+	SelectedIndex *int // original input index; nil when no survivor
+	SelectedScore float32
 }
 
 func matchFuzzyKernel(observation Observation, candidates []Candidate, policy MatchPolicy) (fuzzyKernelResult, error) {
@@ -30,7 +28,7 @@ func matchFuzzyKernel(observation Observation, candidates []Candidate, policy Ma
 		return fail, fmt.Errorf("observation: %w", err)
 	}
 	result := fuzzyKernelResult{NeedsNewKey: true}
-	// Preserve C's empty-observation guard, including no empty-subset sweep.
+	// Empty observations never select an existing key.
 	if len(observationSet) == 0 || len(candidates) == 0 {
 		return result, nil
 	}
@@ -56,30 +54,12 @@ func matchFuzzyKernel(observation Observation, candidates []Candidate, policy Ma
 			selectedScore = score
 		}
 	}
-	addTarget := func(index int) {
-		result.PotentialMergeIndices = append(result.PotentialMergeIndices, index)
-		result.PotentialMergeKeys = append(result.PotentialMergeKeys, candidates[index].AssetKey)
-	}
 	if selectedCandidateIndex >= 0 {
-		selected := candidateSets[selectedCandidateIndex]
 		index := selectedCandidateIndex
 		result.NeedsNewKey = false
 		result.SelectedIndex = &index
 		result.SelectedKey = candidates[index].AssetKey
 		result.SelectedScore = selectedScore
-		// Subsets are compared with the survivor, not the observation.
-		for candidateIndex, candidate := range candidateSets {
-			if candidateIndex != index && fuzzySetSubset(candidate.identifiers, selected.identifiers) {
-				addTarget(candidateIndex)
-			}
-		}
-		return result, nil
-	}
-	// Contained candidates require a new key, even for a single subset.
-	for candidateIndex, candidate := range candidateSets {
-		if fuzzySetSubset(candidate.identifiers, observationSet) {
-			addTarget(candidateIndex)
-		}
 	}
 	return result, nil
 }

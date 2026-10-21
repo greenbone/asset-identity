@@ -1,56 +1,12 @@
-# SPEC-001A: Native Go Identifier Model
+# SPEC-001A: Identifier Model
 
-**Status:** Approved — native Go model contract  
-**Component:** asset-identity  
-**Parent:** [SPEC-001: Asset Identifiers](SPEC-001-identifiers.md)  
-**Scope:** Native Go data representation, structural validation, and equality boundaries
+This document defines the data model in [`identity/model.go`](../../identity/model.go). Payload normalization is defined
+in [SPEC-001B](SPEC-001B-normalization.md).
 
-## 1. Authority and approved scope
-
-SPEC-001 is authoritative. This document finalizes its native Go data model following explicit approval of the choices
-below. It resolves only the parent's model-specific open decisions and does not amend the parent document.
-
-The following are inherited requirements: stable string type identifiers; multiple values; scopes; UTC observation
-timestamps with explicit missingness; separation of identifier values from observation history; no runtime registration;
-a native Go core; and lossless suitability for a future C adapter.
-
-The names, representations, structural comparison, timestamp range and precision, and error contracts below are approved
-for implementation. Type-specific normalization and semantic equality remain open. Go snippets describe the public data
-model and examples.
-
-## 2. Approved identifier type names
-
-Use a defined string type and constants for the types supported by this library version:
+## Data types
 
 ```go
 type IdentifierType string
-
-const (
-TypeGreenboneID       IdentifierType = "greenbone_id"
-TypeAgentID           IdentifierType = "agent_id"
-TypeMachineID         IdentifierType = "machine_id"
-TypeBIOSUUID          IdentifierType = "bios_uuid"
-TypeSSHHostKey        IdentifierType = "ssh_host_key"
-TypeTLSPublicKeyHash  IdentifierType = "tls_certificate_public_key_hash"
-TypeCloudIdentifier   IdentifierType = "cloud_identifier"
-TypeIP                IdentifierType = "ip"
-TypeFQDN              IdentifierType = "fqdn"
-TypeMAC               IdentifierType = "mac"
-TypeHostname          IdentifierType = "hostname"
-)
-```
-
-Approved names are exact and case-sensitive. Validation does not trim, lowercase, or accept aliases for type names. The
-empty string is an unknown type.
-
-The declaration order follows the parent's default strong priority for readability only. It must not be used as a
-priority mechanism. Classification and configurable priority remain separate from these data types.
-
-## 3. Approved data types
-
-```go
-// Scope is a set of named namespace dimensions.
-// nil means absent; a non-nil empty map means explicitly present and empty.
 type Scope map[string]string
 
 type IdentifierValue struct {
@@ -61,260 +17,61 @@ Scope Scope
 
 type IdentifierObservation struct {
 Identifier IdentifierValue
-ObservedAt *time.Time // nil means explicitly missing
+ObservedAt *time.Time
 }
 
 type ObservationHistory []IdentifierObservation
 ```
 
-The snippets use the standard library's `time` package. No interfaces, generic metadata containers, registry objects, C
-types, or database types are required.
+Use `[]IdentifierValue` for collections so multiple values of one type remain representable. Type names are exact,
+case-sensitive strings; declaration order does not define matching priority.
 
-Use `[]IdentifierValue` when a collection of identifier values is needed. It supports any number of values per type and
-values in different scopes. Do not use `map[IdentifierType]IdentifierValue`, which would overwrite additional values of
-a type.
+| Go constant            | Type name                         |
+|------------------------|-----------------------------------|
+| `TypeGreenboneID`      | `greenbone_id`                    |
+| `TypeAgentID`          | `agent_id`                        |
+| `TypeMachineID`        | `machine_id`                      |
+| `TypeBIOSUUID`         | `bios_uuid`                       |
+| `TypeSSHHostKey`       | `ssh_host_key`                    |
+| `TypeTLSPublicKeyHash` | `tls_certificate_public_key_hash` |
+| `TypeCloudIdentifier`  | `cloud_identifier`                |
+| `TypeIP`               | `ip`                              |
+| `TypeFQDN`             | `fqdn`                            |
+| `TypeMAC`              | `mac`                             |
+| `TypeHostname`         | `hostname`                        |
 
-`Value` preserves its supplied bytes without normalization or parsing. A Go string can carry text or bytes; choosing
-accepted encodings for particular types remains subject to separate approval. This model does not choose SSH key, TLS
-hash, UUID, or address encodings.
+## Scope and equality
 
-### 3.1 Structured scopes
+Scope dimensions use exact names and values. Names must be nonempty; values may be empty. Map order does not matter.
+Missing dimensions differ from empty values, and `nil` scope differs from `Scope{}`. Neither absent nor empty scope is a
+wildcard or a claim of global uniqueness.
 
-Use named string dimensions rather than a single concatenated namespace string. For example, a cloud scope could be:
+`SameRepresentation(a, b)` compares type, payload bytes, and complete scope without validation or normalization. Use
+`EqualIdentifiers` from SPEC-001B for semantic equality. Timestamps and history never participate in either comparison.
 
-```go
-Scope{
-"provider": "example-cloud",
-"account":  "account-17",
-"region":   "region-a",
-}
-```
+## Timestamps and history
 
-These dimension names are illustrative, not an approved cloud namespace contract. Which dimensions are required,
-permitted, or meaningful for each identifier type remains open.
+- `nil` means missing. A non-nil Go zero time is present.
+- Present timestamps must fall within UTC years 1–9999. Epoch and pre-epoch times are valid.
+- Timestamp normalization preserves the instant and nanoseconds, converts to UTC, and removes monotonic-clock data.
+- History preserves supplied entry order and duplicates. It does not sort, aggregate, replace, or expire observations.
+  Applications own retention and choose the active values used for matching.
 
-Approved generic scope rules:
+## Operations and errors
 
-- A scope has at most one value per dimension, as represented by the map.
-- Dimension names must be nonempty. Dimension names and values are otherwise compared exactly; there is no generic
-  trimming or case folding.
-- Empty dimension values are representable and differ from absent dimensions. Whether a type permits them remains open.
-- Map insertion and iteration order do not affect scope equality.
-- Absent scope (`nil`) and explicitly present empty scope (`Scope{}`) remain distinct. Neither denotes a wildcard or
-  asserts global uniqueness.
+| Operation                         | Behavior                                                                                        |
+|-----------------------------------|-------------------------------------------------------------------------------------------------|
+| `IdentifierValue.Validate`        | Check supported type and nonempty scope dimension names; do not inspect payload syntax          |
+| `IdentifierObservation.Validate`  | Check the identifier structure and present timestamp range                                      |
+| `ObservationHistory.Validate`     | Return the first invalid entry with its zero-based index                                        |
+| `Clone` methods                   | Copy maps, timestamp storage, and history entries; preserve nil/empty distinctions and timezone |
+| `IdentifierObservation.Normalize` | Clone and normalize only the timestamp; do not validate or normalize the payload                |
+| `NewObservation`                  | Copy, normalize the timestamp, and validate; return a zero observation on error                 |
+| `NewObservationHistory`           | Apply the constructor to each entry; return nil and the first indexed error on failure          |
 
-### 3.2 Observation timestamps
+Direct struct construction does not validate input. Structural errors support `errors.Is`:
+`ErrUnknownIdentifierType`, `ErrInvalidScope`, and `ErrInvalidObservationTime`. Validation is deterministic and does not
+mutate input or return partially accepted histories.
 
-Use an optional `*time.Time`:
-
-- `nil` means the observation timestamp is explicitly missing.
-- A non-nil pointer means present, including a pointer to Go's zero time. `IsZero()` must not be used to infer
-  missingness.
-- Present times retained by validated input constructors are stored in UTC with nanosecond precision, without a
-  monotonic-clock component. Directly constructed input may contain other timezone offsets.
-- Use a supported UTC year range of 1 through 9999 inclusive; out-of-range times produce a validation error. Unix epoch
-  and pre-epoch times are valid.
-- Offset-bearing input is converted to the same UTC instant; it is not reinterpreted as UTC wall time. UTC conversion
-  must not change precision or supply a missing timestamp.
-- Observation order and validity do not depend on whether timestamps are missing, equal, or chronological. No freshness
-  rule is implied.
-
-UTC conversion removes Go's process-local monotonic reading; that reading is not observation-history data. See
-the [Go time documentation](https://pkg.go.dev/time#hdr-Monotonic_Clocks). External timestamp encoding remains open.
-
-### 3.3 Ownership and mutation
-
-These approved structs are mutable Go data. Copying a struct does not deep-copy its scope map or timestamp pointer.
-Every library API retaining caller-provided data, including constructors returning owned observations or histories, must
-defensively copy the scope map and timestamp value so later caller mutation cannot alter retained identifiers or
-history. Copying an absent scope must preserve absence.
-
-No automatic concurrency protection or global mutable state is approved. Callers synchronize concurrent mutation of
-their own data.
-
-## 4. Identifier-value equality
-
-The parent requires semantic equality under approved type-specific value and scope rules. Those rules remain open. This
-document must not substitute byte equality for that semantic contract.
-
-Provide a separate, clearly named structural operation, `SameRepresentation(a, b IdentifierValue) bool`, for model tests
-and callers that deliberately need exact representation comparison. For structurally valid inputs it returns true
-exactly when:
-
-1. Type strings are equal.
-2. Value strings contain identical bytes.
-3. Scope presence is equal and all scope dimension names and values are equal, independent of map order.
-
-The operation neither normalizes nor validates its operands. Validation is a separate boundary. Even if identical
-invalid inputs compare structurally equal, that result does not make them valid identifiers.
-
-Timestamps, history length, history order, and repeated observations are excluded from identifier-value equality. Do not
-compare `IdentifierValue` with Go's `==`; its scope map requires explicit comparison.
-
-When representations differ, `SameRepresentation` returning false does not establish semantic inequality. For example,
-differently formatted IP strings might later normalize to the same value under an approved contract. Semantic equality
-and semantic deduplication remain deferred until the applicable type contracts are approved. No generic `Equal`
-operation claiming semantic equality is approved at this stage.
-
-## 5. Observation history and multiple values
-
-Represent supplied history as an ordered slice of observations. Preserve supplied sequence order without interpreting it
-as timestamp order or priority.
-
-Each history entry contains an identifier value and its own present or missing timestamp. Reobserving the same value
-adds observation metadata, not a new distinct identifier value. Construction and copying preserve supplied entries,
-including identical entries, because no event identifier or history aggregation rule exists. This does not require
-callers to retain all observations indefinitely.
-
-No implicit sorting, replacement by the newest value, timestamp aggregation, or history deduplication is approved.
-Different values remain representable together. `ObservationHistory` is only an in-memory representation. The library
-does not require unlimited observation retention. Callers own persistence, retention limits, pruning, and lifecycle
-decisions; the model itself does not apply those policies.
-
-An ordinary `[]IdentifierValue` does not enforce uniqueness by itself. Consumers must not count duplicate
-representations or repeated observations as additional identity evidence. It is possible to identify exact duplicate
-representations now; semantic duplicates require the later approved normalization contracts. No matching or
-evidence-counting algorithm is defined here.
-
-## 6. Approved validation and error behavior
-
-Direct struct construction can represent invalid input; it does not imply validation. Validated input constructors check
-structural validity at the input boundary. Plain struct construction, cloning, timestamp normalization, and structural
-comparison remain separate operations and do not imply validation. Approved model validation covers only:
-
-- A type name from the supported constant set.
-- Nonempty scope dimension names, when a scope is present.
-- Present observation times whose UTC instant lies within the approved range, regardless of the input timezone offset.
-
-Validation accepts valid `time.Time` values with any timezone offset and checks the UTC instant without modifying the
-input. Timestamp normalization is a separate operation: it copies a present time and converts it to UTC without
-validating it. Validated constructors normalize a defensive copy at the input boundary and then validate that copy.
-Missing timestamps remain `nil` throughout. Type-specific validity, including empty values and placeholders, remains
-open; passing model validation does not certify type-specific validity.
-
-Provide errors identifiable with `errors.Is`:
-
-| Error category              | Approved behavior                                                                                                                                             |
-|-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `ErrUnknownIdentifierType`  | Reject unknown, empty, or misspelled type names; include the rejected type in diagnostic context. Do not silently ignore, register, coerce, or classify them. |
-| `ErrInvalidScope`           | Reject an empty dimension name; identify the affected field. Per-type scope validation remains deferred.                                                      |
-| `ErrInvalidObservationTime` | Reject an instant outside the approved UTC year range. Different timezone offsets are accepted. A missing timestamp is valid.                                 |
-
-Batch validation must return the first error in slice order with its entry index, without returning a partially accepted
-batch or mutating caller data. Where multiple scope keys are invalid, diagnostics must not depend on map iteration
-order. Invalid input returns an error rather than causing a panic.
-
-### 6.1 Minimal public operations
-
-The `identity` package provides these operations in addition to the data types:
-
-```go
-func (v IdentifierValue) Validate() error
-func (v IdentifierValue) Clone() IdentifierValue
-func (o IdentifierObservation) Validate() error
-func (o IdentifierObservation) Clone() IdentifierObservation
-func (o IdentifierObservation) Normalize() IdentifierObservation
-func (h ObservationHistory) Validate() error
-func (h ObservationHistory) Clone() ObservationHistory
-func SameRepresentation(a, b IdentifierValue) bool
-func NewObservation(v IdentifierValue, observedAt *time.Time) (IdentifierObservation, error)
-func NewObservationHistory(input ObservationHistory) (ObservationHistory, error)
-```
-
-`Clone` defensively copies maps, timestamp values, and history slices, preserving nil versus non-nil empty collections.
-It does not validate or normalize. `Normalize` returns a defensive copy with UTC timestamps and no monotonic reading; it
-does not change type names, payloads, or scopes, and does not validate. `Validate` never mutates input and checks types
-before scopes, then timestamps for observations. All validation errors wrap the documented categories.
-
-`NewObservation` normalizes a defensive copy and validates it. `NewObservationHistory` does the same for every supplied
-entry, returning the first error with its zero-based entry index and no partial history. Neither constructor stores
-global state or enforces a retention policy.
-
-## 7. Representative examples
-
-The following is an illustrative function-body fragment, not an implementation. Scope names and payloads demonstrate
-representation only, not approved type-specific validity.
-
-```go
-agent := IdentifierValue{
-Type:  TypeAgentID,
-Value: "agent-42",
-Scope: Scope{"namespace": "deployment-a"},
-}
-
-values := []IdentifierValue{
-{Type: TypeIP, Value: "192.0.2.10", Scope: Scope{"network": "network-a"}},
-{Type: TypeIP, Value: "192.0.2.11", Scope: Scope{"network": "network-a"}},
-{Type: TypeIP, Value: "192.0.2.10", Scope: Scope{"network": "network-b"}},
-agent,
-}
-
-first := time.Date(2026, 10, 14, 8, 0, 0, 123456789, time.UTC)
-later := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
-history := ObservationHistory{
-{Identifier: agent, ObservedAt: &first},
-{Identifier: agent, ObservedAt: &later},
-{Identifier: agent, ObservedAt: nil},
-}
-
-absentScope := IdentifierValue{Type: TypeMachineID, Value: "machine-7"}
-emptyScope := IdentifierValue{Type: TypeMachineID, Value: "machine-7", Scope: Scope{}}
-
-zero := time.Time{}.UTC()
-presentZero := IdentifierObservation{Identifier: agent, ObservedAt: &zero}
-missingTime := IdentifierObservation{Identifier: agent, ObservedAt: nil}
-
-unknown := IdentifierValue{Type: IdentifierType("future_type"), Value: "x"}
-```
-
-Expected outcomes under this contract:
-
-- `values` holds three IP representations, including the same address in two different scopes; none overwrites another.
-- `history` contains three observations of one identifier-value representation. Their timestamp differences do not
-  change identifier-value equality.
-- `absentScope` and `emptyScope` have different representations; no wildcard or global-uniqueness interpretation
-  follows.
-- `presentZero` and `missingTime` have equal identifier representations but different timestamp-presence states.
-- Validation of `unknown` returns an error recognizable as `ErrUnknownIdentifierType`.
-
-## 8. Future C API suitability
-
-No C bindings or ABI layout are approved. A future adapter must preserve the logical data described here:
-
-- Exact type and value bytes, including embedded zero bytes where permitted by the eventual type contract.
-- Scope absence versus an explicitly empty scope and every dimension name/value pair. Map order carries no meaning.
-- Every history entry, supplied sequence order, and the identifier representation associated with each entry.
-- Timestamp presence, UTC instant, and nanosecond precision throughout the approved range, including present zero and
-  pre-epoch instants.
-
-The adapter must not flatten structured scopes ambiguously, collapse history into a latest timestamp, or turn missing
-timestamps into zero instants. String lengths and timestamp presence must remain recoverable; Go memory layouts are not
-the external contract.
-
-A lossless timestamp mapping need not use one signed nanosecond count since the Unix epoch, which would not cover the
-approved range. A later adapter specification will choose a suitable encoding, ownership, and lifetime rules. No
-C-specific fields belong in these Go types.
-
-## 9. Testable acceptance criteria
-
-Test the contracts in sections 2–6 with table-driven cases covering exact type names, scope dimension/presence changes,
-repeated history entries, missing/present-zero timestamps, UTC offsets and range boundaries. Structural comparison must
-be reflexive, symmetric, and transitive without claiming semantic equality.
-
-Copy/export-import tests preserve every field and nil/empty distinction, entry order, timestamp presence, and nanosecond
-precision. Mutating caller maps, slices, or timestamps must not affect owned results. Validation reports the first
-indexed error via `errors.Is`, with no partial batch or input mutation. Verify the package with
-`CGO_ENABLED=0`; tests require no C adapter or application infrastructure.
-
-## 10. Remaining open decisions
-
-Stable names, map-based scope and presence semantics, optional `time.Time`, timestamp range and precision, exact
-representation comparison, defensive copying, caller-controlled retention, and model validation/error contracts are
-resolved by this approved specification.
-
-Type-specific normalization, payload encodings and validity, placeholder handling, required scope dimensions, and
-semantic equality remain unresolved. External serialization and C adapter contracts remain separate work. Classification
-overrides, omitted priority types, and disabling types are not resolved here.
-
-Matching scores, strong or weak matching, candidate selection, asset merging, database operations, runtime registration,
-and C adapter implementation are outside this document's scope.
+Callers must synchronize their own mutations. Library copies must not share mutable scope maps or timestamp storage with
+inputs. The C reconciliation API and its ownership rules are defined in [SPEC-002](SPEC-002-reconciliation.md#c-api).

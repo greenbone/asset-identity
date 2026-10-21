@@ -174,39 +174,9 @@ static gboolean wire_policy(const gvm_asset_identity_policy_t *policy,
     return TRUE;
 }
 
-static GArray *copy_indices(const size_t *values, gsize count) {
-    GArray *indices = g_array_sized_new(FALSE, FALSE, sizeof(gsize), count);
-    for (gsize i = 0; i < count; i++) { gsize value = values[i]; g_array_append_val(indices, value); }
-    return indices;
-}
-
-static GPtrArray *copy_identifiers(const gai_wire_identifier_t *values, gsize count) {
-    GPtrArray *identifiers = new_identifiers();
-    for (gsize i = 0; i < count; i++) {
-        gvm_asset_identity_identifier_t *identifier = gvm_asset_identity_identifier_new(values[i].type, values[i].value.data);
-        if (values[i].scope.present) {
-            identifier->scope = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
-            for (gsize j = 0; j < values[i].scope.count; j++) {
-                gai_wire_scope_dimension_t dimension = values[i].scope.dimensions[j];
-                g_hash_table_insert(identifier->scope, g_strdup(dimension.name.data), g_strdup(dimension.value.data));
-            }
-        }
-        g_ptr_array_add(identifiers, identifier);
-    }
-    return identifiers;
-}
-
 void gvm_asset_identity_decision_free(gvm_asset_identity_decision_t *decision) {
     if (!decision) return;
     g_free(decision->selected_key);
-    if (decision->potential_merge_indices) g_array_unref(decision->potential_merge_indices);
-    if (decision->potential_merge_keys) g_ptr_array_unref(decision->potential_merge_keys);
-    if (decision->conflict) {
-        g_free(decision->conflict->reason);
-        g_array_unref(decision->conflict->candidate_indices);
-        g_ptr_array_unref(decision->conflict->identifiers);
-        g_free(decision->conflict);
-    }
     g_free(decision);
 }
 
@@ -218,15 +188,6 @@ static gvm_asset_identity_decision_t *copy_decision(const gai_wire_decision_t *v
     decision->has_selected_index = value->has_selected_index;
     decision->selected_index = value->selected_index;
     if (value->has_selected_index) decision->selected_key = g_strdup(value->selected_key.data);
-    decision->potential_merge_indices = copy_indices(value->potential_merge_indices, value->potential_merge_count);
-    decision->potential_merge_keys = g_ptr_array_new_with_free_func(g_free);
-    for (gsize i = 0; i < value->potential_merge_count; i++) g_ptr_array_add(decision->potential_merge_keys, g_strdup(value->potential_merge_keys[i].data));
-    if (value->conflict) {
-        decision->conflict = g_new0(gvm_asset_identity_conflict_t, 1);
-        decision->conflict->reason = g_strdup(value->conflict->reason.data);
-        decision->conflict->candidate_indices = copy_indices(value->conflict->candidate_indices, value->conflict->candidate_count);
-        decision->conflict->identifiers = copy_identifiers(value->conflict->identifiers, value->conflict->identifier_count);
-    }
     return decision;
 }
 
