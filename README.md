@@ -85,14 +85,19 @@ when deciding. No caller-side key extraction or hashing is required.
 
 ## Formatting and linting
 
-With golangci-lint v2 installed:
+Install golangci-lint v2, clang-format, and Gersemi, then run:
 
 ```sh
-make format  # gofmt and goimports using .golangci.yml
-make lint    # run the configured linters
+make format              # format Go, C headers/sources, and CMake files
+make format-go           # gofmt and goimports using .golangci.yml
+make format-c            # clang-format using .clang-format
+make format-cmake        # Gersemi using .gersemirc
+make format-check-c      # check C formatting without modifying files
+make format-check-cmake  # check CMake formatting without modifying files
+make lint                # run the configured Go linters
 ```
 
-Set `GOLANGCI_LINT` to override the executable path.
+Set `GOLANGCI_LINT`, `CLANG_FORMAT`, or `GERSEMI` to override executable paths.
 
 ## C build, test, and install
 

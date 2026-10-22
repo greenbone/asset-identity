@@ -8,6 +8,8 @@ INCLUDEDIR ?= $(PREFIX)/include
 DESTDIR ?=
 GO ?= go
 GOLANGCI_LINT ?= golangci-lint
+CLANG_FORMAT ?= clang-format
+GERSEMI ?= gersemi
 GOARCH ?= $(shell $(GO) env GOARCH)
 CC ?= cc
 CMAKE ?= cmake
@@ -17,8 +19,10 @@ DIST := $(CURDIR)/dist
 VERSION ?= 1.0.0
 LIBRARY := libgvm_asset_identity.so
 LIBRARY_FILE := $(LIBRARY).$(VERSION)-$(GOARCH)
+C_SOURCES := $(wildcard capi/*.c capi/*.h include/*.h tests/c/*.c tests/c/*.h)
+CMAKE_SOURCES := tests/c/CMakeLists.txt
 
-.PHONY: build format lint test test-c test-install install uninstall clean
+.PHONY: build format format-go format-c format-cmake format-check-c format-check-cmake lint test test-c test-install install uninstall clean
 
 build:
 	mkdir -p "$(DIST)/include" "$(DIST)/internal"
@@ -28,8 +32,22 @@ build:
 	ln -sfn "$(LIBRARY).1" "$(DIST)/$(LIBRARY)"
 	cp include/gvm_asset_identity.h "$(DIST)/include/"
 
-format:
+format: format-go format-c format-cmake
+
+format-go:
 	$(GOLANGCI_LINT) fmt
+
+format-c:
+	$(CLANG_FORMAT) -i -style=file $(C_SOURCES)
+
+format-cmake:
+	$(GERSEMI) --in-place $(CMAKE_SOURCES)
+
+format-check-c:
+	$(CLANG_FORMAT) --dry-run --Werror -style=file $(C_SOURCES)
+
+format-check-cmake:
+	$(GERSEMI) --check $(CMAKE_SOURCES)
 
 lint:
 	$(GOLANGCI_LINT) run ./...
