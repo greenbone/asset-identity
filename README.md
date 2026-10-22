@@ -149,6 +149,23 @@ independently owned decision. Free functions accept NULL; errors use `GError`. C
 header/library and GLib. See the [public header](include/gvm_asset_identity.h) and
 [C contract](docs/specs/SPEC-002-reconciliation.md#c-api) for details.
 
+## Container image
+
+Build the library image with Docker:
+
+```sh
+docker build -f .docker/Dockerfile -t asset-identity .
+```
+
+Like `gvm-auth-lib`, the image carries installation files under `/install/usr/local`:
+the shared library, public header, and pkg-config metadata. A consuming image can
+copy `/install/` into `/` during its build. Consumers still need GLib at build and
+runtime as described above.
+
+The container workflow uses Greenbone's shared build and push workflow to publish
+`ghcr.io/greenbone/asset-identity` on main branch and version tag pushes, with pull
+request builds and a manual ref input.
+
 ## Algorithm guide
 
 [How Asset Identity Works](docs/how-asset-identity-works.md) explains the decision flow, strong priority, exact TLS
