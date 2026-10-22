@@ -107,7 +107,7 @@ Ensure(strong_no_match_and_multiple_values) {
     g_ptr_array_unref(rows); gvm_asset_identity_policy_free(policy);
 }
 
-Ensure(fuzzy_containment_selects_keys_without_merges) {
+Ensure(fuzzy_containment_returns_merge_plan) {
     gvm_asset_identity_policy_t *policy = default_policy();
     gvm_asset_identity_observation_t *input = observation(GVM_ASSET_IDENTITY_IP, "192.0.2.1");
     GPtrArray *rows = candidates_new();
@@ -123,6 +123,9 @@ Ensure(fuzzy_containment_selects_keys_without_merges) {
     assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_REUSE));
     assert_that(result->needs_new_key, is_false);
     assert_that(result->selected_key, is_equal_to_string("wide"));
+    assert_that(result->merge_indices->len, is_equal_to(1));
+    assert_that(g_array_index(result->merge_indices, gsize, 0), is_equal_to(1));
+    assert_that(g_ptr_array_index(result->merge_keys, 0), is_equal_to_string("narrow"));
     gvm_asset_identity_decision_free(result);
     g_ptr_array_remove_index(rows, 0);
     g_ptr_array_add(input->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_IP, "192.0.2.2"));
@@ -277,13 +280,63 @@ Ensure(tls_requires_equal_public_key_sets) {
     gvm_asset_identity_policy_free(policy);
 }
 
+Ensure(create_returns_owned_merge_targets) {
+    gvm_asset_identity_policy_t *policy = default_policy();
+    gvm_asset_identity_observation_t *input = observation(GVM_ASSET_IDENTITY_IP, "192.0.2.1");
+    g_ptr_array_add(input->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_HOSTNAME, "host.example"));
+    GPtrArray *rows = candidates_new();
+    g_ptr_array_add(rows, candidate("K1", input));
+    g_ptr_array_add(input->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_MAC, "02:00:00:00:00:01"));
+    g_ptr_array_add(rows, candidate("K2", input));
+    gvm_asset_identity_candidate_t *second = g_ptr_array_index(rows, 1);
+    g_ptr_array_remove_index(second->identifiers, 1);
+    gvm_asset_identity_decision_t *result = decide(input, rows, policy);
+    gvm_asset_identity_observation_free(input);
+    g_ptr_array_unref(rows);
+    gvm_asset_identity_policy_free(policy);
+    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_CREATE));
+    assert_that(result->has_selected_index, is_false);
+    assert_that(result->merge_indices->len, is_equal_to(2));
+    assert_that(result->merge_keys->len, is_equal_to(2));
+    assert_that(g_array_index(result->merge_indices, gsize, 0), is_equal_to(0));
+    assert_that(g_array_index(result->merge_indices, gsize, 1), is_equal_to(1));
+    assert_that(g_ptr_array_index(result->merge_keys, 0), is_equal_to_string("K1"));
+    assert_that(g_ptr_array_index(result->merge_keys, 1), is_equal_to_string("K2"));
+    gvm_asset_identity_decision_free(result);
+}
+
+Ensure(weak_observation_keeps_conflicting_agent_records_separate) {
+    gvm_asset_identity_policy_t *policy = default_policy();
+    gvm_asset_identity_observation_t *input = observation(GVM_ASSET_IDENTITY_IP, "192.0.2.1");
+    g_ptr_array_add(input->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_HOSTNAME, "host.example"));
+    GPtrArray *rows = candidates_new();
+    g_ptr_array_add(rows, candidate("K1", input));
+    g_ptr_array_add(input->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_MAC, "02:00:00:00:00:01"));
+    g_ptr_array_add(rows, candidate("K2", input));
+    gvm_asset_identity_candidate_t *first = g_ptr_array_index(rows, 0);
+    gvm_asset_identity_candidate_t *second = g_ptr_array_index(rows, 1);
+    g_ptr_array_remove_index(second->identifiers, 1);
+    g_ptr_array_add(first->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_AGENT_ID, "A"));
+    g_ptr_array_add(second->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_AGENT_ID, "B"));
+    gvm_asset_identity_decision_t *result = decide(input, rows, policy);
+    assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_CREATE));
+    assert_that(result->merge_indices->len, is_equal_to(0));
+    assert_that(result->merge_keys->len, is_equal_to(0));
+    gvm_asset_identity_decision_free(result);
+    gvm_asset_identity_observation_free(input);
+    g_ptr_array_unref(rows);
+    gvm_asset_identity_policy_free(policy);
+}
+
 int main(void) {
     TestSuite *suite = create_test_suite();
     add_test(suite, create_and_strong_reuse);
+    add_test(suite, create_returns_owned_merge_targets);
+    add_test(suite, weak_observation_keeps_conflicting_agent_records_separate);
     add_test(suite, custom_priority_preserves_original_indices);
     add_test(suite, strong_ranking_keeps_nanoseconds_missing_and_key_ties);
     add_test(suite, strong_no_match_and_multiple_values);
-    add_test(suite, fuzzy_containment_selects_keys_without_merges);
+    add_test(suite, fuzzy_containment_returns_merge_plan);
     add_test(suite, fuzzy_time_uses_epoch_whole_seconds_and_input_order);
     add_test(suite, scoped_semantic_equality_preserves_absent_and_empty);
     add_test(suite, raw_ssh_scanner_value_matches_public_key);

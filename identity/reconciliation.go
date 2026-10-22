@@ -45,6 +45,8 @@ type Decision struct {
 	NeedsNewKey   bool
 	SelectedKey   string
 	SelectedIndex *int
+	MergeIndices  []int    // original candidate positions to move to the destination key
+	MergeKeys     []string // keys corresponding to MergeIndices
 }
 
 // ErrDuplicateCandidateKey identifies repeated asset keys in the supplied candidate list.
@@ -53,8 +55,21 @@ var ErrDuplicateCandidateKey = errors.New("duplicate candidate asset key")
 // ErrEmptyCandidateKey identifies a candidate without an asset key.
 var ErrEmptyCandidateKey = errors.New("empty candidate asset key")
 
-// Decide matches caller-prepared eligible views without authorizing merges.
+// Decide selects a destination key and returns eligible existing keys to merge into it.
+// The caller creates any requested key and applies the plan atomically.
 func Decide(observation Observation, candidates []Candidate, policy MatchPolicy) (Decision, error) {
+	decision, err := selectKey(observation, candidates, policy)
+	if err != nil {
+		return Decision{}, err
+	}
+	if err := planMerges(&decision, observation, candidates, policy); err != nil {
+		return Decision{}, err
+	}
+	return decision, nil
+}
+
+// selectKey preserves the strong-priority and fuzzy-containment selection rules.
+func selectKey(observation Observation, candidates []Candidate, policy MatchPolicy) (Decision, error) {
 	if err := policy.Validate(); err != nil {
 		return Decision{}, err
 	}

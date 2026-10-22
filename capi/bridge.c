@@ -177,6 +177,8 @@ static gboolean wire_policy(const gvm_asset_identity_policy_t *policy,
 void gvm_asset_identity_decision_free(gvm_asset_identity_decision_t *decision) {
     if (!decision) return;
     g_free(decision->selected_key);
+    if (decision->merge_indices) g_array_unref(decision->merge_indices);
+    if (decision->merge_keys) g_ptr_array_unref(decision->merge_keys);
     g_free(decision);
 }
 
@@ -188,6 +190,13 @@ static gvm_asset_identity_decision_t *copy_decision(const gai_wire_decision_t *v
     decision->has_selected_index = value->has_selected_index;
     decision->selected_index = value->selected_index;
     if (value->has_selected_index) decision->selected_key = g_strdup(value->selected_key.data);
+    decision->merge_indices = g_array_new(FALSE, FALSE, sizeof(gsize));
+    decision->merge_keys = g_ptr_array_new_with_free_func(g_free);
+    for (size_t i = 0; i < value->merge_count; i++) {
+        gsize index = value->merge_indices[i];
+        g_array_append_val(decision->merge_indices, index);
+        g_ptr_array_add(decision->merge_keys, g_strdup(value->merge_keys[i].data));
+    }
     return decision;
 }
 

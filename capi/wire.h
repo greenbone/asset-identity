@@ -113,6 +113,9 @@ typedef struct {
     gai_wire_string_t selected_key;
     uint32_t has_selected_index;
     size_t selected_index;
+    size_t merge_count;
+    size_t *merge_indices;
+    gai_wire_string_t *merge_keys;
 } gai_wire_decision_t;
 
 typedef struct {

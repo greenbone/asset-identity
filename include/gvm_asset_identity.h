@@ -83,6 +83,8 @@ typedef struct {
     gchar *selected_key;
     gboolean has_selected_index;
     gsize selected_index;
+    GArray *merge_indices; /* Owned gsize entries, original candidate positions. */
+    GPtrArray *merge_keys; /* Owned gchar* entries, parallel to merge_indices. */
 } gvm_asset_identity_decision_t;
 
 /* Constructors return full ownership; child fields are owned by their parent.

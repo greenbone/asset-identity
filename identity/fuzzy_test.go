@@ -140,7 +140,7 @@ func TestFuzzyKernelImmutableAndConcurrent(t *testing.T) {
 }
 
 // Key selection and score fields were captured from the pinned, unmodified C source.
-// Reference C merge outputs are ignored; the library only selects keys.
+// Public merge plans also match the reference for these fuzzy-only views.
 // This regression test consumes data only; Go builds never depend on C or GLib.
 func TestFuzzyKernelCReferenceFixtures(t *testing.T) {
 	file, err := os.Open("testdata/fuzzy_c_compat.jsonl")
@@ -159,10 +159,11 @@ func TestFuzzyKernelCReferenceFixtures(t *testing.T) {
 				LastSeen    int64
 				Identifiers []IdentifierValue
 			}
-			NeedsNewKey       bool
-			SelectedIndex     int
-			SelectedKey       string
-			SelectedScoreBits uint32
+			NeedsNewKey           bool
+			SelectedIndex         int
+			SelectedKey           string
+			SelectedScoreBits     uint32
+			PotentialMergeIndices []int
 		}
 		if err := decoder.Decode(&fixture); err == io.EOF {
 			break
@@ -186,6 +187,9 @@ func TestFuzzyKernelCReferenceFixtures(t *testing.T) {
 			}
 			if err != nil || decision.Action != expectedAction || decision.Stage != StageFuzzy || decision.NeedsNewKey != fixture.NeedsNewKey || decision.SelectedKey != fixture.SelectedKey {
 				t.Fatalf("Decide differs from C fixture: %+v %v", decision, err)
+			}
+			if !reflect.DeepEqual(append([]int{}, decision.MergeIndices...), append([]int{}, fixture.PotentialMergeIndices...)) {
+				t.Fatalf("merge indices %v differ from C fixture %v", decision.MergeIndices, fixture.PotentialMergeIndices)
 			}
 			selected := -1
 			if got.SelectedIndex != nil {

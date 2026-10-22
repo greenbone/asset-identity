@@ -48,25 +48,28 @@ values do not matter, but an extra or missing TLS key prevents a TLS match: `{A,
 `{A,B,C}`. Other strong types retain any-value matching. Priority still applies: higher-priority identifiers can select
 an asset independently, and a TLS mismatch allows later configured strong types to be checked.
 
-Candidate indices refer to the supplied array. No conflict detection or merge proposals are performed. No result
-authorizes a database merge.
+`MergeIndices` and `MergeKeys` list existing assets to move to the destination key. Indices refer to the supplied
+candidate array. On CREATE, the application generates the destination key; on REUSE it uses `SelectedKey`. The
+application applies the observation and key moves atomically. Strong IDs protect merge eligibility; records without
+strong IDs require full fuzzy containment. A weak destination cannot combine sources with conflicting strong IDs.
+See [the algorithm guide](docs/how-asset-identity-works.md#8-the-returned-decision).
 
 ## Scanner identifier values
 
 Pass scanner values directly in `IdentifierValue.Value`:
 
-| Type | Scanner value |
-|------|---------------|
-| `TypeSSHHostKey` | `22 ecdsa-sha2-nistp256 <base64-public-key>` |
-| `TypeTLSPublicKeyHash` | `x509:<base64-DER-certificate>` |
+| Type                   | Scanner value                                |
+|------------------------|----------------------------------------------|
+| `TypeSSHHostKey`       | `22 ecdsa-sha2-nistp256 <base64-public-key>` |
+| `TypeTLSPublicKeyHash` | `x509:<base64-DER-certificate>`              |
 
 The library removes the SSH port and normalizes the public key. For TLS, it parses the certificate and calculates the
 public-key hash internally. Callers do not need to calculate hashes or strip these value prefixes. `Decide` performs
-this normalization automatically. Existing SSH public-key lines and `spki-sha256:` values remain accepted.
-Certificate fingerprints and `SSLDetails`/`SSLInfo` metadata alone cannot supply a public key.
+this normalization automatically. Existing SSH public-key lines and `spki-sha256:` values remain accepted. Certificate
+fingerprints and `SSLDetails`/`SSLInfo` metadata alone cannot supply a public key.
 
-In C, pass the same values to `gvm_asset_identity_identifier_new` and add them to the observation
-(or a candidate's identifiers):
+In C, pass the same values to `gvm_asset_identity_identifier_new` and add them to the observation (or a candidate's
+identifiers):
 
 ```c
 /* ssh_value is "22 ecdsa-sha2-nistp256 ..."; tls_value is "x509:...". */
@@ -76,8 +79,8 @@ g_ptr_array_add(observation->identifiers,
     gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, tls_value));
 ```
 
-`gvm_asset_identity_decide` performs parsing and normalization through the same Go implementation.
-Constructors copy the supplied values; malformed values produce `GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT`
+`gvm_asset_identity_decide` performs parsing and normalization through the same Go implementation. Constructors copy the
+supplied values; malformed values produce `GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT`
 when deciding. No caller-side key extraction or hashing is required.
 
 ## Formatting and linting
@@ -145,6 +148,11 @@ Constructors return owned objects; parents own their children. `decide` borrows 
 independently owned decision. Free functions accept NULL; errors use `GError`. Consumers need only the installed
 header/library and GLib. See the [public header](include/gvm_asset_identity.h) and
 [C contract](docs/specs/SPEC-002-reconciliation.md#c-api) for details.
+
+## Algorithm guide
+
+[How Asset Identity Works](docs/how-asset-identity-works.md) explains the decision flow, strong priority, exact TLS
+key-set matching, fuzzy containment, and Go/C usage through examples.
 
 ## Technical reference
 

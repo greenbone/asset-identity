@@ -1,7 +1,7 @@
 # SPEC-002: Asset Reconciliation
 
-`Decide` selects an existing asset key or requests a new one. It does not create keys, change stored assets, detect
-conflicts, or plan merges. The Go and GLib C APIs use the same implementation.
+`Decide` selects an existing asset key or requests a new one. It returns a merge plan for the application to apply;
+it does not create keys or change stored assets. The Go and GLib C APIs use the same implementation.
 
 ## Inputs and results
 
@@ -22,20 +22,22 @@ Stage         MatchingStage  // STRONG or FUZZY
 NeedsNewKey   bool
 SelectedKey   string
 SelectedIndex *int
+MergeIndices  []int
+MergeKeys     []string
 }
 
 func Decide(observation Observation, candidates []Candidate, policy MatchPolicy) (Decision, error)
 ```
 
 | Action | NeedsNewKey | Selected key/index |
-| ------ | ----------- | ------------------ |
+|--------|-------------|--------------------|
 | CREATE | true        | Absent             |
 | REUSE  | false       | Present            |
 
 Indices refer to the original candidate array. Invalid input returns an error and a zero decision. Inputs are not
 mutated or retained; returned pointers are independent. Concurrent calls may share immutable inputs.
 
-Applications supply eligible active identifiers and candidates. They own discovery, scanner/network boundaries,
+Applications supply complete eligible active identifier views and one candidate per existing key. They own discovery, scanner/network boundaries,
 authorization, producer trust, history retention, persistence, and applying results. Reconciliation does not read
 history or the wall clock. Complete identifier scope remains significant, including nil versus empty scope.
 
@@ -82,9 +84,9 @@ finite float32. Omit a type to disable it. Default policies and clones own their
 5. If incoming configured strong evidence exists but no type matches, return CREATE without fuzzy fallback. Only absence
    of incoming configured strong evidence permits fuzzy matching.
 
-TLS equality ignores order and duplicate normalized keys. `{A,B}` matches `{B,A}` but not `{A}` or `{A,B,C}`;
-scope differences remain significant. If TLS sets differ, continue to later configured strong types. TLS mismatch alone
-does not veto a higher-priority match. If no strong type matches, return CREATE without fuzzy fallback.
+TLS equality ignores order and duplicate normalized keys. `{A,B}` matches `{B,A}` but not `{A}` or `{A,B,C}`; scope
+differences remain significant. If TLS sets differ, continue to later configured strong types. TLS mismatch alone does
+not veto a higher-priority match. If no strong type matches, return CREATE without fuzzy fallback.
 
 Other strong types still match any incoming value. All qualifying candidates use the same ranking. Lower-priority
 matches and fuzzy differences do not veto the winning priority.
@@ -104,8 +106,31 @@ qualifying candidates contain the full observation and therefore have equal scor
 at whole-second precision, then first input position.
 
 For fuzzy ranking, missing `LastSeen` compares as Unix epoch. It ties epoch, outranks pre-epoch times, and differs from
-a present Go zero time. Fractional seconds do not break fuzzy ties. No score threshold, overlap-only matching, or
-merge-target discovery is performed.
+a present Go zero time. Fractional seconds do not break fuzzy ties. No score threshold or overlap-only matching is performed.
+
+## Merge plan
+
+After selecting a key, compare other candidates with the destination view: the selected candidate for REUSE,
+or the incoming observation for CREATE. `MergeIndices` lists source candidates in input order; `MergeKeys`
+contains their corresponding asset keys. The selected candidate is excluded. Empty lists mean no key moves.
+
+- If both views contain configured strong IDs, require a match at the winning strong type. For a STRONG REUSE,
+  use the type that selected the destination; otherwise use the highest-priority strong type present in the
+  destination. TLS requires exact complete key-set equality. Lower-priority differences do not veto that match.
+- If either view lacks configured strong IDs, require every source fuzzy identifier to occur in the destination
+  fuzzy set. The destination fuzzy set must be nonempty. An empty source fuzzy set is a subset, as in the C reference.
+- Partial fuzzy overlap alone does not produce a merge target. Strong mismatches cannot be bypassed through fuzzy
+  containment when both views contain strong IDs.
+
+If the destination lacks strong IDs, also compare the proposed strong-ID sources with each other. Use the
+highest-priority strong type present in either source, with exact full-set equality for TLS. Exclude both sources
+of every incompatible pair; input order does not choose a winner. Compatible strong sources and contained weak
+sources remain eligible. Thus a weak observation cannot bridge different Agent IDs into one new key.
+
+Key selection is unchanged: unmatched incoming strong IDs still produce CREATE, even if weak sources can be moved
+under the new key. On CREATE, `SelectedIndex` is nil and `SelectedKey` is empty, including when merge targets exist.
+The caller generates any new key and atomically stores the observation and moves each merge source to that key.
+The library performs no database writes and does not manufacture a union of supplied views.
 
 ## Validation
 
@@ -120,7 +145,7 @@ satisfy the structural and normalization contracts, even for types outside the s
 Here G/A mean Greenbone/Agent ID and P means IP; scopes are equal unless stated.
 
 | Observation     | Candidates                     | Result                                 |
-| --------------- | ------------------------------ | -------------------------------------- |
+|-----------------|--------------------------------|----------------------------------------|
 | G(g), A(a)      | K1:G(g), K2:A(a) newer         | STRONG REUSE K1: default priority wins |
 | G(g1), G(g2)    | K1:G(g1) older, K2:G(g2) newer | STRONG REUSE K2                        |
 | G(g), P(p)      | K1:P(p)                        | STRONG CREATE: no fuzzy fallback       |
@@ -132,10 +157,9 @@ Here G/A mean Greenbone/Agent ID and P means IP; scopes are equal unless stated.
 
 ## C API
 
-C callers may pass raw scanner values directly to `gvm_asset_identity_identifier_new`: SSH accepts a leading port,
-and TLS accepts `x509:<base64-DER-certificate>`. `gvm_asset_identity_decide` normalizes observation and candidate values
+C callers may pass raw scanner values directly to `gvm_asset_identity_identifier_new`: SSH accepts a leading port, and
+TLS accepts `x509:<base64-DER-certificate>`. `gvm_asset_identity_decide` normalizes observation and candidate values
 internally. Constructors copy values without parsing; invalid values return INVALID_INPUT from `decide`.
-
 
 The public header is [`gvm_asset_identity.h`](../../include/gvm_asset_identity.h). ABI 1 installs
 `libgvm_asset_identity.so -> .so.1 -> .so.<version>-<arch>`, the header, and pkg-config metadata. Consumers need GLib
@@ -161,9 +185,8 @@ been verified; cross-builds require matching GLib, compiler, and sysroot.
 ## Verification
 
 Run `make test`, `make test-install`, `go test -race ./...`, `CGO_ENABLED=0 go test ./...`, and `go vet ./...`. Tests
-cover priority, multiple strong values, ranking, scopes, containment, validation, ownership, and concurrent calls.
+cover priority, multiple strong values, ranking, scopes, containment, merge safeguards, validation, ownership, and concurrent calls.
 
 The 78 [C reference fixtures](../../identity/testdata/fuzzy_c_compat.jsonl) preserve fuzzy key selection and exact score
-bits for canonical supported values with equal scopes, distinct keys, and whole-second timestamps. Historical merge
-outputs in these fixtures are ignored. The reference C code's row-skipping and merge behavior are not part of this
-library's contract.
+bits for canonical supported values with equal scopes, distinct keys, and whole-second timestamps. Their fuzzy merge
+indices are also verified. The reference C code's row-skipping behavior is not part of this library's contract; this library rejects empty and duplicate candidate keys.
