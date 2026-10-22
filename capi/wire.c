@@ -30,10 +30,6 @@ gai_wire_status_t gai_wire_default_policy(
 void gai_wire_decision_free(gai_wire_decision_t *decision) {
     if (!decision) return;
     free_string(decision->selected_key);
-    for (size_t i = 0; i < decision->merge_count; i++) {
-        if (decision->merge_keys) free_string(decision->merge_keys[i]);
-    }
-    free(decision->merge_keys);
     free(decision->merge_indices);
     free(decision);
 }

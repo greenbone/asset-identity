@@ -248,10 +248,8 @@ func encodeDecision(value identity.Decision, output *C.gai_wire_decision_t) {
 	}
 	output.merge_count = C.size_t(len(value.MergeIndices))
 	output.merge_indices = (*C.size_t)(allocate(len(value.MergeIndices), C.sizeof_size_t))
-	output.merge_keys = (*C.gai_wire_string_t)(allocate(len(value.MergeKeys), C.sizeof_gai_wire_string_t))
 	for i, index := range value.MergeIndices {
 		unsafe.Slice(output.merge_indices, len(value.MergeIndices))[i] = C.size_t(index)
-		unsafe.Slice(output.merge_keys, len(value.MergeKeys))[i] = encodedString(value.MergeKeys[i])
 	}
 	output.selected_key = encodedString(value.SelectedKey)
 	if value.SelectedIndex != nil {

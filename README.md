@@ -48,9 +48,9 @@ values do not matter, but an extra or missing TLS key prevents a TLS match: `{A,
 `{A,B,C}`. Other strong types retain any-value matching. Priority still applies: higher-priority identifiers can select
 an asset independently, and a TLS mismatch allows later configured strong types to be checked.
 
-`MergeIndices` and `MergeKeys` list existing assets to move to the destination key. Indices refer to the supplied
-candidate array. On CREATE, the application generates the destination key; on REUSE it uses `SelectedKey`. The
-application applies the observation and key moves atomically. Strong IDs protect merge eligibility; records without
+`MergeIndices` lists the supplied candidates to move to the destination key. Retrieve each candidate and its
+asset key from the original candidate array using the returned index. On CREATE, the application generates the
+destination key; on REUSE it uses `SelectedKey`. The application applies the observation and key moves atomically. Strong IDs protect merge eligibility; records without
 strong IDs require full fuzzy containment. A weak destination cannot combine sources with conflicting strong IDs.
 See [the algorithm guide](docs/how-asset-identity-works.md#8-the-returned-decision).
 

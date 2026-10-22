@@ -23,7 +23,6 @@ NeedsNewKey   bool
 SelectedKey   string
 SelectedIndex *int
 MergeIndices  []int
-MergeKeys     []string
 }
 
 func Decide(observation Observation, candidates []Candidate, policy MatchPolicy) (Decision, error)
@@ -111,8 +110,9 @@ a present Go zero time. Fractional seconds do not break fuzzy ties. No score thr
 ## Merge plan
 
 After selecting a key, compare other candidates with the destination view: the selected candidate for REUSE,
-or the incoming observation for CREATE. `MergeIndices` lists source candidates in input order; `MergeKeys`
-contains their corresponding asset keys. The selected candidate is excluded. Empty lists mean no key moves.
+or the incoming observation for CREATE. `MergeIndices` lists source candidates in input order. Retrieve source
+records and their asset keys from the original candidate array using these indices. The selected candidate is
+excluded. An empty list means no key moves.
 
 - If both views contain configured strong IDs, require a match at the winning strong type. For a STRONG REUSE,
   use the type that selected the destination; otherwise use the highest-priority strong type present in the

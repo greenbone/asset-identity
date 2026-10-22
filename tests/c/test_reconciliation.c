@@ -125,7 +125,9 @@ Ensure(fuzzy_containment_returns_merge_plan) {
     assert_that(result->selected_key, is_equal_to_string("wide"));
     assert_that(result->merge_indices->len, is_equal_to(1));
     assert_that(g_array_index(result->merge_indices, gsize, 0), is_equal_to(1));
-    assert_that(g_ptr_array_index(result->merge_keys, 0), is_equal_to_string("narrow"));
+    gsize merge_index = g_array_index(result->merge_indices, gsize, 0);
+    const gvm_asset_identity_candidate_t *merge_source = g_ptr_array_index(rows, merge_index);
+    assert_that(merge_source->asset_key, is_equal_to_string("narrow"));
     gvm_asset_identity_decision_free(result);
     g_ptr_array_remove_index(rows, 0);
     g_ptr_array_add(input->identifiers, gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_IP, "192.0.2.2"));
@@ -297,11 +299,8 @@ Ensure(create_returns_owned_merge_targets) {
     assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_CREATE));
     assert_that(result->has_selected_index, is_false);
     assert_that(result->merge_indices->len, is_equal_to(2));
-    assert_that(result->merge_keys->len, is_equal_to(2));
     assert_that(g_array_index(result->merge_indices, gsize, 0), is_equal_to(0));
     assert_that(g_array_index(result->merge_indices, gsize, 1), is_equal_to(1));
-    assert_that(g_ptr_array_index(result->merge_keys, 0), is_equal_to_string("K1"));
-    assert_that(g_ptr_array_index(result->merge_keys, 1), is_equal_to_string("K2"));
     gvm_asset_identity_decision_free(result);
 }
 
@@ -321,7 +320,6 @@ Ensure(weak_observation_keeps_conflicting_agent_records_separate) {
     gvm_asset_identity_decision_t *result = decide(input, rows, policy);
     assert_that(result->action, is_equal_to(GVM_ASSET_IDENTITY_CREATE));
     assert_that(result->merge_indices->len, is_equal_to(0));
-    assert_that(result->merge_keys->len, is_equal_to(0));
     gvm_asset_identity_decision_free(result);
     gvm_asset_identity_observation_free(input);
     g_ptr_array_unref(rows);

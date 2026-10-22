@@ -61,7 +61,6 @@ func planMerges(decision *Decision, observation Observation, candidates []Candid
 			}
 		}
 		decision.MergeIndices = append(decision.MergeIndices, i)
-		decision.MergeKeys = append(decision.MergeKeys, candidate.AssetKey)
 	}
 	if !destinationStrong.HasIncomingStrong {
 		return excludeConflictingStrongSources(decision, candidates, policy)
@@ -115,13 +114,11 @@ func excludeConflictingStrongSources(decision *Decision, candidates []Candidate,
 		}
 	}
 	var indices []int
-	var keys []string
 	for i, index := range decision.MergeIndices {
 		if !blocked[i] {
 			indices = append(indices, index)
-			keys = append(keys, decision.MergeKeys[i])
 		}
 	}
-	decision.MergeIndices, decision.MergeKeys = indices, keys
+	decision.MergeIndices = indices
 	return nil
 }

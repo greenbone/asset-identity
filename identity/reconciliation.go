@@ -45,8 +45,7 @@ type Decision struct {
 	NeedsNewKey   bool
 	SelectedKey   string
 	SelectedIndex *int
-	MergeIndices  []int    // original candidate positions to move to the destination key
-	MergeKeys     []string // keys corresponding to MergeIndices
+	MergeIndices  []int // original candidate positions to move to the destination key
 }
 
 // ErrDuplicateCandidateKey identifies repeated asset keys in the supplied candidate list.

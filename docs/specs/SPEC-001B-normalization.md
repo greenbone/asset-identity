@@ -24,7 +24,7 @@ methods and observation constructors do not normalize payloads.
 ## Supported formats
 
 | Type                                     | Accepted input                                                                | Canonical payload                                        |
-|------------------------------------------|-------------------------------------------------------------------------------|----------------------------------------------------------|
+| ---------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Greenbone ID, Agent ID, cloud identifier | Nonempty opaque string                                                        | Exact bytes, including case and whitespace               |
 | Machine ID, `kind=linux_machine_id`      | Exactly 32 hex digits                                                         | Lowercase compact hex                                    |
 | Machine ID, `kind=windows_machine_guid`  | UUID text as defined below                                                    | Lowercase hyphenated UUID                                |

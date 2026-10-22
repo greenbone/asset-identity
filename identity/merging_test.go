@@ -58,17 +58,8 @@ func TestMergePlan(t *testing.T) {
 			if got.Action != tt.action || got.SelectedKey != tt.selected || !reflect.DeepEqual(got.MergeIndices, tt.merges) {
 				t.Fatalf("unexpected decision: %+v", got)
 			}
-			if len(got.MergeKeys) != len(tt.merges) {
-				t.Fatalf("keys not parallel: %+v", got)
-			}
-			for i, index := range tt.merges {
-				if got.MergeKeys[i] != tt.rows[index].AssetKey {
-					t.Fatalf("wrong merge key: %+v", got)
-				}
-			}
 			if len(got.MergeIndices) > 0 {
 				got.MergeIndices[0] = 99
-				got.MergeKeys[0] = "changed"
 				again, err := Decide(Observation{Identifiers: tt.incoming}, tt.rows, GreenboneMatchPolicy())
 				if err != nil || !reflect.DeepEqual(again.MergeIndices, tt.merges) {
 					t.Fatalf("output mutation retained: %+v %v", again, err)
