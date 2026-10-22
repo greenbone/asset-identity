@@ -47,6 +47,37 @@ jobs:
       - name: Test staged installation
         run: make test-install VERSION=1.2.3
 
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Install GLib headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libglib2.0-dev pkg-config
+      - name: Generate coverage report
+        run: make cover
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-report
+          path: |
+            coverage.out
+            coverage.html
+          if-no-files-found: error
+      - name: Submit test coverage to codecov.io
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: greenbone/asset-identity
+          files: coverage.out
+          disable_search: true
+          fail_ci_if_error: false
+
   go-linting:
     name: Run Go Linter
     runs-on: ubuntu-latest

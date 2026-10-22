@@ -1,8 +1,16 @@
+![Greenbone Logo](https://www.greenbone.net/wp-content/uploads/gb_new-logo_horizontal_rgb_small.png)
+
 # Asset identity
 
 A Go library for identifier normalization and strong-first asset reconciliation.
 `libgvm_asset_identity.so` exposes the same algorithm through a GLib C API (ABI 1). Applications supply eligible
 identifiers and candidates; they own scanner boundaries, authorization, persistence, and merge approval.
+
+## Build status
+
+[![Build and tests](https://github.com/greenbone/asset-identity/actions/workflows/build-and-tests.yaml/badge.svg)](https://github.com/greenbone/asset-identity/actions/workflows/build-and-tests.yaml)
+[![Release](https://github.com/greenbone/asset-identity/actions/workflows/release.yml/badge.svg)](https://github.com/greenbone/asset-identity/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/greenbone/asset-identity/branch/main/graph/badge.svg)](https://codecov.io/gh/greenbone/asset-identity)
 
 ## Go
 
@@ -98,6 +106,17 @@ make lint                # run the configured Go linters
 ```
 
 Set `GOLANGCI_LINT`, `CLANG_FORMAT`, or `GERSEMI` to override executable paths.
+
+## Coverage
+
+Run `make cover` to test the core `identity` package with the race detector
+and generate `coverage.out` and an HTML report at `coverage.html`. The Go C API
+adapter in `capi` and C sources are excluded from this report; the separate C
+integration tests exercise that boundary through `make test-c`.
+
+CI saves both reports as the `coverage-report` artifact and uploads coverage to
+Codecov. Enable `greenbone/asset-identity` in Codecov and configure the repository
+secret `CODECOV_TOKEN` to match the upload setup used by `gvm-report-service`.
 
 ## C build, test, and install
 

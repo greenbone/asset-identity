@@ -22,7 +22,7 @@ LIBRARY_FILE := $(LIBRARY).$(VERSION)-$(GOARCH)
 C_SOURCES := $(wildcard capi/*.c capi/*.h include/*.h tests/c/*.c tests/c/*.h)
 CMAKE_SOURCES := tests/c/CMakeLists.txt
 
-.PHONY: build format format-go format-c format-cmake format-check-c format-check-cmake lint test test-c test-install install uninstall clean
+.PHONY: build format format-go format-c format-cmake format-check-c format-check-cmake lint test cover test-c test-install install uninstall clean
 
 build:
 	mkdir -p "$(DIST)/include" "$(DIST)/internal"
@@ -55,6 +55,11 @@ lint:
 test:
 	$(GO) test ./...
 	$(MAKE) test-c
+
+cover:
+	$(GO) test -race -covermode=atomic -coverprofile=coverage.out ./identity/...
+	$(GO) tool cover -func=coverage.out
+	$(GO) tool cover -html=coverage.out -o coverage.html
 
 test-c: build
 	$(CMAKE) -S tests/c -B build/c -DCMAKE_C_COMPILER="$(CC)" -DIDENTITY_ROOT="$(DIST)" $(CMAKE_ARGS)
