@@ -136,8 +136,44 @@ Ensure(invalid_scope_contents_are_rejected) {
     gvm_asset_identity_observation_free(input); g_ptr_array_unref(rows); gvm_asset_identity_policy_free(policy);
 }
 
+Ensure(aggregate_input_budget_is_checked_during_c_conversion) {
+    gvm_asset_identity_policy_t *policy = default_policy();
+    gvm_asset_identity_observation_t *input = observation(GVM_ASSET_IDENTITY_IP, "192.0.2.1");
+    /* Borrow the same live identifier to keep the caller's memory small while
+       requiring more than 64 MiB of private wire arrays across candidates. */
+    GPtrArray *shared = g_ptr_array_new();
+    for (guint i = 0; i < 16384; i++)
+        g_ptr_array_add(shared, g_ptr_array_index(input->identifiers, 0));
+    GPtrArray *rows = candidates_new();
+    for (guint i = 0; i < 128; i++) {
+        gchar *key = g_strdup_printf("K%u", i);
+        gvm_asset_identity_candidate_t *row = gvm_asset_identity_candidate_new(key);
+        g_free(key);
+        g_ptr_array_unref(row->identifiers);
+        row->identifiers = g_ptr_array_ref(shared);
+        g_ptr_array_add(rows, row);
+    }
+    gvm_asset_identity_decision_t *result = NULL;
+    GError *error = NULL;
+    gboolean success = gvm_asset_identity_decide(input, rows, policy, &result, &error);
+    assert_that(success, is_false);
+    assert_that(result == NULL, is_true);
+    assert_that(error != NULL, is_true);
+    if (error) {
+        assert_that(error->code, is_equal_to(GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT));
+        assert_that(error->message, is_equal_to_string("input exceeds byte limit"));
+    }
+    g_clear_error(&error);
+    gvm_asset_identity_decision_free(result);
+    g_ptr_array_unref(rows);
+    g_ptr_array_unref(shared);
+    gvm_asset_identity_observation_free(input);
+    gvm_asset_identity_policy_free(policy);
+}
+
 int main(void) {
     TestSuite *suite = create_test_suite();
+    add_test(suite, aggregate_input_budget_is_checked_during_c_conversion);
     add_test(suite, default_policy_is_copied_from_go);
     add_test(suite, invalid_weights_fail_even_on_strong_matches);
     add_test(suite, invalid_memberships_are_rejected);

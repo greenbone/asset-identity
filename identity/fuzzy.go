@@ -107,6 +107,10 @@ func fuzzyMatchingSet(input []IdentifierValue, weights map[IdentifierType]float3
 	if err != nil {
 		return nil, err
 	}
+	return fuzzySetFromCanonical(normalized, weights), nil
+}
+
+func fuzzySetFromCanonical(normalized []IdentifierValue, weights map[IdentifierType]float32) []IdentifierValue {
 	var set []IdentifierValue
 	for _, value := range normalized {
 		if _, enabled := weights[value.Type]; !enabled {
@@ -116,7 +120,7 @@ func fuzzyMatchingSet(input []IdentifierValue, weights map[IdentifierType]float3
 			set = append(set, value)
 		}
 	}
-	return set, nil
+	return set
 }
 
 func fuzzySetContains(set []IdentifierValue, value IdentifierValue) bool {

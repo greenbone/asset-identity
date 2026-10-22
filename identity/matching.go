@@ -104,25 +104,7 @@ func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidate
 	for priority, typ := range p.StrongOrder {
 		var indices []int
 		for i, view := range candidateViews {
-			matched := false
-			for _, incomingValue := range incomingValues {
-				if incomingValue.Type != typ {
-					continue
-				}
-				for _, candidateValue := range view {
-					if SameRepresentation(incomingValue, candidateValue) {
-						matched = true
-						break
-					}
-				}
-				if matched {
-					break
-				}
-			}
-			if matched && typ == TypeTLSPublicKeyHash {
-				matched = sameTLSIdentifiers(incomingValues, view)
-			}
-			if matched {
+			if strongValuesMatch(incomingValues, view, typ) {
 				indices = append(indices, i)
 			}
 		}
@@ -134,6 +116,16 @@ func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidate
 		}
 	}
 	return result, nil
+}
+
+// Inputs are canonical; only the deciding type participates.
+func strongValuesMatch(left, right []IdentifierValue, typ IdentifierType) bool {
+	for _, value := range left {
+		if value.Type == typ && fuzzySetContains(right, value) {
+			return typ != TypeTLSPublicKeyHash || sameTLSIdentifiers(left, right)
+		}
+	}
+	return false
 }
 
 // Inputs are canonical. Mutual membership ignores order and duplicate representations.

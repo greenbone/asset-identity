@@ -106,11 +106,19 @@ static gboolean fail(GError **error, gint code, const gchar *message) {
     return FALSE;
 }
 
-static gboolean wire_string(const gchar *text, gai_wire_string_t *value, GError **error) {
+static gboolean take_input_bytes(gsize count, gsize size, gsize *remaining, gint code, GError **error) {
+    if (count > *remaining / size)
+        return fail(error, code, "input exceeds byte limit");
+    *remaining -= count * size;
+    return TRUE;
+}
+
+static gboolean wire_string(const gchar *text, gai_wire_string_t *value, gsize *remaining, GError **error) {
     if (!text) return fail(error, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, "NULL string");
     gsize length = strnlen(text, GAI_WIRE_MAX_STRING + 1);
     if (length > GAI_WIRE_MAX_STRING)
         return fail(error, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, "string exceeds length limit");
+    if (!take_input_bytes(length, 1, remaining, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, error)) return FALSE;
     *value = (gai_wire_string_t){text, length};
     return TRUE;
 }
@@ -121,9 +129,10 @@ static void free_input_identifiers(const gai_wire_identifier_t *values, gsize co
 }
 
 static gboolean wire_identifiers(const GPtrArray *identifiers,
-    const gai_wire_identifier_t **values, gsize *count, GError **error) {
+    const gai_wire_identifier_t **values, gsize *count, gsize *remaining, GError **error) {
     if (!identifiers || identifiers->len > GAI_WIRE_MAX_ITEMS || (identifiers->len && !identifiers->pdata))
         return fail(error, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, "invalid identifier array");
+    if (!take_input_bytes(identifiers->len, sizeof(gai_wire_identifier_t), remaining, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, error)) return FALSE;
     *count = identifiers->len;
     gai_wire_identifier_t *items = g_new0(gai_wire_identifier_t, *count);
     *values = items;
@@ -131,11 +140,12 @@ static gboolean wire_identifiers(const GPtrArray *identifiers,
         const gvm_asset_identity_identifier_t *identifier = g_ptr_array_index(identifiers, i);
         if (!identifier) return fail(error, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, "NULL identifier");
         items[i].type = identifier->type;
-        if (!wire_string(identifier->value, &items[i].value, error)) return FALSE;
+        if (!wire_string(identifier->value, &items[i].value, remaining, error)) return FALSE;
         if (!identifier->scope) continue;
         gsize size = g_hash_table_size(identifier->scope);
         if (size > GAI_WIRE_MAX_ITEMS)
             return fail(error, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, "scope exceeds item limit");
+        if (!take_input_bytes(size, sizeof(gai_wire_scope_dimension_t), remaining, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, error)) return FALSE;
         gai_wire_scope_dimension_t *dimensions = g_new0(gai_wire_scope_dimension_t, size);
         items[i].scope = (gai_wire_scope_t){1, dimensions, size};
         GHashTableIter iter;
@@ -143,7 +153,7 @@ static gboolean wire_identifiers(const GPtrArray *identifiers,
         g_hash_table_iter_init(&iter, identifier->scope);
         gsize j = 0;
         while (g_hash_table_iter_next(&iter, &key, &content)) {
-            if (!wire_string(key, &dimensions[j].name, error) || !wire_string(content, &dimensions[j].value, error)) return FALSE;
+            if (!wire_string(key, &dimensions[j].name, remaining, error) || !wire_string(content, &dimensions[j].value, remaining, error)) return FALSE;
             j++;
         }
     }
@@ -151,7 +161,7 @@ static gboolean wire_identifiers(const GPtrArray *identifiers,
 }
 
 static gboolean wire_policy(const gvm_asset_identity_policy_t *policy,
-    gai_wire_policy_t *value, GError **error) {
+    gai_wire_policy_t *value, gsize *remaining, GError **error) {
     if (!policy || !policy->strong_order || !policy->fuzzy ||
         g_array_get_element_size(policy->strong_order) != sizeof(gvm_asset_identity_identifier_type_t) ||
         g_array_get_element_size(policy->fuzzy) != sizeof(gvm_asset_identity_fuzzy_member_t) ||
@@ -159,6 +169,8 @@ static gboolean wire_policy(const gvm_asset_identity_policy_t *policy,
         (policy->strong_order->len && !policy->strong_order->data) ||
         (policy->fuzzy->len && !policy->fuzzy->data))
         return fail(error, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY, "invalid policy arrays");
+    if (!take_input_bytes(policy->strong_order->len, sizeof(gai_wire_identifier_type_t), remaining, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY, error) ||
+        !take_input_bytes(policy->fuzzy->len, sizeof(gai_wire_fuzzy_member_t), remaining, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY, error)) return FALSE;
     value->strong_count = policy->strong_order->len;
     guint32 *order = g_new(guint32, value->strong_count);
     value->strong_order = order;
@@ -206,17 +218,20 @@ gboolean gvm_asset_identity_decide(const gvm_asset_identity_observation_t *obser
         return fail(error, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, "invalid observation, candidates or output");
     gai_wire_policy_t converted_policy = {0};
     gai_wire_observation_t converted_observation = {0};
-    gai_wire_candidate_t *rows = g_new0(gai_wire_candidate_t, candidates->len);
+    gai_wire_candidate_t *rows = NULL;
+    gsize remaining = GAI_WIRE_MAX_INPUT_BYTES;
     gai_wire_decision_t *result = NULL;
     gai_wire_error_t *failure = NULL;
     gboolean success = FALSE;
-    if (!wire_policy(policy, &converted_policy, error)) goto cleanup;
-    if (!wire_identifiers(observation->identifiers, &converted_observation.identifiers, &converted_observation.identifier_count, error)) goto cleanup;
+    if (!wire_policy(policy, &converted_policy, &remaining, error)) goto cleanup;
+    if (!wire_identifiers(observation->identifiers, &converted_observation.identifiers, &converted_observation.identifier_count, &remaining, error)) goto cleanup;
+    if (!take_input_bytes(candidates->len, sizeof(gai_wire_candidate_t), &remaining, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, error)) goto cleanup;
+    rows = g_new0(gai_wire_candidate_t, candidates->len);
     for (gsize i = 0; i < candidates->len; i++) {
         const gvm_asset_identity_candidate_t *candidate = g_ptr_array_index(candidates, i);
         if (!candidate) { fail(error, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, "NULL candidate"); goto cleanup; }
-        if (!wire_string(candidate->asset_key, &rows[i].asset_key, error)) goto cleanup;
-        if (!wire_identifiers(candidate->identifiers, &rows[i].identifiers, &rows[i].identifier_count, error)) goto cleanup;
+        if (!wire_string(candidate->asset_key, &rows[i].asset_key, &remaining, error)) goto cleanup;
+        if (!wire_identifiers(candidate->identifiers, &rows[i].identifiers, &rows[i].identifier_count, &remaining, error)) goto cleanup;
         rows[i].last_seen = (gai_wire_timestamp_t){candidate->last_seen.present != FALSE, candidate->last_seen.seconds, candidate->last_seen.nanoseconds};
     }
     gai_wire_status_t status = gai_wire_decide(&converted_observation, rows, candidates->len, &converted_policy, &result, &failure);
@@ -226,7 +241,7 @@ cleanup:
     gai_wire_error_free(failure);
     gai_wire_decision_free(result);
     free_input_identifiers(converted_observation.identifiers, converted_observation.identifier_count);
-    for (gsize i = 0; i < candidates->len; i++) free_input_identifiers(rows[i].identifiers, rows[i].identifier_count);
+    for (gsize i = 0; rows && i < candidates->len; i++) free_input_identifiers(rows[i].identifiers, rows[i].identifier_count);
     g_free(rows);
     g_free((gpointer)converted_policy.strong_order);
     g_free((gpointer)converted_policy.fuzzy);
