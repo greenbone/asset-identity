@@ -207,6 +207,7 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.release-ref }}
           versioning-scheme: "semver"
           sign-release-files: "false"
+          admin-bypass: "false"
           project-types: "go"
           update-project: "false"
           next-version: "false"
