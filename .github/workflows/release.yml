@@ -160,9 +160,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.prepare-release.outputs.release-sha }}
+          ref: ${{ needs.prepare-release.outputs.release-ref }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Verify release branch matches the built source
+        env:
+          RELEASE_SHA: ${{ needs.prepare-release.outputs.release-sha }}
+        run: |
+          git symbolic-ref --quiet HEAD
+          if [ "$(git rev-parse HEAD)" != "$RELEASE_SHA" ]; then
+            echo "Release branch changed after artifacts were built. Start a new release run."
+            exit 1
+          fi
       - name: Download release artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
