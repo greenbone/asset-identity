@@ -92,7 +92,12 @@ func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidate
 		}
 		candidateViews[i] = normalized
 	}
-	result := empty
+	return evaluateStrongPriority(p, incomingValues, candidateViews), nil
+}
+
+// evaluateStrongPriority compares canonical views under a validated policy.
+func evaluateStrongPriority(p MatchPolicy, incomingValues []IdentifierValue, candidateViews [][]IdentifierValue) StrongPriorityMatch {
+	result := StrongPriorityMatch{Priority: -1}
 	for _, typ := range p.StrongOrder {
 		for _, v := range incomingValues {
 			if v.Type == typ {
@@ -112,10 +117,10 @@ func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidate
 			result.Type = typ
 			result.Priority = priority
 			result.CandidateIndices = indices
-			return result, nil
+			return result
 		}
 	}
-	return result, nil
+	return result
 }
 
 // Inputs are canonical; only the deciding type participates.

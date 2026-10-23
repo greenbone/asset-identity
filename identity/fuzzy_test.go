@@ -6,6 +6,7 @@ package identity
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -234,4 +235,34 @@ func TestFuzzyKernelFloat32Accumulation(t *testing.T) {
 	if err == nil || !reflect.DeepEqual(got, fuzzyKernelResult{}) {
 		t.Fatalf("nonfinite score: %+v %v", got, err)
 	}
+}
+
+// matchFuzzyKernel keeps raw-input fixtures independent of Decide validation.
+func matchFuzzyKernel(observation Observation, candidates []Candidate, policy MatchPolicy) (fuzzyKernelResult, error) {
+	weights, err := fuzzyWeights(policy)
+	if err != nil {
+		return fuzzyKernelResult{}, err
+	}
+	incoming, err := canonicalMatchingView(observation.Identifiers)
+	if err != nil {
+		return fuzzyKernelResult{}, fmt.Errorf("observation: %w", err)
+	}
+	if len(fuzzySetFromCanonical(incoming, weights)) == 0 || len(candidates) == 0 {
+		return fuzzyKernelResult{NeedsNewKey: true}, nil
+	}
+	views := make([][]IdentifierValue, len(candidates))
+	for i, candidate := range candidates {
+		if candidate.AssetKey == "" {
+			return fuzzyKernelResult{}, fmt.Errorf("%w: candidate %d: empty asset key", ErrEmptyCandidateKey, i)
+		}
+		if err := validateLastSeen(candidate.LastSeen); err != nil {
+			return fuzzyKernelResult{}, fmt.Errorf("candidate %d: %w", i, err)
+		}
+		values, err := canonicalMatchingView(candidate.Identifiers)
+		if err != nil {
+			return fuzzyKernelResult{}, fmt.Errorf("candidate %d: %w", i, err)
+		}
+		views[i] = values
+	}
+	return matchFuzzyCanonical(incoming, views, candidates, policy)
 }

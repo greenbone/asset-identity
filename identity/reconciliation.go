@@ -57,18 +57,6 @@ var ErrEmptyCandidateKey = errors.New("empty candidate asset key")
 // Decide selects a destination key and returns eligible existing keys to merge into it.
 // The caller creates any requested key and applies the plan atomically.
 func Decide(observation Observation, candidates []Candidate, policy MatchPolicy) (Decision, error) {
-	decision, err := selectKey(observation, candidates, policy)
-	if err != nil {
-		return Decision{}, err
-	}
-	if err := planMerges(&decision, observation, candidates, policy); err != nil {
-		return Decision{}, err
-	}
-	return decision, nil
-}
-
-// selectKey preserves the strong-priority and fuzzy-containment selection rules.
-func selectKey(observation Observation, candidates []Candidate, policy MatchPolicy) (Decision, error) {
 	if err := policy.Validate(); err != nil {
 		return Decision{}, err
 	}
@@ -85,12 +73,31 @@ func selectKey(observation Observation, candidates []Candidate, policy MatchPoli
 			return Decision{}, fmt.Errorf("candidate %d: %w", index, err)
 		}
 		seenKeys[candidate.AssetKey] = index
-		views[index] = candidate.Identifiers
 	}
-	match, err := EvaluateStrongPriority(policy, observation.Identifiers, views)
+	canonicalIncoming, err := canonicalMatchingView(observation.Identifiers)
+	if err != nil {
+		return Decision{}, fmt.Errorf("incoming: %w", err)
+	}
+	for i, candidate := range candidates {
+		views[i], err = canonicalMatchingView(candidate.Identifiers)
+		if err != nil {
+			return Decision{}, fmt.Errorf("candidate %d: %w", i, err)
+		}
+	}
+	observation.Identifiers = canonicalIncoming
+	decision, err := selectKey(observation, candidates, views, policy)
 	if err != nil {
 		return Decision{}, err
 	}
+	if err := planMerges(&decision, canonicalIncoming, views, policy); err != nil {
+		return Decision{}, err
+	}
+	return decision, nil
+}
+
+// selectKey uses canonical views validated by Decide.
+func selectKey(observation Observation, candidates []Candidate, views [][]IdentifierValue, policy MatchPolicy) (Decision, error) {
+	match := evaluateStrongPriority(policy, observation.Identifiers, views)
 	if match.HasIncomingStrong {
 		if len(match.CandidateIndices) == 0 {
 			return Decision{Action: ActionCreate, Stage: StageStrong, NeedsNewKey: true}, nil
@@ -106,7 +113,7 @@ func selectKey(observation Observation, candidates []Candidate, policy MatchPoli
 		index := match.CandidateIndices[order[0]]
 		return Decision{Action: ActionReuse, Stage: StageStrong, SelectedKey: candidates[index].AssetKey, SelectedIndex: &index}, nil
 	}
-	result, err := matchFuzzyKernel(observation, candidates, policy)
+	result, err := matchFuzzyCanonical(observation.Identifiers, views, candidates, policy)
 	if err != nil {
 		return Decision{}, err
 	}

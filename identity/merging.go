@@ -10,19 +10,8 @@ import (
 	"strings"
 )
 
-// planMerges compares each source with the destination's complete eligible view.
-func planMerges(decision *Decision, observation Observation, candidates []Candidate, policy MatchPolicy) error {
-	incoming, err := canonicalMatchingView(observation.Identifiers)
-	if err != nil {
-		return err
-	}
-	views := make([][]IdentifierValue, len(candidates))
-	for i, candidate := range candidates {
-		views[i], err = canonicalMatchingView(candidate.Identifiers)
-		if err != nil {
-			return err
-		}
-	}
+// planMerges compares canonical source views with the destination's complete view.
+func planMerges(decision *Decision, incoming []IdentifierValue, views [][]IdentifierValue, policy MatchPolicy) error {
 	destination := incoming
 	if decision.SelectedIndex != nil {
 		destination = views[*decision.SelectedIndex]

@@ -17,24 +17,28 @@ type fuzzyKernelResult struct {
 	SelectedScore float32
 }
 
-func matchFuzzyKernel(observation Observation, candidates []Candidate, policy MatchPolicy) (fuzzyKernelResult, error) {
+// matchFuzzyCanonical selects among canonical candidates already validated by its caller.
+func matchFuzzyCanonical(incoming []IdentifierValue, views [][]IdentifierValue, candidates []Candidate, policy MatchPolicy) (fuzzyKernelResult, error) {
 	fail := fuzzyKernelResult{}
 	weights, err := fuzzyWeights(policy)
 	if err != nil {
 		return fail, err
 	}
-	observationSet, err := fuzzyMatchingSet(observation.Identifiers, weights)
-	if err != nil {
-		return fail, fmt.Errorf("observation: %w", err)
-	}
+	observationSet := fuzzySetFromCanonical(incoming, weights)
 	result := fuzzyKernelResult{NeedsNewKey: true}
-	// Empty observations never select an existing key.
 	if len(observationSet) == 0 || len(candidates) == 0 {
 		return result, nil
 	}
-	candidateSets, err := prepareFuzzyCandidates(candidates, weights)
-	if err != nil {
-		return fail, err
+	candidateSets := make([]fuzzyCandidateSet, len(candidates))
+	for i, candidate := range candidates {
+		instant := time.Unix(0, 0).UTC()
+		if candidate.LastSeen != nil {
+			instant = candidate.LastSeen.UTC()
+		}
+		candidateSets[i] = fuzzyCandidateSet{
+			identifiers: fuzzySetFromCanonical(views[i], weights),
+			lastSeen:    instant.Truncate(time.Second),
+		}
 	}
 	selectedCandidateIndex := -1
 	var selectedScore float32
@@ -69,28 +73,6 @@ type fuzzyCandidateSet struct {
 	lastSeen    time.Time
 }
 
-func prepareFuzzyCandidates(candidates []Candidate, weights map[IdentifierType]float32) ([]fuzzyCandidateSet, error) {
-	prepared := make([]fuzzyCandidateSet, len(candidates))
-	for i, candidate := range candidates {
-		if candidate.AssetKey == "" {
-			return nil, fmt.Errorf("%w: candidate %d: empty asset key", ErrEmptyCandidateKey, i)
-		}
-		instant := time.Unix(0, 0).UTC()
-		if candidate.LastSeen != nil {
-			instant = candidate.LastSeen.UTC()
-		}
-		if err := validateLastSeen(candidate.LastSeen); err != nil {
-			return nil, fmt.Errorf("candidate %d: %w", i, err)
-		}
-		values, err := fuzzyMatchingSet(candidate.Identifiers, weights)
-		if err != nil {
-			return nil, fmt.Errorf("candidate %d: %w", i, err)
-		}
-		prepared[i] = fuzzyCandidateSet{identifiers: values, lastSeen: instant.Truncate(time.Second)}
-	}
-	return prepared, nil
-}
-
 func fuzzyWeights(policy MatchPolicy) (map[IdentifierType]float32, error) {
 	if err := policy.Validate(); err != nil {
 		return nil, err
@@ -100,14 +82,6 @@ func fuzzyWeights(policy MatchPolicy) (map[IdentifierType]float32, error) {
 		weights[member.Type] = float32(member.Weight)
 	}
 	return weights, nil
-}
-
-func fuzzyMatchingSet(input []IdentifierValue, weights map[IdentifierType]float32) ([]IdentifierValue, error) {
-	normalized, err := canonicalMatchingView(input)
-	if err != nil {
-		return nil, err
-	}
-	return fuzzySetFromCanonical(normalized, weights), nil
 }
 
 func fuzzySetFromCanonical(normalized []IdentifierValue, weights map[IdentifierType]float32) []IdentifierValue {
