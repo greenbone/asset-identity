@@ -21,7 +21,7 @@ func TestGreenboneMatchPolicy(t *testing.T) {
 	if !reflect.DeepEqual(p.StrongOrder, want) {
 		t.Fatalf("strong order = %v", p.StrongOrder)
 	}
-	fuzzy := []identity.FuzzyMember{{Type: identity.TypeMAC, Weight: 1}, {Type: identity.TypeHostname, Weight: .4}, {Type: identity.TypeIP, Weight: .4}}
+	fuzzy := []identity.FuzzyMember{{Type: identity.TypeMAC, Weight: 1}, {Type: identity.TypeHostname, Weight: .4}, {Type: identity.TypeIP, Weight: .4}, {Type: identity.TypeFQDN, Weight: .4}}
 	if !reflect.DeepEqual(p.Fuzzy, fuzzy) {
 		t.Fatalf("defaults = %+v", p)
 	}
@@ -55,7 +55,7 @@ func TestMatchPolicyValidation(t *testing.T) {
 		{"duplicate fuzzy", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeIP, Weight: 1}, {Type: identity.TypeIP, Weight: 2}}}, identity.ErrInvalidMatchPolicy},
 		{"unknown fuzzy", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: "unknown", Weight: 1}}}, identity.ErrInvalidMatchPolicy},
 		{"overlap", identity.MatchPolicy{StrongOrder: []identity.IdentifierType{identity.TypeIP}, Fuzzy: []identity.FuzzyMember{{Type: identity.TypeIP, Weight: 1}}}, identity.ErrInvalidMatchPolicy},
-		{"fuzzy fqdn disabled", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeFQDN, Weight: 1}}}, identity.ErrInvalidMatchPolicy},
+		{"fuzzy fqdn", identity.MatchPolicy{Fuzzy: []identity.FuzzyMember{{Type: identity.TypeFQDN, Weight: .4}}}, nil},
 	}
 	for _, weight := range []float64{-1, math.Copysign(0, -1), math.NaN(), math.Inf(1), math.Inf(-1)} {
 		tests = append(tests, struct {

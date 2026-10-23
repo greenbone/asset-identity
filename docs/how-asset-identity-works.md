@@ -78,9 +78,12 @@ The default fuzzy types are:
 | MAC        | 1.0    |
 | Hostname   | 0.4    |
 | IP         | 0.4    |
+| FQDN       | 0.4    |
 
-FQDN is a supported identifier type but has no default matching role. It may be explicitly configured as strong;
-fuzzy FQDN membership is currently rejected. Hostname and FQDN remain different types.
+FQDN is weak evidence because names can be reassigned or shared. Compare the full normalized name:
+`SERVER.EXAMPLE.COM.` and `server.example.com` match as FQDNs. Hostname and FQDN remain different types;
+`hostname:server` does not match `fqdn:server.example.com`. FQDN participates in fuzzy containment and merge
+eligibility alongside the other configured fuzzy types.
 
 Callers may reorder, omit, or reclassify supported types. A type cannot belong to both stages.
 An omitted type does not contribute to matching. Empty configuration does not restore defaults.

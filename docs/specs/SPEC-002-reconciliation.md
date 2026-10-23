@@ -64,12 +64,12 @@ Weight float64
 6. TLS public-key hash
 7. Cloud identifier
 
-Default fuzzy members, in accumulation order, are MAC (1.0), hostname (0.4), and IP (0.4). FQDN has no default matching
-role.
+Default fuzzy members, in accumulation order, are MAC (1.0), hostname (0.4), IP (0.4), and FQDN (0.4).
+FQDN is weak evidence and remains distinct from hostname; full normalized names are compared.
 
 Callers may reorder, reclassify, or omit supported types. Omission disables a type for that stage; empty lists do not
 restore defaults. A type cannot participate in both stages. An empty policy is valid. Reject unknown types, duplicate
-members, overlapping stages, and fuzzy FQDN membership. Weights must be positive, finite, and representable as positive
+members and overlapping stages. Weights must be positive, finite, and representable as positive
 finite float32. Omit a type to disable it. Default policies and clones own their slices.
 
 ## Strong matching

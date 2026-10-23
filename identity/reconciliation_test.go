@@ -13,6 +13,35 @@ import (
 	"time"
 )
 
+func TestDecideFQDNWeakMatching(t *testing.T) {
+	fqdn := fuzzyValue(TypeFQDN, "server.example.com")
+	ip := fuzzyValue(TypeIP, "192.0.2.1")
+	tests := []struct {
+		name   string
+		values []IdentifierValue
+		row    Candidate
+		action DecisionAction
+		merges []int
+	}{
+		{"normalized name reuses", []IdentifierValue{fuzzyValue(TypeFQDN, "SERVER.EXAMPLE.COM.")}, fuzzyRow("K", 1, fqdn), ActionReuse, nil},
+		{"different names create", []IdentifierValue{fqdn}, fuzzyRow("K", 1, fuzzyValue(TypeFQDN, "other.example.com")), ActionCreate, nil},
+		{"hostname is a distinct type", []IdentifierValue{fqdn}, fuzzyRow("K", 1, fuzzyValue(TypeHostname, "server.example.com")), ActionCreate, nil},
+		{"fqdn prevents partial containment", []IdentifierValue{ip, fqdn}, fuzzyRow("K", 1, ip, fuzzyValue(TypeFQDN, "other.example.com")), ActionCreate, nil},
+		{"contained fqdn is a merge source", []IdentifierValue{ip, fqdn}, fuzzyRow("K", 1, fqdn), ActionCreate, []int{0}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Decide(Observation{Identifiers: tt.values}, []Candidate{tt.row}, GreenboneMatchPolicy())
+			if err != nil || got.Stage != StageFuzzy || got.Action != tt.action || !reflect.DeepEqual(got.MergeIndices, tt.merges) {
+				t.Fatalf("decision=%+v error=%v", got, err)
+			}
+			if tt.action == ActionReuse && (got.SelectedKey != "K" || got.SelectedIndex == nil || *got.SelectedIndex != 0) {
+				t.Fatal(got)
+			}
+		})
+	}
+}
+
 func TestDecideStrongSelection(t *testing.T) {
 	g := fuzzyValue(TypeGreenboneID, "G")
 	a := fuzzyValue(TypeAgentID, "A")

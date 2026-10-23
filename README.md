@@ -49,7 +49,9 @@ significant, including absent versus explicitly empty scope.
 Strong types are checked in configured priority order. At the first type with matches, the newest candidate wins; equal
 timestamps use asset-key ordering. Multiple incoming values of that type participate in the same ranking. If strong
 evidence exists but no candidate matches, return CREATE without fuzzy fallback. Otherwise fuzzy matching returns REUSE
-for a selected containing candidate, or CREATE if none exists.
+for a selected containing candidate, or CREATE if none exists. Default fuzzy weights are MAC (1.0),
+hostname (0.4), IP (0.4), and FQDN (0.4). FQDN matching uses the full normalized name; hostname and FQDN
+remain distinct identifier types.
 
 At the TLS priority, the observation and candidate must have identical normalized public-key sets. Order and duplicate
 values do not matter, but an extra or missing TLS key prevents a TLS match: `{A,B}` matches `{B,A}`, not `{A}` or

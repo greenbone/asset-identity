@@ -17,7 +17,7 @@ Ensure (default_policy_is_copied_from_go)
   assert_that (g_array_index (policy->strong_order,
                               gvm_asset_identity_identifier_type_t, 0),
                is_equal_to (GVM_ASSET_IDENTITY_GREENBONE_ID));
-  assert_that (policy->fuzzy->len, is_equal_to (3));
+  assert_that (policy->fuzzy->len, is_equal_to (4));
   assert_that (
     g_array_index (policy->fuzzy, gvm_asset_identity_fuzzy_member_t, 0).type,
     is_equal_to (GVM_ASSET_IDENTITY_MAC));
@@ -28,6 +28,33 @@ Ensure (default_policy_is_copied_from_go)
   assert_that (
     g_array_index (policy->fuzzy, gvm_asset_identity_fuzzy_member_t, 1).type,
     is_equal_to (GVM_ASSET_IDENTITY_HOSTNAME));
+  assert_that (
+    g_array_index (policy->fuzzy, gvm_asset_identity_fuzzy_member_t, 3).type,
+    is_equal_to (GVM_ASSET_IDENTITY_FQDN));
+  assert_that (
+    g_array_index (policy->fuzzy, gvm_asset_identity_fuzzy_member_t, 3).weight
+      == 0.4,
+    is_true);
+  gvm_asset_identity_policy_free (policy);
+}
+
+Ensure (fqdn_matches_as_weak_evidence)
+{
+  gvm_asset_identity_policy_t *policy = default_policy ();
+  gvm_asset_identity_observation_t *input =
+    observation (GVM_ASSET_IDENTITY_FQDN, "SERVER.EXAMPLE.COM.");
+  gvm_asset_identity_observation_t *stored =
+    observation (GVM_ASSET_IDENTITY_FQDN, "server.example.com");
+  GPtrArray *rows = candidates_new ();
+  g_ptr_array_add (rows, candidate ("K", stored));
+  gvm_asset_identity_decision_t *result = decide (input, rows, policy);
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
+  assert_that (result->stage, is_equal_to (GVM_ASSET_IDENTITY_STAGE_FUZZY));
+  assert_that (result->selected_key, is_equal_to_string ("K"));
+  gvm_asset_identity_decision_free (result);
+  g_ptr_array_unref (rows);
+  gvm_asset_identity_observation_free (stored);
+  gvm_asset_identity_observation_free (input);
   gvm_asset_identity_policy_free (policy);
 }
 
@@ -70,9 +97,6 @@ Ensure (invalid_memberships_are_rejected)
   g_array_append_val (policy->fuzzy, member);
   expect_failure (input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY);
   g_array_set_size (policy->fuzzy, 1);
-  g_array_index (policy->fuzzy, gvm_asset_identity_fuzzy_member_t, 0).type =
-    GVM_ASSET_IDENTITY_FQDN;
-  expect_failure (input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY);
   g_array_index (policy->fuzzy, gvm_asset_identity_fuzzy_member_t, 0).type =
     999;
   expect_failure (input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY);
@@ -238,6 +262,7 @@ main (void)
   TestSuite *suite = create_test_suite ();
   add_test (suite, aggregate_input_budget_is_checked_during_c_conversion);
   add_test (suite, default_policy_is_copied_from_go);
+  add_test (suite, fqdn_matches_as_weak_evidence);
   add_test (suite, invalid_weights_fail_even_on_strong_matches);
   add_test (suite, invalid_memberships_are_rejected);
   add_test (suite, candidate_keys_and_timestamps_are_validated);

@@ -30,7 +30,7 @@ type MatchPolicy struct {
 func GreenboneMatchPolicy() MatchPolicy {
 	return MatchPolicy{
 		StrongOrder: []IdentifierType{TypeGreenboneID, TypeAgentID, TypeMachineID, TypeBIOSUUID, TypeSSHHostKey, TypeTLSPublicKeyHash, TypeCloudIdentifier},
-		Fuzzy:       []FuzzyMember{{Type: TypeMAC, Weight: 1}, {Type: TypeHostname, Weight: .4}, {Type: TypeIP, Weight: .4}},
+		Fuzzy:       []FuzzyMember{{Type: TypeMAC, Weight: 1}, {Type: TypeHostname, Weight: .4}, {Type: TypeIP, Weight: .4}, {Type: TypeFQDN, Weight: .4}},
 	}
 }
 
@@ -72,11 +72,6 @@ func (p MatchPolicy) Validate() error {
 			return fmt.Errorf("%w: fuzzy member %d: weight is not positive finite float32", ErrInvalidMatchPolicy, i)
 		}
 		fuzzy[member.Type] = true
-	}
-	for i, member := range p.Fuzzy {
-		if member.Type == TypeFQDN {
-			return fmt.Errorf("%w: fuzzy member %d: fuzzy FQDN is disabled", ErrInvalidMatchPolicy, i)
-		}
 	}
 	return nil
 }
