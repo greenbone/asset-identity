@@ -49,20 +49,19 @@ significant, including absent versus explicitly empty scope.
 Strong types are checked in configured priority order. At the first type with matches, the newest candidate wins; equal
 timestamps use asset-key ordering. Multiple incoming values of that type participate in the same ranking. If strong
 evidence exists but no candidate matches, return CREATE without fuzzy fallback. Otherwise fuzzy matching returns REUSE
-for a selected containing candidate, or CREATE if none exists. Default fuzzy weights are MAC (1.0),
-hostname (0.4), IP (0.4), and FQDN (0.4). FQDN matching uses the full normalized name; hostname and FQDN
-remain distinct identifier types.
+for a selected containing candidate, or CREATE if none exists. Default fuzzy weights are MAC (1.0), hostname (0.4), IP
+(0.4), and FQDN (0.4). FQDN matching uses the full normalized name; hostname and FQDN remain distinct identifier types.
 
 At the TLS priority, the observation and candidate must have identical normalized public-key sets. Order and duplicate
 values do not matter, but an extra or missing TLS key prevents a TLS match: `{A,B}` matches `{B,A}`, not `{A}` or
 `{A,B,C}`. Other strong types retain any-value matching. Priority still applies: higher-priority identifiers can select
 an asset independently, and a TLS mismatch allows later configured strong types to be checked.
 
-`MergeIndices` lists the supplied candidates to move to the destination key. Retrieve each candidate and its
-asset key from the original candidate array using the returned index. On CREATE, the application generates the
-destination key; on REUSE it uses `SelectedKey`. The application applies the observation and key moves atomically. Strong IDs protect merge eligibility; records without
-strong IDs require full fuzzy containment. A weak destination cannot combine sources with conflicting strong IDs.
-See [the algorithm guide](docs/how-asset-identity-works.md#8-the-returned-decision).
+`MergeIndices` lists the supplied candidates to move to the destination key. Retrieve each candidate and its asset key
+from the original candidate array using the returned index. On CREATE, the application generates the destination key; on
+REUSE it uses `SelectedKey`. The application applies the observation and key moves atomically. Strong IDs protect merge
+eligibility; records without strong IDs require full fuzzy containment. A weak destination cannot combine sources with
+conflicting strong IDs. See [the algorithm guide](docs/how-asset-identity-works.md#8-the-returned-decision).
 
 ## Scanner identifier values
 
@@ -111,14 +110,13 @@ Set `GOLANGCI_LINT`, `CLANG_FORMAT`, or `GERSEMI` to override executable paths.
 
 ## Coverage
 
-Run `make cover` to test the core `identity` package with the race detector
-and generate `coverage.out` and an HTML report at `coverage.html`. The Go C API
-adapter in `capi` and C sources are excluded from this report; the separate C
+Run `make cover` to test the core `identity` package with the race detector and generate `coverage.out` and an HTML
+report at `coverage.html`. The Go C API adapter in `capi` and C sources are excluded from this report; the separate C
 integration tests exercise that boundary through `make test-c`.
 
-CI saves both reports as the `coverage-report` artifact and uploads coverage to
-Codecov. Enable `greenbone/asset-identity` in Codecov and configure the repository
-secret `CODECOV_TOKEN` to match the upload setup used by `gvm-report-service`.
+CI saves both reports as the `coverage-report` artifact and uploads coverage to Codecov. Enable
+`greenbone/asset-identity` in Codecov and configure the repository secret `CODECOV_TOKEN` to match the upload setup used
+by `gvm-report-service`.
 
 ## C build, test, and install
 
@@ -184,13 +182,12 @@ docker build -f .docker/Dockerfile -t asset-identity .
 ```
 
 Like `gvm-auth-lib`, the image carries installation files under `/install/usr/local`:
-the shared library, public header, and pkg-config metadata. A consuming image can
-copy `/install/` into `/` during its build. Consumers still need GLib at build and
-runtime as described above.
+the shared library, public header, and pkg-config metadata. A consuming image can copy `/install/` into `/` during its
+build. Consumers still need GLib at build and runtime as described above.
 
 The container workflow uses Greenbone's shared build and push workflow to publish
-`ghcr.io/greenbone/asset-identity` on main branch and version tag pushes, with pull
-request builds and a manual ref input.
+`ghcr.io/greenbone/asset-identity` on main branch and version tag pushes, with pull request builds and a manual ref
+input.
 
 ## Algorithm guide
 

@@ -19,7 +19,7 @@ apply database merges. Applications supply eligible active identifiers and candi
 ## Contracts
 
 | Specification                              | Defines                                                                  |
-| ------------------------------------------ | ------------------------------------------------------------------------ |
+|--------------------------------------------|--------------------------------------------------------------------------|
 | [SPEC-001A](SPEC-001A-identifier-model.md) | Types, scopes, timestamps, history, ownership, and structural validation |
 | [SPEC-001B](SPEC-001B-normalization.md)    | Supported payload formats, normalization, and semantic equality          |
 | [SPEC-002](SPEC-002-reconciliation.md)     | Policy, strong/fuzzy matching, decisions, and the C API                  |

@@ -27,7 +27,7 @@ Use `[]IdentifierValue` for collections so multiple values of one type remain re
 case-sensitive strings; declaration order does not define matching priority.
 
 | Go constant            | Type name                         |
-| ---------------------- | --------------------------------- |
+|------------------------|-----------------------------------|
 | `TypeGreenboneID`      | `greenbone_id`                    |
 | `TypeAgentID`          | `agent_id`                        |
 | `TypeMachineID`        | `machine_id`                      |
@@ -60,7 +60,7 @@ wildcard or a claim of global uniqueness.
 ## Operations and errors
 
 | Operation                         | Behavior                                                                                        |
-| --------------------------------- | ----------------------------------------------------------------------------------------------- |
+|-----------------------------------|-------------------------------------------------------------------------------------------------|
 | `IdentifierValue.Validate`        | Check supported type and nonempty scope dimension names; do not inspect payload syntax          |
 | `IdentifierObservation.Validate`  | Check the identifier structure and present timestamp range                                      |
 | `ObservationHistory.Validate`     | Return the first invalid entry with its zero-based index                                        |
