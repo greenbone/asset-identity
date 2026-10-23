@@ -1,0 +1,236 @@
+# SPDX-FileCopyrightText: 2026 Greenbone AG
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+name: Release asset-identity
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      release-type:
+        default: patch
+        type: choice
+        description: What kind of release do you want to do?
+        options:
+          - patch
+          - minor
+          - major
+      release-version:
+        type: string
+        description: Set an explicit version, that will overwrite release-type. Fails if version is not compliant.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  prepare-release:
+    name: Prepare release version and source
+    # Release manually or after merging a PR carrying a release label.
+    if: |
+      ( github.event_name == 'workflow_dispatch') || (
+        ( contains(github.event.pull_request.labels.*.name, 'alpha release') ||
+          contains(github.event.pull_request.labels.*.name, 'rc release') ||
+          contains(github.event.pull_request.labels.*.name, 'patch release') ||
+          contains(github.event.pull_request.labels.*.name, 'minor release') ||
+          contains(github.event.pull_request.labels.*.name, 'major release')) &&
+          github.event.pull_request.merged == true )
+    runs-on: "ubuntu-latest"
+    outputs:
+      release-sha: ${{ steps.source.outputs.sha }}
+      release-ref: ${{ steps.release-type.outputs.release-ref }}
+      last-release-version: ${{ steps.release-version.outputs.last-release-version }}
+      release-version: ${{ steps.release-version.outputs.release-version }}
+    steps:
+      - name: Selecting the Release type
+        id: release-type
+        uses: greenbone/actions/release-type@v3
+        with:
+          release-type-input: ${{ inputs.release-type }}
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # for conventional commits and getting all git tags
+          persist-credentials: false
+          ref: ${{ steps.release-type.outputs.release-ref }}
+      - name: Determine release version
+        id: release-version
+        uses: greenbone/actions/release-version@v3
+        with:
+          release-type: ${{ steps.release-type.outputs.release-type }}
+          release-version: ${{ inputs.release-version }}
+          versioning-scheme: "semver"
+      - name: Pin the source commit
+        id: source
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build-binaries:
+    name: Build binary artifacts (${{ matrix.arch }})
+    needs: prepare-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            expected-machine: 'x86-64|x86_64'
+          - arch: arm64
+            runner: self-hosted-generic-arm64
+            expected-machine: 'aarch64|ARM aarch64'
+    runs-on: ${{ matrix.runner }}
+    container: debian:bookworm-slim
+    env:
+      RELEASE_VERSION: ${{ needs.prepare-release.outputs.release-version }}
+      EXPECTED_ARCH: ${{ matrix.arch }}
+      EXPECTED_MACHINE: ${{ matrix.expected-machine }}
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates curl gcc g++ libc6-dev libglib2.0-dev cmake make pkg-config file binutils
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-release.outputs.release-sha }}
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Install Cgreen
+        run: sh .github/scripts/install-cgreen.sh
+      - name: Verify native architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(go env GOARCH)" = "$EXPECTED_ARCH"
+      - name: Build and test library
+        run: |
+          make test VERSION="$RELEASE_VERSION"
+          make test-install VERSION="$RELEASE_VERSION" PREFIX=/usr
+      - name: Stage release files
+        run: |
+          make install VERSION="$RELEASE_VERSION" PREFIX=/usr DESTDIR="$RUNNER_TEMP/install"
+          install -d "$RUNNER_TEMP/install/usr/share/doc/asset-identity"
+          install -m 644 LICENSE README.md "$RUNNER_TEMP/install/usr/share/doc/asset-identity/"
+      - name: Verify library and metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/install/usr"
+          library="$root/lib/libgvm_asset_identity.so.$RELEASE_VERSION-$EXPECTED_ARCH"
+          file "$library"
+          file "$library" | grep -E "$EXPECTED_MACHINE"
+          readelf -d "$library" | grep -F 'Library soname: [libgvm_asset_identity.so.1]'
+          test "$(readlink "$root/lib/libgvm_asset_identity.so")" = libgvm_asset_identity.so.1
+          test "$(readlink "$root/lib/libgvm_asset_identity.so.1")" = "libgvm_asset_identity.so.$RELEASE_VERSION-$EXPECTED_ARCH"
+          test "$(pkg-config --modversion "$root/lib/pkgconfig/libgvm_asset_identity.pc")" = "$RELEASE_VERSION"
+          test -f "$root/include/gvm_asset_identity.h"
+      - name: Create tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          tarball="asset-identity-$RELEASE_VERSION-$EXPECTED_ARCH.tar.gz"
+          tar -C "$RUNNER_TEMP/install" -czf "$tarball" .
+          tar -tzf "$tarball"
+      - name: Upload artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: asset-identity-${{ env.RELEASE_VERSION }}-${{ matrix.arch }}-tarball
+          path: asset-identity-${{ env.RELEASE_VERSION }}-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+
+  upload-and-sign-release-files:
+    name: Create release, upload and sign files
+    runs-on: ubuntu-latest
+    needs: [prepare-release, build-binaries]
+    env:
+      RELEASE_VERSION: ${{ needs.prepare-release.outputs.release-version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-release.outputs.release-sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download release artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: asset-identity-${{ env.RELEASE_VERSION }}-*-tarball
+          path: release-assets
+          merge-multiple: true
+      - name: Verify both architecture artifacts are available
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "release-assets/asset-identity-$RELEASE_VERSION-amd64.tar.gz"
+          test -s "release-assets/asset-identity-$RELEASE_VERSION-arm64.tar.gz"
+      - name: Install git-cliff
+        uses: greenbone/actions/uv@v3
+        with:
+          install: git-cliff
+      - name: Determine changelog
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.prepare-release.outputs.release-version }}
+          LAST_RELEASE_VERSION: ${{ needs.prepare-release.outputs.last-release-version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--unreleased --tag "$RELEASE_VERSION")
+          if [ -n "$LAST_RELEASE_VERSION" ] && git rev-parse --verify "refs/tags/$LAST_RELEASE_VERSION" >/dev/null 2>&1; then
+            args+=("$LAST_RELEASE_VERSION..HEAD")
+          elif [ -n "$LAST_RELEASE_VERSION" ] && git rev-parse --verify "refs/tags/v$LAST_RELEASE_VERSION" >/dev/null 2>&1; then
+            args+=("v$LAST_RELEASE_VERSION..HEAD")
+          fi
+          git-cliff -v --strip header -o /tmp/changelog.md "${args[@]}"
+      - name: Release with release action
+        id: release
+        uses: greenbone/actions/release@v3
+        with:
+          github-user: ${{ secrets.GREENBONE_BOT }}
+          github-user-mail: ${{ secrets.GREENBONE_BOT_MAIL }}
+          github-user-token: ${{ secrets.GREENBONE_BOT_TOKEN }}
+          release-version: ${{ needs.prepare-release.outputs.release-version }}
+          changelog: /tmp/changelog.md
+          ref: ${{ needs.prepare-release.outputs.release-ref }}
+          versioning-scheme: "semver"
+          sign-release-files: "false"
+          project-types: "go"
+          update-project: "false"
+          next-version: "false"
+      - name: Upload release artifacts to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GREENBONE_BOT_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release.outputs.git-release-tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            "release-assets/asset-identity-$RELEASE_VERSION-amd64.tar.gz" \
+            "release-assets/asset-identity-$RELEASE_VERSION-arm64.tar.gz"
+      - name: Set up release signing tools
+        uses: greenbone/actions/setup-pontos@v3
+      - name: Sign release files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GREENBONE_BOT_TOKEN }}
+          GPG_KEY: ${{ secrets.GPG_KEY }}
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%b\n' "$GPG_KEY" | gpg --batch --pinentry-mode loopback \
+            --passphrase "$GPG_PASSPHRASE" --import
+          pontos-release sign --repository "$RELEASE_REPOSITORY" \
+            --release-version "$RELEASE_VERSION" --versioning-scheme semver \
+            --signing-key "$GPG_FINGERPRINT" --passphrase "$GPG_PASSPHRASE"

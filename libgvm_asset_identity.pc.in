@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Greenbone AG
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=@LIBDIR@
+includedir=@INCLUDEDIR@
+
+Name: libgvm_asset_identity
+Description: Greenbone Asset Identity Library
+Version: @VERSION@
+Requires: glib-2.0 >= 2.42.0
+Cflags: -I${includedir}
+Libs: -L${libdir} -lgvm_asset_identity
