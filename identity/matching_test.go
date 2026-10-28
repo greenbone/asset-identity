@@ -17,7 +17,7 @@ import (
 
 func TestGreenboneMatchPolicy(t *testing.T) {
 	p := identity.GreenboneMatchPolicy()
-	want := []identity.IdentifierType{identity.TypeGreenboneID, identity.TypeAgentID, identity.TypeMachineID, identity.TypeBIOSUUID, identity.TypeSSHHostKey, identity.TypeTLSPublicKeyHash, identity.TypeCloudIdentifier}
+	want := []identity.IdentifierType{identity.TypeCloudIdentifier, identity.TypeGreenboneID, identity.TypeMachineID, identity.TypeBIOSUUID, identity.TypeAgentID, identity.TypeSSHHostKey, identity.TypeTLSPublicKeyHash}
 	if !reflect.DeepEqual(p.StrongOrder, want) {
 		t.Fatalf("strong order = %v", p.StrongOrder)
 	}
@@ -185,7 +185,8 @@ func TestStrongPriorityEvaluation(t *testing.T) {
 		indices    []int
 		strong     bool
 	}{
-		{"highest default", identity.GreenboneMatchPolicy().StrongOrder, []identity.IdentifierValue{a, g, ip}, [][]identity.IdentifierValue{{a}, {g}}, identity.TypeGreenboneID, 0, []int{1}, true},
+		{"highest default", identity.GreenboneMatchPolicy().StrongOrder, []identity.IdentifierValue{a, g, ip}, [][]identity.IdentifierValue{{a}, {g}}, identity.TypeGreenboneID, 1, []int{1}, true},
+		{"differing shared higher type excludes the candidate", []identity.IdentifierType{identity.TypeGreenboneID, identity.TypeAgentID}, []identity.IdentifierValue{g, a}, [][]identity.IdentifierValue{{identity.IdentifierValue{Type: identity.TypeGreenboneID, Value: "other"}, a}, {a}}, identity.TypeAgentID, 1, []int{1}, true},
 		{"custom", []identity.IdentifierType{identity.TypeAgentID, identity.TypeGreenboneID}, []identity.IdentifierValue{g, a}, [][]identity.IdentifierValue{{g}, {a}}, identity.TypeAgentID, 0, []int{1}, true},
 		{"unmatched higher", []identity.IdentifierType{identity.TypeGreenboneID, identity.TypeAgentID}, []identity.IdentifierValue{g, a}, [][]identity.IdentifierValue{{a}}, identity.TypeAgentID, 1, []int{0}, true},
 		{"disabled", nil, []identity.IdentifierValue{g, ip}, [][]identity.IdentifierValue{{g, ip}}, "", -1, nil, false},

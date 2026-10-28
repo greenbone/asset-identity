@@ -16,7 +16,7 @@ Ensure (default_policy_is_copied_from_go)
   assert_that (policy->strong_order->len, is_equal_to (7));
   assert_that (g_array_index (policy->strong_order,
                               gvm_asset_identity_identifier_type_t, 0),
-               is_equal_to (GVM_ASSET_IDENTITY_GREENBONE_ID));
+               is_equal_to (GVM_ASSET_IDENTITY_CLOUD_IDENTIFIER));
   assert_that (policy->fuzzy->len, is_equal_to (4));
   assert_that (
     g_array_index (policy->fuzzy, gvm_asset_identity_fuzzy_member_t, 0).type,
@@ -43,8 +43,12 @@ Ensure (fqdn_matches_as_weak_evidence)
   gvm_asset_identity_policy_t *policy = default_policy ();
   gvm_asset_identity_observation_t *input =
     observation (GVM_ASSET_IDENTITY_FQDN, "SERVER.EXAMPLE.COM.");
+  g_ptr_array_add (input->identifiers, gvm_asset_identity_identifier_new (
+                                         GVM_ASSET_IDENTITY_IP, "192.0.2.1"));
   gvm_asset_identity_observation_t *stored =
     observation (GVM_ASSET_IDENTITY_FQDN, "server.example.com");
+  g_ptr_array_add (stored->identifiers, gvm_asset_identity_identifier_new (
+                                          GVM_ASSET_IDENTITY_IP, "192.0.2.1"));
   GPtrArray *rows = candidates_new ();
   g_ptr_array_add (rows, candidate ("K", stored));
   gvm_asset_identity_decision_t *result = decide (input, rows, policy);

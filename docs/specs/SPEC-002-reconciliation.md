@@ -57,13 +57,13 @@ Weight float64
 
 `GreenboneMatchPolicy()` uses this strong priority, highest first:
 
-1. Greenbone ID
-2. Agent ID
+1. Cloud identifier
+2. Greenbone ID
 3. Machine ID
 4. BIOS UUID
-5. SSH host key
-6. TLS public-key hash
-7. Cloud identifier
+5. Agent ID
+6. SSH host key
+7. TLS public-key hash
 
 Default fuzzy members, in accumulation order, are MAC (1.0), hostname (0.4), IP (0.4), and FQDN (0.4). FQDN is weak
 evidence and remains distinct from hostname; full normalized names are compared.
@@ -75,64 +75,58 @@ type to disable it. Default policies and clones own their slices.
 
 ## Strong matching
 
-1. Normalize identifiers using [SPEC-001B](SPEC-001B-normalization.md).
-2. Check configured strong types in priority order. At the first type with matches, collect every candidate matching any
-   incoming value of that type, with equal scope. For TLS, require equality of the complete normalized public-key sets.
-3. Choose the candidate with the newest present `LastSeen`. Missing times rank last. Compare UTC instants at nanosecond
-   precision; equal or all-missing times use the smallest asset key by byte order.
+1. Normalize identifiers using [SPEC-001B](SPEC-001B-normalization.md) and leave placeholders out. An `x509:` TLS
+   certificate stays in a view, as its public-key hash, only when its subject CN or a DNS SAN equals a normalized FQDN
+   or hostname of the same view (ASCII names only, case-insensitive, trailing dot ignored, no wildcard matching);
+   `spki-sha256:` values stay. The exported `EvaluateStrongPriority` and `MatchingIdentifiers` apply the same view.
+2. For each candidate, find the first configured strong type both views carry. An equal value (equal scope) is a match
+   at that priority. A different value excludes the candidate from strong and fuzzy matching. For TLS, require equality
+   of the complete normalized public-key sets; TLS sets that differ are inconclusive and the next configured type
+   decides. A type only one view carries is skipped.
+3. Among matching candidates, the highest priority wins. Within it choose the newest present `LastSeen`. Missing times
+   rank last. Compare UTC instants at nanosecond precision; equal or all-missing times use the smallest asset key by
+   byte order.
 4. Return REUSE for that candidate.
-5. If incoming configured strong evidence exists but no type matches, return CREATE without fuzzy fallback. Only absence
-   of incoming configured strong evidence permits fuzzy matching.
+5. Without a strong match, candidates that share no configured strong type with the observation enter fuzzy matching.
+   Excluded candidates do not.
 
 TLS equality ignores order and duplicate normalized keys. `{A,B}` matches `{B,A}` but not `{A}` or `{A,B,C}`; scope
-differences remain significant. If TLS sets differ, continue to later configured strong types. TLS mismatch alone does
-not veto a higher-priority match. If no strong type matches, return CREATE without fuzzy fallback.
+differences remain significant.
 
-Other strong types still match any incoming value. All qualifying candidates use the same ranking. Lower-priority
-matches and fuzzy differences do not veto the winning priority.
+Other strong types match any incoming value. Lower-priority matches and fuzzy differences do not veto the winning
+priority.
 
 ## Fuzzy matching
 
 Normalize and deduplicate identifiers, then keep only configured fuzzy types. Each set entry includes type, canonical
-value, and complete scope.
+value, and complete scope. A fuzzy member with weight >= 1 is an anchor.
 
-A candidate qualifies only if it contains every observed fuzzy identifier. Select a qualifying candidate and return
-REUSE; if none qualifies, return CREATE. Empty projected observations and empty candidate lists return CREATE. A
-candidate contained by the observation, or partial overlap alone, is insufficient for reuse.
+A candidate qualifies when it is compatible and the shared evidence is sufficient. Compatible: no anchor type carried by
+both views without a shared value. Sufficient: a shared anchor value, or shared values of at least two fuzzy types.
+Values only one view carries do not block. Empty projected observations and empty candidate lists return CREATE.
 
 The score is the sum of shared distinct-value counts multiplied by their configured weights. Count conversion,
-multiplication, and each accumulation step round to float32 in policy order. Nonfinite scores return an error. All
-qualifying candidates contain the full observation and therefore have equal scores. They are ranked by newest `LastSeen`
-at whole-second precision, then first input position.
+multiplication, and each accumulation step round to float32 in policy order. Nonfinite scores return an error. The
+highest score wins; equal scores are ranked by newest `LastSeen` at whole-second precision, then first input position.
 
 For fuzzy ranking, missing `LastSeen` compares as Unix epoch. It ties epoch, outranks pre-epoch times, and differs from
-a present Go zero time. Fractional seconds do not break fuzzy ties. No score threshold or overlap-only matching is
-performed.
+a present Go zero time. Fractional seconds do not break fuzzy ties.
+
+`Stage` is FUZZY when weak evidence selected the key or the observation carries no configured strong identifier;
+otherwise STRONG.
 
 ## Merge plan
 
-After selecting a key, compare other candidates with the destination view: the selected candidate for REUSE, or the
-incoming observation for CREATE. `MergeIndices` lists source candidates in input order. Retrieve source records and
+After selecting an existing key, compare other candidates with the selected candidate's view. `MergeIndices` lists source candidates in input order. Retrieve source records and
 their asset keys from the original candidate array using these indices. The selected candidate is excluded. An empty
 list means no key moves.
 
-- If both views contain configured strong IDs, require a match at the winning strong type. For a STRONG REUSE, use the
-  type that selected the destination; otherwise use the highest-priority strong type present in the destination. TLS
-  requires exact complete key-set equality. Lower-priority differences do not veto that match.
-- If either view lacks configured strong IDs, require every source fuzzy identifier to occur in the destination fuzzy
-  set. The destination fuzzy set must be nonempty. An empty source fuzzy set is a subset, as in the C reference.
-- Partial fuzzy overlap alone does not produce a merge target. Strong mismatches cannot be bypassed through fuzzy
-  containment when both views contain strong IDs.
+- A source sharing a strong type with the destination moves when the value at the first shared type is equal; TLS
+  requires exact complete key-set equality. A different value keeps it apart.
+- A source sharing no strong type with the destination moves when it is compatible with sufficient shared weak
+  evidence, and contradicts neither a source moving through a strong match nor another such weak source. Both sources of a contradicting pair stay; input order does not choose a winner.
 
-If the destination lacks strong IDs, also compare the proposed strong-ID sources with each other. Use the
-highest-priority strong type present in either source, with exact full-set equality for TLS. Exclude both sources of
-every incompatible pair; input order does not choose a winner. Compatible strong sources and contained weak sources
-remain eligible. Thus a weak observation cannot bridge different Agent IDs into one new key.
-
-Key selection is unchanged: unmatched incoming strong IDs still produce CREATE, even if weak sources can be moved under
-the new key. On CREATE, `SelectedIndex` is nil and `SelectedKey` is empty, including when merge targets exist. The
-caller generates any new key and atomically stores the observation and moves each merge source to that key. The library
-performs no database writes and does not manufacture a union of supplied views.
+A CREATE decision moves no records: a candidate with sufficient evidence would have been reused.
 
 ## Validation
 
@@ -144,17 +138,19 @@ satisfy the structural and normalization contracts, even for types outside the s
 
 ## Examples
 
-Here G/A mean Greenbone/Agent ID and P means IP; scopes are equal unless stated.
+Here G/A mean Greenbone/Agent ID, P means IP and M means MAC; scopes are equal unless stated.
 
 | Observation     | Candidates                     | Result                                 |
 |-----------------|--------------------------------|----------------------------------------|
 | G(g), A(a)      | K1:G(g), K2:A(a) newer         | STRONG REUSE K1: default priority wins |
 | G(g1), G(g2)    | K1:G(g1) older, K2:G(g2) newer | STRONG REUSE K2                        |
-| G(g), P(p)      | K1:P(p)                        | STRONG CREATE: no fuzzy fallback       |
-| P(p1)           | K1:P(p1),P(p2)                 | FUZZY REUSE K1                         |
-| P(p1),P(p2)     | K1:P(p1)                       | FUZZY CREATE                           |
-| P(p1),P(p3)     | K1:P(p1),P(p2)                 | FUZZY CREATE                           |
-| P(p1)           | Z:P(p1), A:P(p1), equal times  | FUZZY REUSE Z: input order wins        |
+| G(g), P(p)      | K1:P(p)                        | STRONG CREATE: one weak type           |
+| G(g), A(a)      | K1:G(g2), A(a)                 | STRONG CREATE: G differs on both sides |
+| A(a), M(m), P(p)| K1:M(m), P(p)                  | FUZZY REUSE K1: no shared strong type  |
+| P(p1), M(m)     | K1:P(p2), M(m)                 | FUZZY REUSE K1: anchor shared          |
+| P(p1)           | K1:P(p1),P(p2)                 | FUZZY CREATE: one type                 |
+| P(p1), M(m)     | K1:P(p1), M(m2)                | FUZZY CREATE: anchors differ           |
+| M(m)            | Z:M(m), A:M(m), equal times    | FUZZY REUSE Z: input order wins        |
 | G(g), nil scope | K1:G(g), empty scope           | STRONG CREATE                          |
 
 ## C API
@@ -187,10 +183,9 @@ been verified; cross-builds require matching GLib, compiler, and sysroot.
 ## Verification
 
 Run `make test`, `make test-install`, `go test -race ./...`, `CGO_ENABLED=0 go test ./...`, and `go vet ./...`. Tests
-cover priority, multiple strong values, ranking, scopes, containment, merge safeguards, validation, ownership, and
+cover priority, multiple strong values, ranking, scopes, weak evidence, merge safeguards, validation, ownership, and
 concurrent calls.
 
-The 78 [C reference fixtures](../../identity/testdata/fuzzy_c_compat.jsonl) preserve fuzzy key selection and exact score
-bits for canonical supported values with equal scopes, distinct keys, and whole-second timestamps. Their fuzzy merge
-indices are also verified. The reference C code's row-skipping behavior is not part of this library's contract; this
-library rejects empty and duplicate candidate keys.
+The 78 [reference fixtures](../../identity/testdata/fuzzy_reference.jsonl) pin fuzzy key selection, exact score bits
+and merge indices for canonical supported values with equal scopes, distinct keys, and whole-second timestamps. They
+were generated from this implementation; the rules themselves are proven by the decision and counting tests.

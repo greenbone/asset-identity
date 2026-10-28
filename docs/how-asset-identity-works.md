@@ -1,7 +1,7 @@
 # How Asset Identity Works
 
 Asset-identity decides whether an observation should use an existing asset key or receive a new one. It combines
-identifier normalization, configurable strong-ID priority, and fuzzy set containment. The native Go API and the GLib C
+identifier normalization, configurable strong-ID priority, and weighted weak evidence. The native Go API and the GLib C
 API run the same algorithm.
 
 This document explains the current library through examples. The [specifications](specs/SPEC-001-identifiers.md)
@@ -37,7 +37,7 @@ The application finds candidates before calling the library. It also decides whi
 values, and producer data are eligible. The library compares exactly the supplied views; it does not discover hosts,
 query a database, or build candidates from past observations. You can collect candidates by any equal hostname, IP, or
 MAC. Supply one candidate per existing key, with its complete eligible active identifiers, rather than only the
-identifier that matched the query. Otherwise containment and strong-ID safeguards would operate on incomplete data.
+identifier that matched the query. Otherwise weak-evidence and strong-ID safeguards would operate on incomplete data.
 
 ### Scope is part of the identifier
 
@@ -62,13 +62,15 @@ remains application-owned even when identifiers carry scope.
 
 | Priority | Identifier          | Matching rule                  |
 |----------|---------------------|--------------------------------|
-| 1        | Greenbone ID        | Any equal value                |
-| 2        | Agent ID            | Any equal value                |
+| 1        | Cloud identifier    | Any equal value                |
+| 2        | Greenbone ID        | Any equal value                |
 | 3        | Machine ID          | Any equal value                |
 | 4        | BIOS UUID           | Any equal value                |
-| 5        | SSH host key        | Any equal public key           |
-| 6        | TLS public-key hash | Equal complete public-key sets |
-| 7        | Cloud identifier    | Any equal value                |
+| 5        | Agent ID            | Any equal value                |
+| 6        | SSH host key        | Any equal public key           |
+| 7        | TLS public-key hash | Equal complete public-key sets |
+
+A value that differs at a higher type both views carry excludes the candidate; a type only one view carries is skipped.
 
 The default fuzzy types are:
 
@@ -81,7 +83,7 @@ The default fuzzy types are:
 
 FQDN is weak evidence because names can be reassigned or shared. Compare the full normalized name:
 `SERVER.EXAMPLE.COM.` and `server.example.com` match as FQDNs. Hostname and FQDN remain different types;
-`hostname:server` does not match `fqdn:server.example.com`. FQDN participates in fuzzy containment and merge eligibility
+`hostname:server` does not match `fqdn:server.example.com`. FQDN participates in weak matching and merge eligibility
 alongside the other configured fuzzy types.
 
 Callers may reorder, omit, or reclassify supported types. A type cannot belong to both stages. An omitted type does not
@@ -95,12 +97,18 @@ Normalization makes equivalent representations comparable without changing calle
 |----------------------------------------------------|----------------------------------------|
 | MAC `02-AB-CD-EF-01-23`                            | `02:ab:cd:ef:01:23`                    |
 | IP `2001:0DB8:0:0:0:0:0:1`                         | `2001:db8::1`                          |
-| Hostname `WEB.Example.`                            | `web.example`                          |
+| Hostname `WEB.Example.`                            | `web`                                  |
+| FQDN `WEB.Example.`                                | `web.example`                          |
+| IP `::ffff:192.0.2.1`                              | `192.0.2.1`                            |
+| Cloud identifier `I-0ABC`                          | `i-0abc`                               |
 | BIOS UUID `{00112233-4455-6677-8899-AABBCCDDEEFF}` | `00112233-4455-6677-8899-aabbccddeeff` |
 | SSH `22 ecdsa-sha2-nistp256 <key>`                 | `ecdsa-sha2-nistp256 <canonical-key>`  |
 | TLS `x509:<base64-DER-certificate>`                | `spki-sha256:<public-key-digest>`      |
 
-Greenbone, agent, and cloud IDs preserve their opaque bytes, including case and whitespace. Machine IDs require
+Every type has its own normalizer and surrounding whitespace is trimmed. Greenbone and agent IDs keep their case;
+cloud identifiers are lowercased. Placeholders such as `127.0.0.1`, `00:00:00:00:00:00`, a zero BIOS UUID, or
+`localhost` identify no single machine: normalization reports them as invalid, and matching leaves them out instead of
+failing. Machine IDs require
 `Scope["kind"]` to select Linux machine-ID or Windows MachineGuid parsing. Scopes are copied and preserved, rather than
 inferred from payloads.
 
@@ -119,8 +127,10 @@ This means:
 - A certificate with a different public key contributes a different TLS identifier.
 - Issuer CN, serial number, validity dates, and whole-certificate fingerprints cannot replace the public-key input.
 
-Certificate trust, signatures, expiry, and DNS-name agreement are not checked. Certificate subject CN/SAN names are not
-automatically converted into FQDN identifiers, and there is no `tls_fqdn_cn` identifier type.
+Certificate trust, signatures, and expiry are not checked. An `x509:` certificate takes part in matching only when its
+subject CN or a DNS SAN equals an FQDN or hostname identifier in the same view, compared case-insensitively without a
+trailing dot; wildcard names never match. Other certificates are left out. Certificate names are not converted into
+FQDN identifiers, and there is no `tls_fqdn_cn` identifier type.
 
 `Decide` performs normalization automatically. Structural model `Validate` methods alone do not validate payload syntax;
 standalone `ValidateIdentifier`, `NormalizeIdentifier`, and `EqualIdentifiers` are available when needed. Full format
@@ -130,31 +140,29 @@ rules are in [SPEC-001B](specs/SPEC-001B-normalization.md).
 
 The algorithm first chooses the destination key, then finds existing records that can move under it.
 
-1. **Look for a strong match.** Try strong identifier types in priority order. The first type with a match selects an
-   existing key: `REUSE`.
-2. **Create if supplied strong IDs do not match.** If the observation has strong IDs but none matches, return `CREATE`.
-   An IP, hostname, or MAC match cannot select an existing key in this case.
-3. **Use fuzzy containment when no strong IDs were supplied.** Reuse a candidate containing every incoming fuzzy
-   identifier. If none qualifies, return `CREATE`.
-4. **Find records that can join the destination.** Apply the strong-ID safeguards and containment rules below. Return
-   their indices in the merge plan.
+1. **Look for a strong match.** For each candidate, take the first strong type both views carry: an equal value is a
+   match, a different value excludes the candidate. TLS key sets that differ are inconclusive and the next type decides.
+   The match at the highest priority selects an existing key: `REUSE`.
+2. **Compare weak evidence when strong comparison is unavailable.** Candidates that share no strong type with the
+   observation are compared on the configured fuzzy types. A compatible candidate with sufficient shared evidence is
+   reused; the best score wins.
+3. **Otherwise create.** Return `CREATE` when no candidate qualifies.
+4. **Find records that can join the destination.** Apply the merge rules below and return their indices.
 
 Here, “strong” and “fuzzy” mean the types enabled in the supplied policy. The defaults are listed above.
 `CREATE` requests a new key from the application; the library does not generate one.
 
 ```mermaid
 flowchart TD
-    A[Validate and normalize inputs] --> B{Incoming strong IDs?}
-    B -- Yes --> C{Any strong type matches?}
-    C -- Yes --> D[REUSE key selected by strong priority]
-    C -- No --> E[CREATE a new key]
-    B -- No --> F{Nonempty fuzzy observation contained by a candidate?}
-    F -- Yes --> G[REUSE the best containing candidate]
-    F -- No --> E
+    A[Validate and normalize inputs] --> B{Equal value at the first shared strong type?}
+    B -- Yes --> D[REUSE key selected by strong priority, then recency]
+    B -- No --> F{Candidate without a shared strong type: compatible and sufficient weak evidence?}
+    F -- Yes --> G[REUSE the best scoring candidate]
+    F -- No --> E[CREATE a new key]
     D --> H[Find eligible records to merge into the destination]
     G --> H
-    E --> H
-    H --> I[Return CREATE or REUSE, plus merge indices]
+    E --> I[Return CREATE or REUSE, plus merge indices]
+    H --> I
 ```
 
 Invalid input returns an error before a decision can be applied.
@@ -163,8 +171,9 @@ Invalid input returns an error before a decision can be applied.
 
 ### Try identifier types in order
 
-Try the highest-priority strong type first. If it matches nobody, try the next type. As soon as a type matches, choose
-among its matching candidates and stop checking other types.
+For each candidate, look at the first configured strong type both the observation and the candidate carry. An equal
+value is a match at that type's priority; a different value excludes the candidate. A type only one side carries is
+skipped. Among all matching candidates, the highest priority wins.
 
 For example, Greenbone ID has higher priority than Agent ID:
 
@@ -174,11 +183,13 @@ For example, Greenbone ID has higher priority than Agent ID:
 | Greenbone ID G, Agent ID A | Nobody matches G; asset-A matches A        | REUSE asset-A |
 | Agent ID A, changed IP     | asset-A matches A and has the old IP       | REUSE asset-A |
 | Agent ID A, IP P           | Nobody matches A; asset-B matches only P   | CREATE        |
+| Agent ID A, IP P, MAC M    | asset-B has no strong ID; matches P and M  | REUSE asset-B |
+| Agent ID A, Machine ID X   | asset-C has Agent ID A and Machine ID Y    | CREATE        |
 
-**Priority comes before recency.** A newer Agent-ID match cannot beat a Greenbone-ID match. An unmatched Greenbone ID
-still allows an Agent-ID match to be considered. If no strong type matches, create a new key; do not select an existing
-key using fuzzy identifiers. Merge planning still runs afterward, so contained records without strong IDs may join the
-new key.
+**Priority comes before recency.** A newer Agent-ID match cannot beat a Greenbone-ID match. A Greenbone ID only one
+side carries is skipped and an Agent-ID match is still considered; different Greenbone IDs on both sides exclude the
+candidate. A candidate that shares no strong type with the observation is compared on weak evidence instead, so an
+agent's first report reuses the record a scanner created.
 
 ### If several candidates match the same strong type
 
@@ -206,27 +217,28 @@ These are public-key identities, not certificate rows. The same key and scope co
 continue to later strong types. A higher-priority match, such as Agent ID, already decides the destination even if TLS
 keys differ.
 
-## 7. Choose a key when no strong IDs were supplied
+## 7. Choose a key using weak evidence
 
-Compare only the configured fuzzy identifiers: MAC, hostname, and IP by default. Normalize them and ignore duplicate
-values. Type and complete scope remain part of each identifier.
+Candidates that share no strong type with the observation are compared on the configured fuzzy identifiers: MAC,
+hostname, IP, and FQDN by default. Normalize them and ignore duplicate values. Type and complete scope remain part of
+each identifier.
 
-**Reuse requires a candidate to contain every incoming fuzzy identifier.**
-Additional candidate identifiers are allowed. An observation with no fuzzy identifiers returns `CREATE`.
+A fuzzy type with weight 1 or more is an anchor; MAC is the default anchor. A candidate is **compatible** unless both
+views carry an anchor type and share none of its values. Shared evidence is **sufficient** when an anchor value is
+shared, or values of at least two fuzzy types are shared. Values only one side carries never block a match.
 
-| Incoming fuzzy identifiers | Candidate fuzzy identifiers | Destination                                           |
-|----------------------------|-----------------------------|-------------------------------------------------------|
-| IP P, hostname H           | IP P, hostname H, MAC M     | REUSE the candidate                                   |
-| IP P, hostname H, MAC M    | IP P, hostname H            | CREATE if no other candidate contains the observation |
-| IP P, hostname H1          | IP P, hostname H2           | CREATE if no other candidate contains the observation |
+| Incoming fuzzy identifiers | Candidate fuzzy identifiers | Destination                      |
+|----------------------------|-----------------------------|----------------------------------|
+| IP P, hostname H           | IP P, hostname H, MAC M     | REUSE the candidate              |
+| IP P2, FQDN F, MAC M       | IP P1, FQDN F, MAC M        | REUSE the candidate: new address |
+| IP P, MAC M, IP P2, MAC M2 | IP P, MAC M                 | REUSE the candidate: second NIC  |
+| IP P                       | IP P, MAC M                 | CREATE: one type is not enough   |
+| IP P, MAC M2               | IP P, MAC M                 | CREATE: different anchors        |
 
-Matching only the IP is insufficient when the observation also supplies a different hostname. In the second row, the
-narrower candidate may still join the new key during merge planning.
-
-If several candidates contain the full observation, choose the newest `LastSeen` at whole-second precision. Equal times
-keep the first candidate in the supplied array. Missing fuzzy timestamps compare as Unix epoch. The weighted score does
-not allow partial matches: containment is required first, so qualifying candidates have equal scores. Arithmetic details
-are in [SPEC-002](specs/SPEC-002-reconciliation.md#fuzzy-matching).
+If several candidates qualify, the highest weighted score wins, then the newest `LastSeen` at whole-second precision.
+Equal times keep the first candidate in the supplied array. Missing fuzzy timestamps compare as Unix epoch. An
+observation with no fuzzy identifiers returns `CREATE`. Arithmetic details are in
+[SPEC-002](specs/SPEC-002-reconciliation.md#fuzzy-matching).
 
 ## 8. The returned decision
 
@@ -246,23 +258,18 @@ are in [SPEC-002](specs/SPEC-002-reconciliation.md#fuzzy-matching).
 identifiers and asset key. The selected destination is excluded. An empty list means there are no existing records to
 move. The library does not return copies of candidates or individual historical observations.
 
-Use the selected candidate's identifiers as the destination view on `REUSE`. Use the incoming observation's identifiers
-on `CREATE`. Then apply these rules:
+Records join only a reused destination; compare each with the selected candidate's identifiers:
 
-| Source and destination  | Requirement to merge                                                                  |
-|-------------------------|---------------------------------------------------------------------------------------|
-| Both have strong IDs    | Match at the destination's deciding strong type; TLS requires equal complete key sets |
-| Either lacks strong IDs | Every source fuzzy identifier must occur in the destination's nonempty fuzzy set      |
+| Source and destination | Requirement to merge                                                                                          |
+|------------------------|---------------------------------------------------------------------------------------------------------------|
+| Share a strong type    | Equal value at the first shared type; TLS requires equal complete key sets                                    |
+| Share no strong type   | Compatible, sufficient shared weak evidence, and no contradiction with a record joining through a strong type or with another weak record |
 
-For a strong `REUSE`, the deciding type is the one that selected the key. Otherwise, use the highest-priority strong
-type present in the destination. Other identifier types do not veto a match at that deciding type. An empty source fuzzy
-set is contained, matching the original C containment rule.
+A different value at the first shared strong type keeps the record apart, also through weak evidence. Two weak records
+contradicting each other both stay; candidate order does not choose a winner. `CREATE` never moves records: a record
+with sufficient evidence would have been reused.
 
-If the destination has no strong IDs, also check the proposed strong-ID sources against each other. Compare each pair at
-the highest-priority strong type present in either source. Leave both members of an incompatible pair separate;
-candidate order does not choose a winner. Contained weak records remain eligible.
-
-### Example: combine two partial records under a new key
+### Example: combine two partial records
 
 Here hostname uses `TypeHostname`, and none of the records has strong IDs:
 
@@ -270,33 +277,32 @@ Here hostname uses `TypeHostname`, and none of the records has strong IDs:
 |-------------|-------------------------|--------------|
 | Observation | IP P, hostname H, MAC M | —            |
 | Candidate 0 | IP P, hostname H        | key-1        |
-| Candidate 1 | IP P, MAC M             | key-2        |
+| Candidate 1 | IP P, hostname H, MAC M | key-2        |
 
-Neither candidate contains the full observation, so create a new key. Both candidates are contained by the observation,
-so both can move under it:
+Both candidates are compatible and sufficient. Candidate 1 scores higher, so reuse key-2. Candidate 0 shares two types
+with the destination, so it can move under it:
 
 ```text
-Action: CREATE
-NeedsNewKey: true
-SelectedIndex: absent
-SelectedKey: absent
-MergeIndices: [0, 1]
+Action: REUSE
+NeedsNewKey: false
+SelectedIndex: 1
+SelectedKey: key-2
+MergeIndices: [0]
 ```
 
-The application generates key-3, stores the observation under key-3, and moves the records belonging to key-1 and key-2
-under key-3 in one transaction. `SelectedIndex` identifies a reused destination;
-`MergeIndices` identifies the existing records to move.
+The application stores the observation under key-2 and moves the records belonging to key-1 under key-2 in one
+transaction. `SelectedIndex` identifies the reused destination; `MergeIndices` identifies the existing records to move.
 
 ### Examples with strong IDs
 
-- **Incoming strong ID, existing weak records:** add Agent ID A to the observation above. If no existing strong ID
-  matches, still return `CREATE` and merge both contained weak records into the new key.
+- **Incoming strong ID, existing weak records:** add Agent ID A to the observation above. No candidate carries an
+  Agent ID, so weak evidence decides: `REUSE key-2` as before. The record gains the Agent ID instead of a new key.
 - **Weak observation, conflicting strong records:** give candidate 0 Agent ID A and candidate 1 Agent ID B. Return
-  `CREATE` and leave both existing records under their own keys.
-- **Same deciding strong ID:** records matching the destination's deciding Agent ID can merge despite changed IPs.
-  Different Agent IDs cannot be bypassed through fuzzy containment when Agent ID decides.
-- **TLS decides:** TLS sets `{A,B}` and `{A}` cannot merge through TLS. A higher-priority matching Agent ID still takes
-  precedence.
+  `REUSE key-2` and leave candidate 0 under its own key: its Agent ID contradicts the destination.
+- **Same deciding strong ID:** records matching the destination's first shared strong type can merge despite changed
+  IPs. Different Agent IDs cannot be bypassed through weak evidence.
+- **Different values at a higher shared type:** Machine IDs X and Y exclude a candidate even when its Agent ID matches.
+- **TLS sets differ:** `{A,B}` and `{A}` are inconclusive through TLS; a lower configured type or weak evidence decides.
 
 Go callers retrieve the supplied candidates directly:
 
@@ -372,7 +378,7 @@ through the inputs supplied by the application. No key is generated inside `Deci
 | Input validation and decision assembly         | [reconciliation.go](../identity/reconciliation.go)       |
 | Strong matching, TLS set equality, and ranking | [matching.go](../identity/matching.go)                   |
 | Merge eligibility and source collection        | [merging.go](../identity/merging.go)                     |
-| Fuzzy containment and scoring                  | [fuzzy.go](../identity/fuzzy.go)                         |
+| Weak evidence and scoring                      | [fuzzy.go](../identity/fuzzy.go)                         |
 | Default policy and policy validation           | [policy.go](../identity/policy.go)                       |
 | TLS certificate parsing                        | [normalization_tls.go](../identity/normalization_tls.go) |
 | SSH key parsing                                | [normalization_ssh.go](../identity/normalization_ssh.go) |

@@ -11,6 +11,9 @@ Ensure (results_outlive_inputs_and_other_results)
   gvm_asset_identity_policy_t *policy = default_policy ();
   gvm_asset_identity_observation_t *input =
     observation (GVM_ASSET_IDENTITY_IP, "2001:0DB8::1");
+  g_ptr_array_add (input->identifiers,
+                   gvm_asset_identity_identifier_new (GVM_ASSET_IDENTITY_MAC,
+                                                      "02:00:00:00:00:01"));
   GPtrArray *rows = candidates_new ();
   gvm_asset_identity_candidate_t *row = candidate ("K", input);
   row->last_seen = (gvm_asset_identity_timestamp_t){TRUE, -1, 123};
@@ -71,7 +74,7 @@ Ensure (repeated_reuse_and_error_cleanup)
 {
   gvm_asset_identity_policy_t *policy = default_policy ();
   gvm_asset_identity_observation_t *input =
-    observation (GVM_ASSET_IDENTITY_IP, "192.0.2.1");
+    observation (GVM_ASSET_IDENTITY_MAC, "02:00:00:00:00:01");
   GPtrArray *rows = candidates_new ();
   g_ptr_array_add (rows, candidate ("A", input));
   g_ptr_array_add (rows, candidate ("B", input));

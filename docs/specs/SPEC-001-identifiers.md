@@ -8,7 +8,8 @@ calls the same reconciliation implementation.
 - Support multiple types and multiple values per type.
 - Identify values by type, canonical payload, and complete scope. Repeated values do not add evidence.
 - Keep observation timestamps and history separate from identifier equality.
-- Use configurable strong-ID priority, followed by fuzzy containment when no strong evidence is supplied.
+- Use configurable strong-ID priority; candidates that share no strong type with the observation are compared on
+  sufficient, compatible weak evidence.
 - Return `CREATE` or `REUSE`; invalid input returns an error.
 - Preserve caller data and return independent copies where data is retained or returned.
 - Keep the Go core independent of C, GLib, databases, and network services.

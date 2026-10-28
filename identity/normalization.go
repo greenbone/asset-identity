@@ -7,14 +7,38 @@ package identity
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var (
-	// ErrInvalidIdentifierValue identifies malformed payload syntax.
+	// ErrInvalidIdentifierValue identifies malformed payload syntax and values that identify no machine.
 	ErrInvalidIdentifierValue = errors.New("invalid identifier value")
 	// ErrUnsupportedIdentifierFormat identifies formats that have no supported contract.
 	ErrUnsupportedIdentifierFormat = errors.New("unsupported identifier format")
 )
+
+// errPlaceholder marks well-formed values every machine or no machine carries: zero, broadcast, loopback,
+// link-local, multicast and vendor default values. Decide leaves them out; NormalizeIdentifier reports them as
+// ErrInvalidIdentifierValue.
+var errPlaceholder = errors.New("placeholder value")
+
+const maxOpaqueLength = 2048
+
+// normalizers holds one normalizer per identifier type. Input is trimmed of surrounding whitespace, nonempty, and a
+// machine id carries a supported kind.
+var normalizers = map[IdentifierType]func(value string, scope Scope) (string, error){
+	TypeCloudIdentifier:  normalizeCloudIdentifier,
+	TypeGreenboneID:      normalizeOpaque,
+	TypeAgentID:          normalizeOpaque,
+	TypeMachineID:        normalizeMachineID,
+	TypeBIOSUUID:         normalizeBIOSUUID,
+	TypeSSHHostKey:       normalizeSSHHostKey,
+	TypeTLSPublicKeyHash: normalizeTLSPublicKeyHash,
+	TypeIP:               normalizeIP,
+	TypeFQDN:             normalizeFQDN,
+	TypeMAC:              normalizeMAC,
+	TypeHostname:         normalizeHostname,
+}
 
 // ValidateIdentifier checks type-specific payload syntax without mutating input.
 func ValidateIdentifier(value IdentifierValue) error {
@@ -51,42 +75,135 @@ func canonicalIdentifierValue(value IdentifierValue) (string, error) {
 	if err := value.Validate(); err != nil {
 		return "", err
 	}
-	if value.Type == TypeMachineID {
-		switch value.Scope["kind"] {
-		case "linux_machine_id", "windows_machine_guid":
-		default:
-			return "", fmt.Errorf("%s: kind: %w", value.Type, ErrUnsupportedIdentifierFormat)
-		}
+	if value.Type == TypeMachineID && value.Scope["kind"] != "linux_machine_id" && value.Scope["kind"] != "windows_machine_guid" {
+		return "", fmt.Errorf("%s: kind: %w", value.Type, ErrUnsupportedIdentifierFormat)
 	}
-	if value.Value == "" {
+	payload := strings.TrimSpace(value.Value)
+	if payload == "" {
 		return "", fmt.Errorf("%s: empty payload: %w", value.Type, ErrInvalidIdentifierValue)
 	}
-	var canonical string
-	var err error
-	switch value.Type {
-	case TypeGreenboneID, TypeAgentID, TypeCloudIdentifier:
-		canonical = value.Value
-	case TypeMachineID:
-		if value.Scope["kind"] == "linux_machine_id" {
-			canonical, err = canonicalHex(value.Value, 32)
-		} else {
-			canonical, err = canonicalUUID(value.Value)
-		}
-	case TypeBIOSUUID:
-		canonical, err = canonicalUUID(value.Value)
-	case TypeMAC:
-		canonical, err = canonicalMAC(value.Value)
-	case TypeIP:
-		canonical, err = canonicalIP(value.Value)
-	case TypeHostname, TypeFQDN:
-		canonical, err = canonicalDNS(value.Value, value.Type == TypeFQDN)
-	case TypeTLSPublicKeyHash:
-		canonical, err = canonicalSPKIHash(value.Value)
-	case TypeSSHHostKey:
-		canonical, err = canonicalSSHKey(value.Value)
+	canonical, err := normalizers[value.Type](payload, value.Scope)
+	if errors.Is(err, errPlaceholder) {
+		return "", fmt.Errorf("%s: %w: %w", value.Type, ErrInvalidIdentifierValue, err)
 	}
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", value.Type, err)
 	}
 	return canonical, nil
+}
+
+func normalizeOpaque(value string, _ Scope) (string, error) {
+	if len(value) > maxOpaqueLength {
+		return "", ErrInvalidIdentifierValue
+	}
+	return value, nil
+}
+
+func normalizeCloudIdentifier(value string, scope Scope) (string, error) {
+	opaque, err := normalizeOpaque(value, scope)
+	if err != nil {
+		return "", err
+	}
+	return strings.ToLower(opaque), nil
+}
+
+func normalizeMachineID(value string, scope Scope) (string, error) {
+	if strings.EqualFold(value, "uninitialized") {
+		return "", errPlaceholder
+	}
+	var canonical string
+	var err error
+	if scope["kind"] == "linux_machine_id" {
+		canonical, err = canonicalHex(value, 32)
+	} else {
+		canonical, err = canonicalUUID(value)
+	}
+	if err != nil {
+		return "", err
+	}
+	if strings.Trim(canonical, "0-") == "" {
+		return "", errPlaceholder
+	}
+	return canonical, nil
+}
+
+var placeholderBIOSUUIDs = []string{
+	"00000000-0000-0000-0000-000000000000",
+	"ffffffff-ffff-ffff-ffff-ffffffffffff",
+	"03000200-0400-0500-0006-000700080009",
+}
+
+func normalizeBIOSUUID(value string, _ Scope) (string, error) {
+	canonical, err := canonicalUUID(value)
+	if err != nil {
+		return "", err
+	}
+	for _, placeholder := range placeholderBIOSUUIDs {
+		if canonical == placeholder {
+			return "", errPlaceholder
+		}
+	}
+	return canonical, nil
+}
+
+func normalizeSSHHostKey(value string, _ Scope) (string, error) {
+	return canonicalSSHKey(value)
+}
+
+func normalizeTLSPublicKeyHash(value string, _ Scope) (string, error) {
+	return canonicalSPKIHash(value)
+}
+
+func normalizeIP(value string, _ Scope) (string, error) {
+	address, err := canonicalIP(value)
+	if err != nil {
+		return "", err
+	}
+	if isSharedAddress(address) {
+		return "", errPlaceholder
+	}
+	return address.String(), nil
+}
+
+func normalizeMAC(value string, _ Scope) (string, error) {
+	canonical, err := canonicalMAC(value)
+	if err != nil {
+		return "", err
+	}
+	if canonical == "00:00:00:00:00:00" || canonical == "ff:ff:ff:ff:ff:ff" {
+		return "", errPlaceholder
+	}
+	return canonical, nil
+}
+
+func normalizeFQDN(value string, _ Scope) (string, error) {
+	labels, err := dnsLabels(value)
+	if err != nil {
+		return "", err
+	}
+	if len(labels) < 2 {
+		return "", ErrUnsupportedIdentifierFormat
+	}
+	if isDigits(labels[len(labels)-1]) {
+		return "", ErrInvalidIdentifierValue
+	}
+	canonical := strings.Join(labels, ".")
+	if canonical == "localhost.localdomain" {
+		return "", errPlaceholder
+	}
+	return canonical, nil
+}
+
+func normalizeHostname(value string, _ Scope) (string, error) {
+	labels, err := dnsLabels(value)
+	if err != nil {
+		return "", err
+	}
+	if len(labels) > 1 && isDigits(labels[len(labels)-1]) {
+		return "", ErrInvalidIdentifierValue
+	}
+	if labels[0] == "localhost" {
+		return "", errPlaceholder
+	}
+	return labels[0], nil
 }

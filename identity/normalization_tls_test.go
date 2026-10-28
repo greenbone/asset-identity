@@ -44,8 +44,9 @@ func TestTLSScannerCertificate(t *testing.T) {
 		if equal, err := identity.EqualIdentifiers(input, normalized); err != nil || !equal {
 			t.Fatalf("certificate differs from its SPKI hash: %v %v", equal, err)
 		}
+		host := identity.IdentifierValue{Type: identity.TypeHostname, Value: "gat-29"}
 		for _, pair := range [][2]identity.IdentifierValue{{input, normalized}, {normalized, input}} {
-			decision, err := identity.Decide(identity.Observation{Identifiers: []identity.IdentifierValue{pair[0]}}, []identity.Candidate{{AssetKey: "existing", Identifiers: []identity.IdentifierValue{pair[1]}}}, identity.GreenboneMatchPolicy())
+			decision, err := identity.Decide(identity.Observation{Identifiers: []identity.IdentifierValue{pair[0], host}}, []identity.Candidate{{AssetKey: "existing", Identifiers: []identity.IdentifierValue{pair[1], host}}}, identity.GreenboneMatchPolicy())
 			if err != nil || decision.Action != identity.ActionReuse || decision.Stage != identity.StageStrong || decision.SelectedKey != "existing" {
 				t.Fatalf("raw/canonical matching: %+v %v", decision, err)
 			}
@@ -88,7 +89,7 @@ func TestInvalidTLSScannerCertificate(t *testing.T) {
 	}
 	inputs := []string{
 		"x509:", "x509:!!!!", "x509:AAAA", "x509: " + strings.TrimPrefix(raw, "x509:"),
-		raw + "\n", "x509:\n" + strings.TrimPrefix(raw, "x509:"),
+		"x509:\n" + strings.TrimPrefix(raw, "x509:"),
 		"x509:" + base64.StdEncoding.EncodeToString(der[:len(der)-1]),
 		"x509:" + base64.StdEncoding.EncodeToString(append(der, 0)),
 	}
