@@ -23,11 +23,11 @@ func TestDecideFQDNWeakMatching(t *testing.T) {
 		action DecisionAction
 		merges []int
 	}{
-		{"normalized name with ip reuses", []IdentifierValue{fuzzyValue(TypeFQDN, "SERVER.EXAMPLE.COM."), ip}, fuzzyRow("K", 1, fqdn, ip), ActionReuse, nil},
-		{"fqdn alone is insufficient", []IdentifierValue{fqdn}, fuzzyRow("K", 1, fqdn), ActionCreate, nil},
-		{"different names with one shared ip create", []IdentifierValue{ip, fqdn}, fuzzyRow("K", 1, ip, fuzzyValue(TypeFQDN, "other.example.com")), ActionCreate, nil},
-		{"hostname is a distinct type", []IdentifierValue{fqdn, ip}, fuzzyRow("K", 1, fuzzyValue(TypeHostname, "server.example.com"), ip), ActionCreate, nil},
-		{"a different fqdn does not block a mac match", []IdentifierValue{ip, fqdn, fuzzyValue(TypeMAC, "02:00:00:00:00:01")}, fuzzyRow("K", 1, fuzzyValue(TypeMAC, "02:00:00:00:00:01"), fuzzyValue(TypeFQDN, "other.example.com")), ActionReuse, nil},
+		{"normalized name reuses", []IdentifierValue{fuzzyValue(TypeFQDN, "SERVER.EXAMPLE.COM.")}, fuzzyRow("K", 1, fqdn), ActionReuse, nil},
+		{"different names create", []IdentifierValue{fqdn}, fuzzyRow("K", 1, fuzzyValue(TypeFQDN, "other.example.com")), ActionCreate, nil},
+		{"hostname is a distinct type", []IdentifierValue{fqdn}, fuzzyRow("K", 1, fuzzyValue(TypeHostname, "server.example.com")), ActionCreate, nil},
+		{"fqdn prevents partial containment", []IdentifierValue{ip, fqdn}, fuzzyRow("K", 1, ip, fuzzyValue(TypeFQDN, "other.example.com")), ActionCreate, nil},
+		{"contained fqdn is a merge source", []IdentifierValue{ip, fqdn}, fuzzyRow("K", 1, fqdn), ActionCreate, []int{0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -55,12 +55,11 @@ func TestDecideStrongSelection(t *testing.T) {
 	}{
 		{"default priority", []IdentifierValue{g, a}, []Candidate{fuzzyRow("greenbone", 10, g), fuzzyRow("agent", 20, a)}, GreenboneMatchPolicy().StrongOrder, 0},
 		{"custom priority", []IdentifierValue{g, a}, []Candidate{fuzzyRow("greenbone", 10, g), fuzzyRow("agent", 20, a)}, []IdentifierType{TypeAgentID, TypeGreenboneID}, 1},
-		{"unmatched higher priority", []IdentifierValue{g, a}, []Candidate{fuzzyRow("agent", 10, a)}, GreenboneMatchPolicy().StrongOrder, 0},
+		{"stronger incoming creates an upgrade", []IdentifierValue{g, a}, []Candidate{fuzzyRow("agent", 10, a)}, GreenboneMatchPolicy().StrongOrder, -1},
 		{"newest same value", []IdentifierValue{g}, []Candidate{fuzzyRow("old", 10, g), fuzzyRow("new", 20, g)}, GreenboneMatchPolicy().StrongOrder, 1},
 		{"exact lexical tie", []IdentifierValue{g}, []Candidate{fuzzyRow("asset-2", 20, g), fuzzyRow("asset-10", 20, g)}, GreenboneMatchPolicy().StrongOrder, 1},
 		{"weak differences do not veto", []IdentifierValue{g, ip}, []Candidate{fuzzyRow("K", 10, g, fuzzyValue(TypeIP, "192.0.2.2"))}, GreenboneMatchPolicy().StrongOrder, 0},
-		{"unmatched strong with insufficient weak evidence creates", []IdentifierValue{g, ip}, []Candidate{fuzzyRow("K", 10, ip)}, GreenboneMatchPolicy().StrongOrder, -1},
-		{"differing shared higher type blocks a lower match", []IdentifierValue{g, a}, []Candidate{fuzzyRow("K", 10, fuzzyValue(TypeGreenboneID, "other"), a)}, GreenboneMatchPolicy().StrongOrder, -1},
+		{"eligible no match never falls back", []IdentifierValue{g, ip}, []Candidate{fuzzyRow("K", 10, ip)}, GreenboneMatchPolicy().StrongOrder, -1},
 		{"no candidates", []IdentifierValue{g}, nil, GreenboneMatchPolicy().StrongOrder, -1},
 		{"reclassified IP", []IdentifierValue{ip}, []Candidate{fuzzyRow("K", 10, ip)}, []IdentifierType{TypeIP}, 0},
 	}
@@ -98,7 +97,6 @@ func TestDecideFuzzyCases(t *testing.T) {
 	ip2 := fuzzyValue(TypeIP, "192.0.2.2")
 	ip3 := fuzzyValue(TypeIP, "192.0.2.3")
 	host := fuzzyValue(TypeHostname, "host")
-	mac := fuzzyValue(TypeMAC, "02:00:00:00:00:01")
 	tests := []struct {
 		name     string
 		values   []IdentifierValue
@@ -107,15 +105,14 @@ func TestDecideFuzzyCases(t *testing.T) {
 		newKey   bool
 		selected int
 	}{
-		{"two shared types reuse", []IdentifierValue{ip1, host}, []Candidate{fuzzyRow("K", 10, ip1, host, ip2)}, ActionReuse, false, 0},
-		{"one shared type creates", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionCreate, true, -1},
-		{"observed extra value does not block", []IdentifierValue{ip1, ip2, host}, []Candidate{fuzzyRow("K", 10, ip1, host)}, ActionReuse, false, 0},
-		{"partial overlap of one type creates", []IdentifierValue{ip1, ip3}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionCreate, true, -1},
-		{"highest score wins", []IdentifierValue{mac, ip1, host}, []Candidate{fuzzyRow("newer", 20, mac), fuzzyRow("closer", 10, mac, host)}, ActionReuse, false, 1},
-		{"input order breaks fuzzy ties", []IdentifierValue{mac}, []Candidate{fuzzyRow("Z", 20, mac), fuzzyRow("A", 20, mac)}, ActionReuse, false, 0},
+		{"candidate contains observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionReuse, false, 0},
+		{"observation contains candidate", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K", 10, ip1)}, ActionCreate, true, -1},
+		{"partial overlap", []IdentifierValue{ip1, ip3}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionCreate, true, -1},
+		{"subset of survivor need not overlap observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("selected", 20, ip1, host), fuzzyRow("potential", 10, host)}, ActionReuse, false, 0},
+		{"input order breaks fuzzy ties", []IdentifierValue{ip1}, []Candidate{fuzzyRow("Z", 20, ip1), fuzzyRow("A", 20, ip1)}, ActionReuse, false, 0},
 		{"empty observation guard", nil, []Candidate{fuzzyRow("K", 10, ip1)}, ActionCreate, true, -1},
-		{"empty candidate", []IdentifierValue{mac}, []Candidate{fuzzyRow("K", 10)}, ActionCreate, true, -1},
-		{"indices refer to supplied list", []IdentifierValue{mac}, []Candidate{fuzzyRow("unrelated", 1, ip3), fuzzyRow("selected", 20, mac, host), fuzzyRow("other", 10, host)}, ActionReuse, false, 1},
+		{"empty candidate subset", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K", 10)}, ActionCreate, true, -1},
+		{"indices refer to supplied list", []IdentifierValue{ip1}, []Candidate{fuzzyRow("unrelated", 1, ip3), fuzzyRow("selected", 20, ip1, host), fuzzyRow("potential", 10, host)}, ActionReuse, false, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -134,23 +131,23 @@ func TestDecideFuzzyCases(t *testing.T) {
 	}
 }
 
-func TestDecideFuzzyUsesWholeSeconds(t *testing.T) {
-	mac := fuzzyValue(TypeMAC, "02:00:00:00:00:01")
-	rows := []Candidate{fuzzyRow("Z", 200, mac), fuzzyRow("A", 200, mac)}
+func TestDecideFuzzyUsesCWholeSeconds(t *testing.T) {
+	ip := fuzzyValue(TypeIP, "192.0.2.1")
+	rows := []Candidate{fuzzyRow("Z", 200, ip), fuzzyRow("A", 200, ip)}
 	newer := time.Unix(200, 999999999)
 	rows[1].LastSeen = &newer
-	got, err := Decide(Observation{Identifiers: []IdentifierValue{mac}}, rows, GreenboneMatchPolicy())
+	got, err := Decide(Observation{Identifiers: []IdentifierValue{ip}}, rows, GreenboneMatchPolicy())
 	if err != nil || got.SelectedKey != "Z" {
 		t.Fatalf("whole-second tie: %+v %v", got, err)
 	}
 }
 
 func TestDecidePreservesScopeIdentity(t *testing.T) {
-	for _, typ := range []IdentifierType{TypeGreenboneID, TypeMAC} {
+	for _, typ := range []IdentifierType{TypeGreenboneID, TypeIP} {
 		for _, scope := range []Scope{{}, {"realm": "other"}} {
 			value := "G"
-			if typ == TypeMAC {
-				value = "02:00:00:00:00:01"
+			if typ == TypeIP {
+				value = "192.168.1.10"
 			}
 			left := IdentifierValue{Type: typ, Value: value}
 			right := IdentifierValue{Type: typ, Value: value, Scope: scope}
@@ -191,13 +188,12 @@ func TestDecideStrongMultiplicity(t *testing.T) {
 		{"different values lexical tie", []IdentifierValue{g1, g2}, []Candidate{fuzzyRow("Z", 20, g1), fuzzyRow("A", 20, g2)}, ActionReuse, "A"},
 		{"different values missing times", []IdentifierValue{g1, g2}, []Candidate{{AssetKey: "Z", Identifiers: []IdentifierValue{g1}}, {AssetKey: "A", Identifiers: []IdentifierValue{g2}}}, ActionReuse, "A"},
 		{"single value multiple candidates ranks", []IdentifierValue{g1}, []Candidate{fuzzyRow("old", 10, g1), fuzzyRow("new", 20, g1)}, ActionReuse, "new"},
-		{"no match multiplicity with insufficient weak evidence creates", []IdentifierValue{g1, g2, ip}, []Candidate{fuzzyRow("weak", 10, ip)}, ActionCreate, ""},
+		{"no match multiplicity creates without fuzzy", []IdentifierValue{g1, g2, ip}, []Candidate{fuzzyRow("weak", 10, ip)}, ActionCreate, ""},
 		{"no candidates multiplicity creates", []IdentifierValue{g1, g2}, nil, ActionCreate, ""},
 		{"no match lower type multiplicity creates", []IdentifierValue{g1, a1, a2}, nil, ActionCreate, ""},
-		{"no match single value with insufficient weak evidence creates", []IdentifierValue{g1, ip}, []Candidate{fuzzyRow("weak", 10, ip)}, ActionCreate, ""},
-		{"a different value at a shared higher type contradicts", []IdentifierValue{g1, a1}, []Candidate{fuzzyRow("K", 10, g2, a1)}, ActionCreate, ""},
+		{"no match single value creates without fuzzy", []IdentifierValue{g1, ip}, []Candidate{fuzzyRow("weak", 10, ip)}, ActionCreate, ""},
 		{"candidate only differing values do not conflict", []IdentifierValue{g1}, []Candidate{fuzzyRow("K", 10, g1, g2)}, ActionReuse, "K"},
-		{"unmatched higher multiplicity does not veto lower match", []IdentifierValue{g1, g2, a1}, []Candidate{fuzzyRow("A", 10, a1)}, ActionReuse, "A"},
+		{"stronger incoming multiplicity upgrades lower record", []IdentifierValue{g1, g2, a1}, []Candidate{fuzzyRow("A", 10, a1)}, ActionCreate, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -233,7 +229,7 @@ func TestDecideStrongMultipleValuesPreserveNormalizationAndInputs(t *testing.T) 
 }
 
 func TestDecideFuzzyMissingTimeUsesEpoch(t *testing.T) {
-	ip := fuzzyValue(TypeMAC, "02:00:00:00:00:01")
+	ip := fuzzyValue(TypeIP, "192.0.2.1")
 	tests := []struct {
 		name          string
 		first, second *time.Time
@@ -286,8 +282,7 @@ func TestDecideDisabledStrongMembership(t *testing.T) {
 	g := fuzzyValue(TypeGreenboneID, "G")
 	p := GreenboneMatchPolicy()
 	p.StrongOrder = nil
-	mac := fuzzyValue(TypeMAC, "02:00:00:00:00:01")
-	got, err := Decide(Observation{Identifiers: []IdentifierValue{g, mac}}, []Candidate{fuzzyRow("K", 10, mac)}, p)
+	got, err := Decide(Observation{Identifiers: []IdentifierValue{g, ip}}, []Candidate{fuzzyRow("K", 10, ip)}, p)
 	if err != nil || got.Action != ActionReuse || got.Stage != StageFuzzy {
 		t.Fatalf("disabled strong: %+v %v", got, err)
 	}
@@ -298,7 +293,7 @@ func TestDecideDisabledStrongMembership(t *testing.T) {
 }
 
 func TestDecideImmutableInputs(t *testing.T) {
-	ip := IdentifierValue{Type: TypeMAC, Value: "02-AB-CD-EF-01-23", Scope: Scope{"realm": "r"}}
+	ip := IdentifierValue{Type: TypeIP, Value: "2001:0DB8::1", Scope: Scope{"realm": "r"}}
 	before := ip.Clone()
 	policy := GreenboneMatchPolicy()
 	originalPolicy := policy.Clone()
@@ -376,7 +371,7 @@ func TestDecideValidatesAllCandidateTimestamps(t *testing.T) {
 
 func TestDecideAcceptsValidCandidateTimestamps(t *testing.T) {
 	for _, instant := range []time.Time{time.Unix(0, 0), time.Unix(-1, 999999999), {}, time.Unix(0, 0).In(time.FixedZone("east", 3600))} {
-		for _, value := range []IdentifierValue{fuzzyValue(TypeGreenboneID, "g"), fuzzyValue(TypeMAC, "02:00:00:00:00:01")} {
+		for _, value := range []IdentifierValue{fuzzyValue(TypeGreenboneID, "g"), fuzzyValue(TypeIP, "192.0.2.1")} {
 			before := instant
 			candidate := Candidate{AssetKey: "K", Identifiers: []IdentifierValue{value}, LastSeen: &instant}
 			got, err := Decide(Observation{Identifiers: []IdentifierValue{value}}, []Candidate{candidate}, GreenboneMatchPolicy())

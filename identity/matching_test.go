@@ -186,9 +186,10 @@ func TestStrongPriorityEvaluation(t *testing.T) {
 		strong     bool
 	}{
 		{"highest default", identity.GreenboneMatchPolicy().StrongOrder, []identity.IdentifierValue{a, g, ip}, [][]identity.IdentifierValue{{a}, {g}}, identity.TypeGreenboneID, 1, []int{1}, true},
-		{"differing shared higher type excludes the candidate", []identity.IdentifierType{identity.TypeGreenboneID, identity.TypeAgentID}, []identity.IdentifierValue{g, a}, [][]identity.IdentifierValue{{identity.IdentifierValue{Type: identity.TypeGreenboneID, Value: "other"}, a}, {a}}, identity.TypeAgentID, 1, []int{1}, true},
+		{"higher conflict and upgrade both prevent reuse", []identity.IdentifierType{identity.TypeGreenboneID, identity.TypeAgentID}, []identity.IdentifierValue{g, a}, [][]identity.IdentifierValue{{identity.IdentifierValue{Type: identity.TypeGreenboneID, Value: "other"}, a}, {a}}, "", -1, nil, true},
 		{"custom", []identity.IdentifierType{identity.TypeAgentID, identity.TypeGreenboneID}, []identity.IdentifierValue{g, a}, [][]identity.IdentifierValue{{g}, {a}}, identity.TypeAgentID, 0, []int{1}, true},
-		{"unmatched higher", []identity.IdentifierType{identity.TypeGreenboneID, identity.TypeAgentID}, []identity.IdentifierValue{g, a}, [][]identity.IdentifierValue{{a}}, identity.TypeAgentID, 1, []int{0}, true},
+		{"stronger incoming requires upgrade", []identity.IdentifierType{identity.TypeGreenboneID, identity.TypeAgentID}, []identity.IdentifierValue{g, a}, [][]identity.IdentifierValue{{a}}, "", -1, nil, true},
+		{"weaker incoming reuses richer candidate", []identity.IdentifierType{identity.TypeGreenboneID, identity.TypeAgentID}, []identity.IdentifierValue{a}, [][]identity.IdentifierValue{{g, a}}, identity.TypeAgentID, 1, []int{0}, true},
 		{"disabled", nil, []identity.IdentifierValue{g, ip}, [][]identity.IdentifierValue{{g, ip}}, "", -1, nil, false},
 		{"reclassified IP", []identity.IdentifierType{identity.TypeIP}, []identity.IdentifierValue{g, ip}, [][]identity.IdentifierValue{{ip}}, identity.TypeIP, 0, []int{0}, true},
 		{"no match still incoming strong", []identity.IdentifierType{identity.TypeGreenboneID}, []identity.IdentifierValue{g, ip}, [][]identity.IdentifierValue{{ip}}, "", -1, nil, true},

@@ -43,12 +43,8 @@ Ensure (fqdn_matches_as_weak_evidence)
   gvm_asset_identity_policy_t *policy = default_policy ();
   gvm_asset_identity_observation_t *input =
     observation (GVM_ASSET_IDENTITY_FQDN, "SERVER.EXAMPLE.COM.");
-  g_ptr_array_add (input->identifiers, gvm_asset_identity_identifier_new (
-                                         GVM_ASSET_IDENTITY_IP, "192.0.2.1"));
   gvm_asset_identity_observation_t *stored =
     observation (GVM_ASSET_IDENTITY_FQDN, "server.example.com");
-  g_ptr_array_add (stored->identifiers, gvm_asset_identity_identifier_new (
-                                          GVM_ASSET_IDENTITY_IP, "192.0.2.1"));
   GPtrArray *rows = candidates_new ();
   g_ptr_array_add (rows, candidate ("K", stored));
   gvm_asset_identity_decision_t *result = decide (input, rows, policy);

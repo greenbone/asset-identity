@@ -89,19 +89,19 @@ func Decide(observation Observation, candidates []Candidate, policy MatchPolicy)
 	if err != nil {
 		return Decision{}, err
 	}
-	if err := planMerges(&decision, views, policy); err != nil {
+	if err := planMerges(&decision, canonicalIncoming, views, policy); err != nil {
 		return Decision{}, err
 	}
 	return decision, nil
 }
 
-// selectKey uses canonical views validated by Decide. A strong match wins; otherwise candidates sharing no strong
-// type with the observation compete on weak evidence. Stage is STRONG unless weak evidence selected the key or the
-// observation carries no strong identifier.
+// selectKey uses canonical views validated by Decide.
 func selectKey(observation Observation, candidates []Candidate, views [][]IdentifierValue, policy MatchPolicy) (Decision, error) {
-	relations, priorities := strongRelations(policy, observation.Identifiers, views)
-	match := strongMatchFromRelations(policy, observation.Identifiers, relations, priorities)
-	if len(match.CandidateIndices) > 0 {
+	match := evaluateStrongPriority(policy, observation.Identifiers, views)
+	if match.HasIncomingStrong {
+		if len(match.CandidateIndices) == 0 {
+			return Decision{Action: ActionCreate, Stage: StageStrong, NeedsNewKey: true}, nil
+		}
 		ranking := make([]StrongRankingCandidate, len(match.CandidateIndices))
 		for i, index := range match.CandidateIndices {
 			ranking[i] = StrongRankingCandidate{AssetKey: candidates[index].AssetKey, LastSeen: candidates[index].LastSeen}
@@ -113,20 +113,16 @@ func selectKey(observation Observation, candidates []Candidate, views [][]Identi
 		index := match.CandidateIndices[order[0]]
 		return Decision{Action: ActionReuse, Stage: StageStrong, SelectedKey: candidates[index].AssetKey, SelectedIndex: &index}, nil
 	}
-	eligible := make([]bool, len(views))
-	for i, relation := range relations {
-		eligible[i] = relation == strongNone
-	}
-	result, err := matchFuzzyCanonical(observation.Identifiers, views, candidates, eligible, policy)
+	result, err := matchFuzzyCanonical(observation.Identifiers, views, candidates, policy)
 	if err != nil {
 		return Decision{}, err
 	}
+	action := ActionCreate
 	if result.SelectedIndex != nil {
-		return Decision{Action: ActionReuse, Stage: StageFuzzy, SelectedKey: result.SelectedKey, SelectedIndex: result.SelectedIndex}, nil
+		action = ActionReuse
 	}
-	stage := StageFuzzy
-	if match.HasIncomingStrong {
-		stage = StageStrong
-	}
-	return Decision{Action: ActionCreate, Stage: stage, NeedsNewKey: true}, nil
+	return Decision{
+		Action: action, Stage: StageFuzzy, NeedsNewKey: result.NeedsNewKey,
+		SelectedKey: result.SelectedKey, SelectedIndex: result.SelectedIndex,
+	}, nil
 }

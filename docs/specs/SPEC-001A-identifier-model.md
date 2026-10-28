@@ -1,30 +1,18 @@
 # SPEC-001A: Identifier Model
 
-This document defines the data model in [`identity/model.go`](../../identity/model.go). Payload normalization is defined
+The Go types are defined in [`model.go`](../../identity/model.go). Payload formats are defined
 in [SPEC-001B](SPEC-001B-normalization.md).
 
 ## Data types
 
-```go
-type IdentifierType string
-type Scope map[string]string
+| Type                    | Contents                                                      |
+|-------------------------|---------------------------------------------------------------|
+| `IdentifierValue`       | `Type`, raw string `Value`, and `Scope` (`map[string]string`) |
+| `IdentifierObservation` | An identifier and optional `ObservedAt` timestamp             |
+| `ObservationHistory`    | An ordered slice of identifier observations                   |
 
-type IdentifierValue struct {
-Type  IdentifierType
-Value string
-Scope Scope
-}
-
-type IdentifierObservation struct {
-Identifier IdentifierValue
-ObservedAt *time.Time
-}
-
-type ObservationHistory []IdentifierObservation
-```
-
-Use `[]IdentifierValue` for collections so multiple values of one type remain representable. Type names are exact,
-case-sensitive strings; declaration order does not define matching priority.
+Use `[]IdentifierValue` to allow multiple values of the same type. Type names are case-sensitive; their declaration
+order does not define matching priority.
 
 | Go constant            | Type name                         |
 |------------------------|-----------------------------------|
@@ -42,36 +30,29 @@ case-sensitive strings; declaration order does not define matching priority.
 
 ## Scope and equality
 
-Scope dimensions use exact names and values. Names must be nonempty; values may be empty. Map order does not matter.
-Missing dimensions differ from empty values, and `nil` scope differs from `Scope{}`. Neither absent nor empty scope is a
-wildcard or a claim of global uniqueness.
+Scope names and values are exact; names must be nonempty. Map order does not matter. A missing dimension differs from an
+empty value; `nil` scope differs from `Scope{}`. Neither is a wildcard.
 
-`SameRepresentation(a, b)` compares type, payload bytes, and complete scope without validation or normalization. Use
-`EqualIdentifiers` from SPEC-001B for semantic equality. Timestamps and history never participate in either comparison.
+`SameRepresentation` compares type, raw value, and complete scope without validation.
+`EqualIdentifiers` compares normalized values. Neither comparison includes timestamps or history.
 
 ## Timestamps and history
 
-- `nil` means missing. A non-nil Go zero time is present.
-- Present timestamps must fall within UTC years 1–9999. Epoch and pre-epoch times are valid.
-- Timestamp normalization preserves the instant and nanoseconds, converts to UTC, and removes monotonic-clock data.
-- History preserves supplied entry order and duplicates. It does not sort, aggregate, replace, or expire observations.
-  Applications own retention and choose the active values used for matching.
+`nil` means a missing timestamp; a non-nil Go zero time is present. Present instants must fall within UTC years 1–9999;
+epoch and pre-epoch times are valid. Timestamp normalization preserves nanoseconds, converts to UTC, and removes
+monotonic-clock data. History keeps input order and duplicates; applications decide retention and active values.
 
 ## Operations and errors
 
-| Operation                         | Behavior                                                                                        |
-|-----------------------------------|-------------------------------------------------------------------------------------------------|
-| `IdentifierValue.Validate`        | Check supported type and nonempty scope dimension names; do not inspect payload syntax          |
-| `IdentifierObservation.Validate`  | Check the identifier structure and present timestamp range                                      |
-| `ObservationHistory.Validate`     | Return the first invalid entry with its zero-based index                                        |
-| `Clone` methods                   | Copy maps, timestamp storage, and history entries; preserve nil/empty distinctions and timezone |
-| `IdentifierObservation.Normalize` | Clone and normalize only the timestamp; do not validate or normalize the payload                |
-| `NewObservation`                  | Copy, normalize the timestamp, and validate; return a zero observation on error                 |
-| `NewObservationHistory`           | Apply the constructor to each entry; return nil and the first indexed error on failure          |
+| Operation                         | Behavior                                                                                              |
+|-----------------------------------|-------------------------------------------------------------------------------------------------------|
+| `Validate` methods                | Check supported type, scope names, and any present timestamp; history returns the first indexed error |
+| `Clone` methods                   | Copy scopes, timestamp storage, and history; preserve nil/empty distinctions and timezone             |
+| `IdentifierObservation.Normalize` | Clone and normalize only the timestamp; do not validate or normalize the payload                      |
+| `NewObservation`                  | Copy, normalize the timestamp, and validate; return a zero observation on error                       |
+| `NewObservationHistory`           | Apply the constructor to each entry; return nil and the first indexed error on failure                |
 
-Direct struct construction does not validate input. Structural errors support `errors.Is`:
-`ErrUnknownIdentifierType`, `ErrInvalidScope`, and `ErrInvalidObservationTime`. Validation is deterministic and does not
-mutate input or return partially accepted histories.
-
-Callers must synchronize their own mutations. Library copies must not share mutable scope maps or timestamp storage with
-inputs. The C reconciliation API and its ownership rules are defined in [SPEC-002](SPEC-002-reconciliation.md#c-api).
+Direct struct construction does not validate. Structural validation does not check payload syntax. Errors support
+`errors.Is`: `ErrUnknownIdentifierType`, `ErrInvalidScope`, and `ErrInvalidObservationTime`. Operations do not mutate
+inputs or return partial histories; callers must synchronize their own mutations.
+See [SPEC-002](SPEC-002-reconciliation.md#c-api) for C ownership.

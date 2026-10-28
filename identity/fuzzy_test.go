@@ -23,13 +23,12 @@ func fuzzyRow(key string, seconds int64, values ...IdentifierValue) Candidate {
 	when := time.Unix(seconds, 0)
 	return Candidate{AssetKey: key, LastSeen: &when, Identifiers: values}
 }
-func TestFuzzyKernelSelection(t *testing.T) {
+func TestFuzzyKernelContainment(t *testing.T) {
 	ip1 := fuzzyValue(TypeIP, "192.0.2.1")
 	ip2 := fuzzyValue(TypeIP, "192.0.2.2")
 	ip3 := fuzzyValue(TypeIP, "192.0.2.3")
 	host := fuzzyValue(TypeHostname, "host")
 	mac := fuzzyValue(TypeMAC, "02:00:00:00:00:01")
-	otherMAC := fuzzyValue(TypeMAC, "02:00:00:00:00:02")
 	tests := []struct {
 		name        string
 		observation []IdentifierValue
@@ -37,23 +36,20 @@ func TestFuzzyKernelSelection(t *testing.T) {
 		selected    int
 		score       float32
 	}{
-		{"anchor alone selects", []IdentifierValue{mac}, []Candidate{fuzzyRow("K1", 10, mac, ip1)}, 0, 1},
-		{"two shared types select", []IdentifierValue{ip1, host}, []Candidate{fuzzyRow("K1", 10, ip1, host, ip2)}, 0, .8},
-		{"one shared type is insufficient", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 10, ip1, ip2)}, -1, 0},
-		{"observed extra value does not block", []IdentifierValue{ip1, ip2, host}, []Candidate{fuzzyRow("K1", 10, ip1, host)}, 0, .8},
-		{"partial overlap of one type is insufficient", []IdentifierValue{ip1, ip3}, []Candidate{fuzzyRow("K1", 10, ip1, ip2)}, -1, 0},
-		{"different anchors contradict", []IdentifierValue{mac, ip1, host}, []Candidate{fuzzyRow("K1", 10, otherMAC, ip1, host)}, -1, 0},
-		{"anchor on one side only", []IdentifierValue{mac, ip1, host}, []Candidate{fuzzyRow("K1", 10, ip1, host)}, 0, .8},
-		{"highest score wins over newest", []IdentifierValue{mac, ip1, host}, []Candidate{fuzzyRow("K1", 20, mac), fuzzyRow("K2", 10, mac, ip1)}, 1, 1.4},
-		{"equal score newest wins", []IdentifierValue{mac}, []Candidate{fuzzyRow("K1", 10, mac), fuzzyRow("K2", 20, mac, host)}, 1, 1},
-		{"equal score time first row not lexical", []IdentifierValue{mac}, []Candidate{fuzzyRow("Z", 20, mac), fuzzyRow("A", 20, mac)}, 0, 1},
-		{"multiple distinct values", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K1", 10, ip1, ip2, ip3)}, -1, 0},
+		{"candidate contains observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 10, ip1, ip2)}, 0, .4},
+		{"observation contains one", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K1", 10, ip1)}, -1, 0},
+		{"partial overlap", []IdentifierValue{ip1, ip3}, []Candidate{fuzzyRow("K1", 10, ip1, ip2)}, -1, 0},
+		{"multiple containing same score newest", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 10, ip1), fuzzyRow("K2", 20, ip1, host)}, 1, .4},
+		{"multiple contained", []IdentifierValue{ip1, ip2, host}, []Candidate{fuzzyRow("K1", 10, ip1), fuzzyRow("K2", 20, host), fuzzyRow("K3", 30, ip1, ip3)}, -1, 0},
+		{"equal score time first row not lexical", []IdentifierValue{ip1}, []Candidate{fuzzyRow("Z", 20, ip1), fuzzyRow("A", 20, ip1)}, 0, .4},
+		{"multiple distinct values", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K1", 10, ip1, ip2, ip3)}, 0, .8},
 		{"empty observation guard", nil, []Candidate{fuzzyRow("K1", 10, ip1)}, -1, 0},
-		{"empty candidate", []IdentifierValue{mac}, []Candidate{fuzzyRow("K1", 10)}, -1, 0},
-		{"no candidates", []IdentifierValue{mac}, nil, -1, 0},
-		{"first negative timestamp accepted", []IdentifierValue{mac}, []Candidate{fuzzyRow("K1", -10, mac), fuzzyRow("K2", -20, mac)}, 0, 1},
-		{"pre epoch versus epoch", []IdentifierValue{mac}, []Candidate{fuzzyRow("K1", -1, mac), fuzzyRow("K2", 0, mac)}, 1, 1},
-		{"hostname and ip weights", []IdentifierValue{host, ip1}, []Candidate{fuzzyRow("K1", 10, host, ip1)}, 0, .8},
+		{"empty candidate literal subset", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 10)}, -1, 0},
+		{"no candidates", []IdentifierValue{ip1}, nil, -1, 0},
+		{"candidate merge without observation overlap", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", 20, ip1, host), fuzzyRow("K2", 10, host)}, 0, .4},
+		{"first negative timestamp accepted", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", -10, ip1), fuzzyRow("K2", -20, ip1)}, 0, .4},
+		{"pre epoch versus epoch", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", -1, ip1), fuzzyRow("K2", 0, ip1)}, 1, .4},
+		{"hostname weight", []IdentifierValue{host}, []Candidate{fuzzyRow("K1", 10, host)}, 0, .4},
 		{"mac weight", []IdentifierValue{mac}, []Candidate{fuzzyRow("K1", 10, mac)}, 0, 1},
 	}
 	for _, tt := range tests {
@@ -87,12 +83,13 @@ func TestFuzzyKernelNormalizationAndConfiguration(t *testing.T) {
 		score    float32
 		selected bool
 	}{
-		{"semantic DNS duplicates", []IdentifierValue{fuzzyValue(TypeHostname, "HOST."), fuzzyValue(TypeHostname, "host."), ip}, []IdentifierValue{fuzzyValue(TypeHostname, "host."), ip}, GreenboneMatchPolicy(), .8, true},
-		{"semantic IPv6 duplicates", []IdentifierValue{fuzzyValue(TypeIP, "2001:0DB8::1"), fuzzyValue(TypeIP, "2001:db8::1"), fuzzyValue(TypeMAC, "02:ab:cd:ef:01:23")}, []IdentifierValue{fuzzyValue(TypeIP, "2001:db8::1"), fuzzyValue(TypeMAC, "02:ab:cd:ef:01:23")}, GreenboneMatchPolicy(), 1.4, true},
+		{"semantic DNS duplicates", []IdentifierValue{fuzzyValue(TypeHostname, "HOST."), fuzzyValue(TypeHostname, "host.")}, []IdentifierValue{fuzzyValue(TypeHostname, "host.")}, GreenboneMatchPolicy(), .4, true},
+		{"semantic IPv6 duplicates", []IdentifierValue{fuzzyValue(TypeIP, "2001:0DB8::1"), fuzzyValue(TypeIP, "2001:db8::1")}, []IdentifierValue{fuzzyValue(TypeIP, "2001:db8::1")}, GreenboneMatchPolicy(), .4, true},
 		{"MAC formatting duplicates", []IdentifierValue{fuzzyValue(TypeMAC, "02-AB-CD-EF-01-23"), fuzzyValue(TypeMAC, "02:ab:cd:ef:01:23")}, []IdentifierValue{fuzzyValue(TypeMAC, "02abcdef0123")}, GreenboneMatchPolicy(), 1, true},
-		{"one shared type is insufficient", []IdentifierValue{ip, fuzzyValue(TypeFQDN, "host.example.")}, []IdentifierValue{ip}, GreenboneMatchPolicy(), 0, false},
-		{"normalized FQDN and IP weights", []IdentifierValue{ip, fuzzyValue(TypeFQDN, "HOST.EXAMPLE.")}, []IdentifierValue{ip, fuzzyValue(TypeFQDN, "host.example")}, GreenboneMatchPolicy(), .8, true},
-		{"omitted FQDN projected out, IP as anchor", []IdentifierValue{ip, fuzzyValue(TypeFQDN, "host.example.")}, []IdentifierValue{ip}, MatchPolicy{Fuzzy: []FuzzyMember{{Type: TypeIP, Weight: 1}}}, 1, true},
+		{"missing FQDN prevents containment", []IdentifierValue{ip, fuzzyValue(TypeFQDN, "host.example.")}, []IdentifierValue{ip}, GreenboneMatchPolicy(), 0, false},
+		{"normalized FQDN weight", []IdentifierValue{fuzzyValue(TypeFQDN, "HOST.EXAMPLE.")}, []IdentifierValue{fuzzyValue(TypeFQDN, "host.example")}, GreenboneMatchPolicy(), .4, true},
+		{"FQDN and IP weights", []IdentifierValue{ip, fuzzyValue(TypeFQDN, "host.example.")}, []IdentifierValue{ip, fuzzyValue(TypeFQDN, "host.example")}, GreenboneMatchPolicy(), .8, true},
+		{"omitted FQDN projected out", []IdentifierValue{ip, fuzzyValue(TypeFQDN, "host.example.")}, []IdentifierValue{ip}, MatchPolicy{Fuzzy: []FuzzyMember{{Type: TypeIP, Weight: .4}}}, .4, true},
 		{"disabled fuzzy types", []IdentifierValue{ip}, []IdentifierValue{ip}, MatchPolicy{}, 0, false},
 		{"configured types and weights", []IdentifierValue{fuzzyValue(TypeAgentID, "a"), ip}, []IdentifierValue{fuzzyValue(TypeAgentID, "a"), ip}, MatchPolicy{Fuzzy: []FuzzyMember{{Type: TypeAgentID, Weight: 2}, {Type: TypeIP, Weight: .25}}}, 2.25, true},
 	}
@@ -116,11 +113,11 @@ func TestFuzzyKernelNormalizationAndConfiguration(t *testing.T) {
 }
 
 func TestFuzzyKernelImmutableAndConcurrent(t *testing.T) {
-	mac := IdentifierValue{Type: TypeMAC, Value: "02-AB-CD-EF-01-23", Scope: Scope{"network": "n"}}
-	obs := Observation{Identifiers: []IdentifierValue{mac}}
-	rows := []Candidate{fuzzyRow("survivor", 20, mac), fuzzyRow("potential", 10, mac)}
+	ip := IdentifierValue{Type: TypeIP, Value: "2001:0DB8::1", Scope: Scope{"network": "n"}}
+	obs := Observation{Identifiers: []IdentifierValue{ip}}
+	rows := []Candidate{fuzzyRow("survivor", 20, ip), fuzzyRow("potential", 10, ip)}
 	p := GreenboneMatchPolicy()
-	original := mac.Clone()
+	original := ip.Clone()
 	originalTime := *rows[0].LastSeen
 	originalPolicy := p.Clone()
 	var wg sync.WaitGroup
@@ -137,7 +134,7 @@ func TestFuzzyKernelImmutableAndConcurrent(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	if !reflect.DeepEqual(mac, original) || *rows[0].LastSeen != originalTime || !reflect.DeepEqual(p, originalPolicy) {
+	if !reflect.DeepEqual(ip, original) || *rows[0].LastSeen != originalTime || !reflect.DeepEqual(p, originalPolicy) {
 		t.Fatal("input mutated")
 	}
 	got, err := matchFuzzyKernel(obs, rows, p)
@@ -146,9 +143,11 @@ func TestFuzzyKernelImmutableAndConcurrent(t *testing.T) {
 	}
 }
 
-// The fixtures pin fuzzy key selection, score bits and merge plans for canonical fuzzy-only views.
-func TestFuzzyReferenceFixtures(t *testing.T) {
-	file, err := os.Open("testdata/fuzzy_reference.jsonl")
+// Key selection and score fields were captured from the pinned, unmodified C source.
+// Public merge plans also match the reference for these fuzzy-only views.
+// This regression test consumes data only; Go builds never depend on C or GLib.
+func TestFuzzyKernelCReferenceFixtures(t *testing.T) {
+	file, err := os.Open("testdata/fuzzy_reference.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,23 +190,23 @@ func TestFuzzyReferenceFixtures(t *testing.T) {
 				expectedAction = ActionReuse
 			}
 			if err != nil || decision.Action != expectedAction || decision.Stage != StageFuzzy || decision.NeedsNewKey != fixture.NeedsNewKey || decision.SelectedKey != fixture.SelectedKey {
-				t.Fatalf("Decide differs from fixture: %+v %v", decision, err)
+				t.Fatalf("Decide differs from C fixture: %+v %v", decision, err)
 			}
 			if !reflect.DeepEqual(append([]int{}, decision.MergeIndices...), append([]int{}, fixture.PotentialMergeIndices...)) {
-				t.Fatalf("merge indices %v differ from fixture %v", decision.MergeIndices, fixture.PotentialMergeIndices)
+				t.Fatalf("merge indices %v differ from C fixture %v", decision.MergeIndices, fixture.PotentialMergeIndices)
 			}
 			selected := -1
 			if got.SelectedIndex != nil {
 				selected = *got.SelectedIndex
 			}
 			if got.NeedsNewKey != fixture.NeedsNewKey || selected != fixture.SelectedIndex || got.SelectedKey != fixture.SelectedKey || math.Float32bits(got.SelectedScore) != fixture.SelectedScoreBits {
-				t.Fatalf("result %+v differs from fixture %+v", got, fixture)
+				t.Fatalf("Go result %+v differs from C fixture %+v", got, fixture)
 			}
 		})
 		count++
 	}
 	if count != 78 {
-		t.Fatalf("fixture count = %d", count)
+		t.Fatalf("C fixture count = %d", count)
 	}
 }
 
@@ -265,5 +264,5 @@ func matchFuzzyKernel(observation Observation, candidates []Candidate, policy Ma
 		}
 		views[i] = values
 	}
-	return matchFuzzyCanonical(incoming, views, candidates, nil, policy)
+	return matchFuzzyCanonical(incoming, views, candidates, policy)
 }
