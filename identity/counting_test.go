@@ -174,7 +174,7 @@ func TestCountingTLSEligibility(t *testing.T) {
 	wildcardTLS := fuzzyValue(TypeTLSPublicKeyHash, wildcard)
 	fqdn := fuzzyValue(TypeFQDN, "WEB01.example.com.")
 	alt := fuzzyValue(TypeFQDN, "alt.example.com")
-	host := fuzzyValue(TypeHostname, "WEB01.example.com")
+	host := fuzzyValue(TypeHostname, "WEB01")
 	runCountingCases(t, GreenboneMatchPolicy(), []countingCase{
 		{"a certificate issued to the host's fqdn is strong evidence", []IdentifierValue{tls, fqdn}, []Candidate{fuzzyRow("A", 1, hash)}, ActionReuse, StageStrong, "A", nil},
 		{"a san naming the host counts", []IdentifierValue{tls, alt}, []Candidate{fuzzyRow("A", 1, hash)}, ActionReuse, StageStrong, "A", nil},

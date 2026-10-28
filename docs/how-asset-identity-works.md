@@ -97,16 +97,14 @@ Normalization makes equivalent representations comparable without changing calle
 |----------------------------------------------------|----------------------------------------|
 | MAC `02-AB-CD-EF-01-23`                            | `02:ab:cd:ef:01:23`                    |
 | IP `2001:0DB8:0:0:0:0:0:1`                         | `2001:db8::1`                          |
-| Hostname `WEB.Example.`                            | `web`                                  |
-| FQDN `WEB.Example.`                                | `web.example`                          |
+| Hostname `WEB.Example.`                            | `web.example`                          |
 | IP `::ffff:192.0.2.1`                              | `192.0.2.1`                            |
-| Cloud identifier `I-0ABC`                          | `i-0abc`                               |
 | BIOS UUID `{00112233-4455-6677-8899-AABBCCDDEEFF}` | `00112233-4455-6677-8899-aabbccddeeff` |
 | SSH `22 ecdsa-sha2-nistp256 <key>`                 | `ecdsa-sha2-nistp256 <canonical-key>`  |
 | TLS `x509:<base64-DER-certificate>`                | `spki-sha256:<public-key-digest>`      |
 
-Every type has its own normalizer and surrounding whitespace is trimmed. Greenbone and agent IDs keep their case;
-cloud identifiers are lowercased. Placeholders such as `127.0.0.1`, `00:00:00:00:00:00`, a zero BIOS UUID, or
+Every type has its own normalizer and surrounding whitespace is trimmed. Greenbone, agent, and cloud IDs keep their
+case. Placeholders such as `127.0.0.1`, `00:00:00:00:00:00`, a zero BIOS UUID, or
 `localhost` identify no single machine: normalization reports them as invalid, and matching leaves them out instead of
 failing. Machine IDs require
 `Scope["kind"]` to select Linux machine-ID or Windows MachineGuid parsing. Scopes are copied and preserved, rather than

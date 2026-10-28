@@ -31,8 +31,7 @@ neither fails nor influences a decision. Malformed values still fail.
 
 | Type                                     | Accepted input                                                    | Canonical payload                         | Placeholders                                                  |
 |------------------------------------------|-------------------------------------------------------------------|-------------------------------------------|---------------------------------------------------------------|
-| Greenbone ID, Agent ID                   | Nonempty opaque string up to 2048 bytes                           | Exact bytes after trimming, case kept     | —                                                             |
-| Cloud identifier                         | Nonempty opaque string up to 2048 bytes                           | Lowercase after trimming                  | —                                                             |
+| Greenbone ID, Agent ID, cloud identifier | Nonempty opaque string up to 2048 bytes                           | Exact bytes after trimming, case kept     | —                                                             |
 | Machine ID, `kind=linux_machine_id`      | Exactly 32 hex digits                                             | Lowercase compact hex                     | All zero; `uninitialized` in any case                         |
 | Machine ID, `kind=windows_machine_guid`  | UUID text as defined below                                        | Lowercase hyphenated UUID                 | All zero                                                      |
 | BIOS UUID                                | UUID text as defined below                                        | Lowercase hyphenated UUID                 | All zero, all F, `03000200-0400-0500-0006-000700080009`       |
@@ -40,7 +39,7 @@ neither fails nor influences a decision. Malformed values still fail.
 | TLS public-key hash                      | `x509:<base64-DER>` or `spki-sha256:<64 hex digits>`              | `spki-sha256:` and lowercase digest       | —                                                             |
 | MAC                                      | 48-bit colon, hyphen, dotted, or compact hex                      | Six lowercase colon-separated octets      | All zero, broadcast                                           |
 | IP                                       | IPv4 or IPv6 address, IPv4-mapped IPv6, optional IPv6 zone        | Canonical address text, unmapped, no zone | Unspecified, loopback, link-local, multicast, broadcast       |
-| Hostname                                 | ASCII DNS name, single or qualified                               | Lowercase first label                     | `localhost`                                                   |
+| Hostname                                 | ASCII DNS name, single or qualified, non-numeric last label       | Lowercase; final dot removed only for multi-label names | `localhost`, `localhost.localdomain`                |
 | FQDN                                     | ASCII DNS name with at least two labels and a non-numeric last label | Lowercase, no final dot                | `localhost.localdomain`                                       |
 
 ### Machine IDs and UUIDs
@@ -92,8 +91,9 @@ Each label contains 1–63 ASCII letters, digits, hyphens, or underscores and ne
 name excluding a final dot is at most 253 bytes. Empty labels, root-only names, IP literals, wildcards, raw Unicode
 (Unicode case folding included), and DNS escapes are rejected. No IDNA conversion or alias expansion is performed.
 
-A hostname is the first label: `HOST.Example.` becomes `host`. An FQDN keeps all labels without the final dot:
-`HOST.Example.` becomes `host.example`. A single-label name is unsupported as FQDN, and a numeric last label is invalid.
+`HOST.Example.` becomes `host.example` as hostname and as FQDN. A single-label absolute hostname keeps its dot: `HOST.`
+becomes `host.`, distinct from `host`. A single-label name is unsupported as FQDN. A numeric last label in a
+multi-label name is invalid for both types, so a malformed IP such as `192.168.1.010` is never read as a name.
 Identically spelled hostname and FQDN values remain distinct because their types differ.
 
 ## Errors and verification

@@ -27,7 +27,7 @@ const maxOpaqueLength = 2048
 // normalizers holds one normalizer per identifier type. Input is trimmed of surrounding whitespace, nonempty, and a
 // machine id carries a supported kind.
 var normalizers = map[IdentifierType]func(value string, scope Scope) (string, error){
-	TypeCloudIdentifier:  normalizeCloudIdentifier,
+	TypeCloudIdentifier:  normalizeOpaque,
 	TypeGreenboneID:      normalizeOpaque,
 	TypeAgentID:          normalizeOpaque,
 	TypeMachineID:        normalizeMachineID,
@@ -97,14 +97,6 @@ func normalizeOpaque(value string, _ Scope) (string, error) {
 		return "", ErrInvalidIdentifierValue
 	}
 	return value, nil
-}
-
-func normalizeCloudIdentifier(value string, scope Scope) (string, error) {
-	opaque, err := normalizeOpaque(value, scope)
-	if err != nil {
-		return "", err
-	}
-	return strings.ToLower(opaque), nil
 }
 
 func normalizeMachineID(value string, scope Scope) (string, error) {
@@ -202,8 +194,12 @@ func normalizeHostname(value string, _ Scope) (string, error) {
 	if len(labels) > 1 && isDigits(labels[len(labels)-1]) {
 		return "", ErrInvalidIdentifierValue
 	}
-	if labels[0] == "localhost" {
+	canonical := strings.Join(labels, ".")
+	if canonical == "localhost" || canonical == "localhost.localdomain" {
 		return "", errPlaceholder
 	}
-	return labels[0], nil
+	if len(labels) == 1 && strings.HasSuffix(value, ".") {
+		canonical += "."
+	}
+	return canonical, nil
 }

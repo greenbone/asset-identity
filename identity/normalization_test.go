@@ -72,12 +72,12 @@ func TestSemanticEquality(t *testing.T) {
 		want bool
 	}{
 		{"hostname canonical", a, nilScope, true}, {"different type", a, value(identity.TypeFQDN, "web.example"), false},
-		{"short versus qualified hostname", value(identity.TypeHostname, "web"), nilScope, true},
-		{"absolute versus relative", value(identity.TypeHostname, "web."), value(identity.TypeHostname, "web"), true},
+		{"short versus qualified hostname", value(identity.TypeHostname, "web"), nilScope, false},
+		{"absolute versus relative", value(identity.TypeHostname, "web."), value(identity.TypeHostname, "web"), false},
 		{"opaque case", value(identity.TypeAgentID, "Id"), value(identity.TypeAgentID, "id"), false},
 		{"opaque surrounding whitespace", value(identity.TypeGreenboneID, " Id "), value(identity.TypeGreenboneID, "Id"), true},
 		{"opaque inner whitespace", value(identity.TypeGreenboneID, "I d"), value(identity.TypeGreenboneID, "Id"), false},
-		{"cloud case", value(identity.TypeCloudIdentifier, "Provider/Resource-A"), value(identity.TypeCloudIdentifier, "provider/resource-a"), true},
+		{"cloud case", value(identity.TypeCloudIdentifier, "Provider/Resource-A"), value(identity.TypeCloudIdentifier, "provider/resource-a"), false},
 		{"scope presence", nilScope, empty, false}, {"scope insertion order", scoped, reordered, true}, {"scope case", scoped, changed, false},
 		{"empty versus absent dimension", withEmpty, withoutDimension, false},
 		{"extra dimension", scoped, extra, false},
@@ -257,7 +257,7 @@ func TestConcurrentNormalization(t *testing.T) {
 		wg.Go(func() {
 			for range 30 {
 				got, err := identity.NormalizeIdentifier(v)
-				if err != nil || got.Value != "web" {
+				if err != nil || got.Value != "web.example" {
 					t.Error("nondeterministic normalization")
 				}
 				if same, err := identity.EqualIdentifiers(v, got); err != nil || !same {
