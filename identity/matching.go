@@ -81,7 +81,7 @@ func canonicalMatchingView(input []IdentifierValue) ([]IdentifierValue, error) {
 	return kept, nil
 }
 
-// StrongPriorityMatch reports correspondence at one configured priority.
+// StrongPriorityMatch reports reusable candidates at one configured priority.
 type StrongPriorityMatch struct {
 	Type              IdentifierType
 	Priority          int   // zero-based; -1 when no candidate matches
@@ -89,10 +89,9 @@ type StrongPriorityMatch struct {
 	CandidateIndices  []int // original input positions
 }
 
-// EvaluateStrongPriority reports all matches at the highest matching configured priority.
-// Callers must supply admitted views. TLS requires equal normalized key sets;
-// other strong types match any incoming value. A candidate whose value differs at a
-// higher configured type both views carry never matches.
+// EvaluateStrongPriority reports reusable candidates at the first matching priority.
+// A richer incoming view requires a new key. Shared stronger conflicts block lower
+// matches. TLS requires equal normalized key sets; other types match any value.
 func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidates [][]IdentifierValue) (StrongPriorityMatch, error) {
 	empty := StrongPriorityMatch{Priority: -1}
 	if err := p.Validate(); err != nil {
@@ -115,67 +114,58 @@ func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidate
 
 // evaluateStrongPriority compares canonical views under a validated policy.
 func evaluateStrongPriority(p MatchPolicy, incomingValues []IdentifierValue, candidateViews [][]IdentifierValue) StrongPriorityMatch {
-	relations, priorities := strongRelations(p, incomingValues, candidateViews)
-	return strongMatchFromRelations(p, incomingValues, relations, priorities)
-}
-
-func strongRelations(p MatchPolicy, incomingValues []IdentifierValue, candidateViews [][]IdentifierValue) ([]strongRelation, []int) {
-	relations := make([]strongRelation, len(candidateViews))
-	priorities := make([]int, len(candidateViews))
-	for i, view := range candidateViews {
-		relations[i], priorities[i] = relateStrong(p, incomingValues, view)
+	result := StrongPriorityMatch{Priority: -1}
+	incomingPriority := firstStrongPriority(incomingValues, p)
+	result.HasIncomingStrong = incomingPriority < len(p.StrongOrder)
+	if !result.HasIncomingStrong {
+		return result
 	}
-	return relations, priorities
-}
-
-func strongMatchFromRelations(p MatchPolicy, incomingValues []IdentifierValue, relations []strongRelation, priorities []int) StrongPriorityMatch {
-	result := StrongPriorityMatch{Priority: -1, HasIncomingStrong: firstStrongType(incomingValues, p) != ""}
-	for i, relation := range relations {
-		if relation != strongMatch {
+	for i, view := range candidateViews {
+		// A lower-priority stored identity may be merged into a new, stronger key.
+		if incomingPriority < firstStrongPriority(view, p) {
 			continue
 		}
-		if result.Priority < 0 || priorities[i] < result.Priority {
-			result.Type, result.Priority, result.CandidateIndices = p.StrongOrder[priorities[i]], priorities[i], nil
+		priority, matches := compareStrong(incomingValues, view, p)
+		if !matches {
+			continue
 		}
-		if priorities[i] == result.Priority {
+		if result.Priority < 0 || priority < result.Priority {
+			result.Type = p.StrongOrder[priority]
+			result.Priority = priority
+			result.CandidateIndices = nil
+		}
+		if priority == result.Priority {
 			result.CandidateIndices = append(result.CandidateIndices, i)
 		}
 	}
 	return result
 }
 
-type strongRelation int
-
-const (
-	strongNone strongRelation = iota
-	strongMatch
-	strongContradiction
-)
-
-// relateStrong decides at the first configured strong type both views carry: an equal value matches, a different
-// value contradicts. TLS key sets that differ are inconclusive and the next type decides.
-func relateStrong(p MatchPolicy, left, right []IdentifierValue) (strongRelation, int) {
-	for priority, typ := range p.StrongOrder {
-		if !hasType(left, typ) || !hasType(right, typ) {
-			continue
-		}
-		if strongValuesMatch(left, right, typ) {
-			return strongMatch, priority
-		}
-		if typ != TypeTLSPublicKeyHash {
-			return strongContradiction, priority
-		}
-	}
-	return strongNone, -1
-}
-
 func firstStrongType(values []IdentifierValue, policy MatchPolicy) IdentifierType {
-	for _, typ := range policy.StrongOrder {
-		if hasType(values, typ) {
-			return typ
-		}
+	if priority := firstStrongPriority(values, policy); priority < len(policy.StrongOrder) {
+		return policy.StrongOrder[priority]
 	}
 	return ""
+}
+
+func firstStrongPriority(values []IdentifierValue, policy MatchPolicy) int {
+	for priority, typ := range policy.StrongOrder {
+		if hasType(values, typ) {
+			return priority
+		}
+	}
+	return len(policy.StrongOrder)
+}
+
+// The first type present on both sides decides. Missing types are skipped;
+// a shared conflict cannot be bypassed by a lower-priority match.
+func compareStrong(left, right []IdentifierValue, policy MatchPolicy) (priority int, matches bool) {
+	for priority, typ := range policy.StrongOrder {
+		if hasType(left, typ) && hasType(right, typ) {
+			return priority, strongValuesMatch(left, right, typ)
+		}
+	}
+	return -1, false
 }
 
 func hasType(values []IdentifierValue, typ IdentifierType) bool {

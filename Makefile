@@ -16,7 +16,8 @@ CMAKE ?= cmake
 CTEST ?= ctest
 CMAKE_ARGS ?=
 DIST := $(CURDIR)/dist
-VERSION ?= 1.0.0
+# Use the nearest release tag;
+VERSION ?= $(patsubst v%,%,$(shell git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || echo v0.0.1))
 LIBRARY := libgvm_asset_identity.so
 LIBRARY_FILE := $(LIBRARY).$(VERSION)-$(GOARCH)
 C_SOURCES := $(wildcard capi/*.c capi/*.h include/*.h tests/c/*.c tests/c/*.h)

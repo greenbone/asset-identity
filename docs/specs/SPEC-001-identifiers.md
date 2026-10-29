@@ -1,34 +1,29 @@
 # SPEC-001: Asset Identifiers
 
-The `identity` package provides a native Go identifier model, normalization, and asset-key selection. The GLib C API
-calls the same reconciliation implementation.
+The library normalizes identifiers, chooses `CREATE` or `REUSE`, and returns candidates to merge. Go and GLib C callers
+use the same algorithm.
 
 ## Requirements
 
-- Support multiple types and multiple values per type.
-- Identify values by type, canonical payload, and complete scope. Repeated values do not add evidence.
-- Keep observation timestamps and history separate from identifier equality.
-- Use configurable strong-ID priority; candidates that share no strong type with the observation are compared on
-  sufficient, compatible weak evidence.
-- Return `CREATE` or `REUSE`; invalid input returns an error.
-- Preserve caller data and return independent copies where data is retained or returned.
-- Keep the Go core independent of C, GLib, databases, and network services.
+- Accept multiple identifier types and multiple values per type.
+- Compare type, canonical value, and complete scope. Duplicates add no evidence.
+- Use strong priority to reuse an equally strong or richer key, or create a stronger key and merge compatible older
+  records.
+- Use weak containment only when the observation has no configured strong IDs.
+- Return an error for invalid input. Preserve caller data and return independently owned results.
+- Keep timestamps and history separate from identifier equality.
+- Keep the Go core independent of C, databases, and network services; it must work with `CGO_ENABLED=0`.
 
-The library does not generate keys, discover candidates, verify producer trust, manage persistence, retain history, or
-apply database merges. Applications supply eligible active identifiers and candidates and apply the result.
+Applications supply eligible active identifiers and candidates, enforce scope and access boundaries, create keys, retain
+evidence, and apply merges. The library does not discover assets, verify producer trust, or store results.
 
 ## Contracts
 
-| Specification                              | Defines                                                                  |
-|--------------------------------------------|--------------------------------------------------------------------------|
-| [SPEC-001A](SPEC-001A-identifier-model.md) | Types, scopes, timestamps, history, ownership, and structural validation |
-| [SPEC-001B](SPEC-001B-normalization.md)    | Supported payload formats, normalization, and semantic equality          |
-| [SPEC-002](SPEC-002-reconciliation.md)     | Policy, strong/fuzzy matching, decisions, and the C API                  |
+| Specification                              | Defines                                           |
+|--------------------------------------------|---------------------------------------------------|
+| [SPEC-001A](SPEC-001A-identifier-model.md) | Types, scopes, timestamps, history, and ownership |
+| [SPEC-001B](SPEC-001B-normalization.md)    | Accepted formats, normalization, and equality     |
+| [SPEC-002](SPEC-002-reconciliation.md)     | Policy, matching, merge plans, and the C API      |
 
-Type names and normalization do not establish global uniqueness or matching eligibility. New formats or matching rules
-require an explicit contract; unsupported inputs are not guessed.
-
-## Verification
-
-Model, normalization, and reconciliation tests live in [`identity`](../../identity). The core must build and test with
-`CGO_ENABLED=0`.
+Supported formats are explicit; the library does not guess conversions or global uniqueness. Tests live in [
+`identity`](../../identity) and [`tests/c`](../../tests/c).

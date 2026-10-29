@@ -66,10 +66,10 @@
       ]
     }
   ],
-  "NeedsNewKey": true,
-  "SelectedIndex": -1,
-  "SelectedKey": "",
-  "SelectedScoreBits": 0,
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1061997773,
   "PotentialMergeIndices": []
 }
 {
@@ -100,7 +100,9 @@
   "SelectedIndex": -1,
   "SelectedKey": "",
   "SelectedScoreBits": 0,
-  "PotentialMergeIndices": []
+  "PotentialMergeIndices": [
+    0
+  ]
 }
 {
   "Name": "partial-overlap",
@@ -192,7 +194,10 @@
   "SelectedIndex": -1,
   "SelectedKey": "",
   "SelectedScoreBits": 0,
-  "PotentialMergeIndices": []
+  "PotentialMergeIndices": [
+    0,
+    1
+  ]
 }
 {
   "Name": "timestamp-ranking",
@@ -224,11 +229,13 @@
       ]
     }
   ],
-  "NeedsNewKey": true,
-  "SelectedIndex": -1,
-  "SelectedKey": "",
-  "SelectedScoreBits": 0,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": false,
+  "SelectedIndex": 1,
+  "SelectedKey": "newer",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    0
+  ]
 }
 {
   "Name": "input-order-tie",
@@ -260,11 +267,13 @@
       ]
     }
   ],
-  "NeedsNewKey": true,
-  "SelectedIndex": -1,
-  "SelectedKey": "",
-  "SelectedScoreBits": 0,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "z",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    1
+  ]
 }
 {
   "Name": "no-observation-intersection-merge",
@@ -300,11 +309,13 @@
       ]
     }
   ],
-  "NeedsNewKey": true,
-  "SelectedIndex": -1,
-  "SelectedKey": "",
-  "SelectedScoreBits": 0,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    1
+  ]
 }
 {
   "Name": "empty-subset",
@@ -325,7 +336,9 @@
   "SelectedIndex": -1,
   "SelectedKey": "",
   "SelectedScoreBits": 0,
-  "PotentialMergeIndices": []
+  "PotentialMergeIndices": [
+    0
+  ]
 }
 {
   "Name": "negative-timestamps",
@@ -357,11 +370,13 @@
       ]
     }
   ],
-  "NeedsNewKey": true,
-  "SelectedIndex": -1,
-  "SelectedKey": "",
-  "SelectedScoreBits": 0,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    1
+  ]
 }
 {
   "Name": "all-weights-and-counts",
@@ -513,11 +528,14 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "mac",
-  "SelectedScoreBits": 1065353216,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0,
+    1
+  ]
 }
 {
   "Name": "generated-0000",
@@ -616,7 +634,10 @@
   "SelectedIndex": 2,
   "SelectedKey": "k2",
   "SelectedScoreBits": 1080452710,
-  "PotentialMergeIndices": []
+  "PotentialMergeIndices": [
+    0,
+    1
+  ]
 }
 {
   "Name": "generated-0002",
@@ -684,10 +705,10 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1072064102,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": []
 }
 {
@@ -746,10 +767,10 @@
       ]
     }
   ],
-  "NeedsNewKey": true,
-  "SelectedIndex": -1,
-  "SelectedKey": "",
-  "SelectedScoreBits": 0,
+  "NeedsNewKey": false,
+  "SelectedIndex": 1,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1053609165,
   "PotentialMergeIndices": []
 }
 {
@@ -828,11 +849,13 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1072064102,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    1
+  ]
 }
 {
   "Name": "generated-0005",
@@ -955,11 +978,13 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 3,
-  "SelectedKey": "k3",
-  "SelectedScoreBits": 1068708659,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0
+  ]
 }
 {
   "Name": "generated-0007",
@@ -1051,10 +1076,10 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1068708659,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": []
 }
 {
@@ -1137,10 +1162,10 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1068708659,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": [
     2
   ]
@@ -1277,10 +1302,10 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1061997773,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": []
 }
 {
@@ -1381,10 +1406,10 @@
       ]
     }
   ],
-  "NeedsNewKey": true,
-  "SelectedIndex": -1,
-  "SelectedKey": "",
-  "SelectedScoreBits": 0,
+  "NeedsNewKey": false,
+  "SelectedIndex": 1,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1053609165,
   "PotentialMergeIndices": []
 }
 {
@@ -1465,10 +1490,10 @@
       ]
     }
   ],
-  "NeedsNewKey": true,
-  "SelectedIndex": -1,
-  "SelectedKey": "",
-  "SelectedScoreBits": 0,
+  "NeedsNewKey": false,
+  "SelectedIndex": 0,
+  "SelectedKey": "k0",
+  "SelectedScoreBits": 1067030938,
   "PotentialMergeIndices": []
 }
 {
@@ -1555,14 +1580,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1072064102,
-  "PotentialMergeIndices": [
-    1,
-    2
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0014",
@@ -1720,10 +1742,10 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1065353216,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": []
 }
 {
@@ -1819,13 +1841,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1073741824,
-  "PotentialMergeIndices": [
-    1
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0019",
@@ -1941,11 +1961,14 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1068708659,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0,
+    2
+  ]
 }
 {
   "Name": "generated-0021",
@@ -2022,11 +2045,13 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1077097267,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0
+  ]
 }
 {
   "Name": "generated-0023",
@@ -2147,12 +2172,13 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 2,
-  "SelectedKey": "k2",
-  "SelectedScoreBits": 1074580685,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": [
-    0
+    0,
+    1
   ]
 }
 {
@@ -2236,11 +2262,13 @@
       ]
     }
   ],
-  "NeedsNewKey": true,
-  "SelectedIndex": -1,
-  "SelectedKey": "",
-  "SelectedScoreBits": 0,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": false,
+  "SelectedIndex": 3,
+  "SelectedKey": "k3",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    1
+  ]
 }
 {
   "Name": "generated-0026",
@@ -2356,10 +2384,10 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1065353216,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": []
 }
 {
@@ -2458,14 +2486,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 2,
-  "SelectedKey": "k2",
-  "SelectedScoreBits": 1072064102,
-  "PotentialMergeIndices": [
-    0,
-    1
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0029",
@@ -2507,11 +2532,13 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1075419546,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0
+  ]
 }
 {
   "Name": "generated-0030",
@@ -2649,11 +2676,14 @@
       ]
     }
   ],
-  "NeedsNewKey": true,
-  "SelectedIndex": -1,
-  "SelectedKey": "",
-  "SelectedScoreBits": 0,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": false,
+  "SelectedIndex": 1,
+  "SelectedKey": "k1",
+  "SelectedScoreBits": 1053609165,
+  "PotentialMergeIndices": [
+    2,
+    3
+  ]
 }
 {
   "Name": "generated-0032",
@@ -2739,11 +2769,12 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1074580685,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": [
+    1,
     2
   ]
 }
@@ -2819,13 +2850,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1065353216,
-  "PotentialMergeIndices": [
-    2
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0034",
@@ -3061,14 +3090,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 2,
-  "SelectedKey": "k2",
-  "SelectedScoreBits": 1072064102,
-  "PotentialMergeIndices": [
-    1,
-    3
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0037",
@@ -3210,16 +3236,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 2,
-  "SelectedKey": "k2",
-  "SelectedScoreBits": 1073741824,
-  "PotentialMergeIndices": [
-    0,
-    1,
-    3,
-    4
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0038",
@@ -3357,10 +3378,7 @@
   "SelectedIndex": 3,
   "SelectedKey": "k3",
   "SelectedScoreBits": 1074580685,
-  "PotentialMergeIndices": [
-    2,
-    4
-  ]
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0039",
@@ -3455,7 +3473,6 @@
   "SelectedKey": "k1",
   "SelectedScoreBits": 1068708659,
   "PotentialMergeIndices": [
-    0,
     2
   ]
 }
@@ -3547,11 +3564,13 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 2,
-  "SelectedKey": "k2",
-  "SelectedScoreBits": 1072064102,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    2
+  ]
 }
 {
   "Name": "generated-0041",
@@ -3629,12 +3648,12 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1061997773,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": [
-    0
+    2
   ]
 }
 {
@@ -3696,10 +3715,10 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1061997773,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": []
 }
 {
@@ -3752,13 +3771,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1065353216,
-  "PotentialMergeIndices": [
-    1
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0045",
@@ -3822,10 +3839,10 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1072064102,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": []
 }
 {
@@ -3886,11 +3903,13 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1072064102,
-  "PotentialMergeIndices": []
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": [
+    0
+  ]
 }
 {
   "Name": "generated-0047",
@@ -4030,9 +4049,7 @@
   "SelectedIndex": 1,
   "SelectedKey": "k1",
   "SelectedScoreBits": 1061997773,
-  "PotentialMergeIndices": [
-    0
-  ]
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0049",
@@ -4143,10 +4160,10 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1076258406,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": [
     0
   ]
@@ -4344,8 +4361,7 @@
   "SelectedScoreBits": 1077097268,
   "PotentialMergeIndices": [
     1,
-    2,
-    3
+    2
   ]
 }
 {
@@ -4428,13 +4444,12 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1067030938,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": [
-    1,
-    2
+    1
   ]
 }
 {
@@ -4539,11 +4554,12 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1072064102,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": [
+    1,
     2,
     3
   ]
@@ -4632,14 +4648,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1072064102,
-  "PotentialMergeIndices": [
-    0,
-    2
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0057",
@@ -4761,15 +4774,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 3,
-  "SelectedKey": "k3",
-  "SelectedScoreBits": 1068708659,
-  "PotentialMergeIndices": [
-    0,
-    2,
-    4
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0058",
@@ -4899,16 +4908,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1072064102,
-  "PotentialMergeIndices": [
-    0,
-    2,
-    3,
-    4
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0059",
@@ -5007,13 +5011,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1072064102,
-  "PotentialMergeIndices": [
-    0
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0061",
@@ -5113,15 +5115,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 0,
-  "SelectedKey": "k0",
-  "SelectedScoreBits": 1068708659,
-  "PotentialMergeIndices": [
-    1,
-    2,
-    3
-  ]
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
+  "PotentialMergeIndices": []
 }
 {
   "Name": "generated-0062",
@@ -5235,12 +5233,11 @@
       ]
     }
   ],
-  "NeedsNewKey": false,
-  "SelectedIndex": 1,
-  "SelectedKey": "k1",
-  "SelectedScoreBits": 1073741824,
+  "NeedsNewKey": true,
+  "SelectedIndex": -1,
+  "SelectedKey": "",
+  "SelectedScoreBits": 0,
   "PotentialMergeIndices": [
-    3,
     4
   ]
 }
