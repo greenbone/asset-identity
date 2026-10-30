@@ -41,11 +41,11 @@ jobs:
         ghcr.io/${{ github.repository }},enable=true
     secrets: inherit
 
-  notify:
-    needs:
-      - build
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'greenbone/asset-identity' }}
-    uses: greenbone/workflows/.github/workflows/notify-mattermost-2nd-gen.yml@main
-    with:
-      status: ${{ contains(needs.*.result, 'failure') && 'failure' || 'success' }}
-    secrets: inherit
+#  notify:
+#    needs:
+#      - build
+#    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'greenbone/asset-identity' }}
+#    uses: greenbone/workflows/.github/workflows/notify-mattermost-2nd-gen.yml@main
+#    with:
+#      status: ${{ contains(needs.*.result, 'failure') && 'failure' || 'success' }}
+#    secrets: inherit
