@@ -90,8 +90,8 @@ type StrongPriorityMatch struct {
 }
 
 // EvaluateStrongPriority reports reusable candidates at the first matching priority.
-// A richer incoming view requires a new key. Shared stronger conflicts block lower
-// matches. TLS requires equal normalized key sets; other types match any value.
+// Missing types allow lower matches; shared stronger conflicts block them.
+// TLS requires equal normalized key sets; other types match any value.
 func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidates [][]IdentifierValue) (StrongPriorityMatch, error) {
 	empty := StrongPriorityMatch{Priority: -1}
 	if err := p.Validate(); err != nil {
@@ -121,10 +121,6 @@ func evaluateStrongPriority(p MatchPolicy, incomingValues []IdentifierValue, can
 		return result
 	}
 	for i, view := range candidateViews {
-		// A lower-priority stored identity may be merged into a new, stronger key.
-		if incomingPriority < firstStrongPriority(view, p) {
-			continue
-		}
 		priority, matches := compareStrong(incomingValues, view, p)
 		if !matches {
 			continue

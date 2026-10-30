@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-// These regressions cover containment and upgrades to stronger identity evidence.
+// These regressions cover containment, strong reuse, and merge safeguards.
 
 type countingCase struct {
 	name       string
@@ -94,7 +94,7 @@ func TestCountingStrongRules(t *testing.T) {
 	tlsA := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("a", 64))
 	tlsB := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("b", 64))
 	runCountingCases(t, GreenboneMatchPolicy(), []countingCase{
-		{"cloud priority beats newer greenbone match", []IdentifierValue{cloud, g}, []Candidate{fuzzyRow("K0", 20, g), fuzzyRow("K1", 10, cloud)}, ActionReuse, StageStrong, "K1", nil},
+		{"cloud priority beats newer greenbone match", []IdentifierValue{cloud, g}, []Candidate{fuzzyRow("K0", 20, g), fuzzyRow("K1", 10, cloud)}, ActionReuse, StageStrong, "K1", []int{0}},
 		{"conflicting higher type blocks a lower match", []IdentifierValue{g, agent}, []Candidate{fuzzyRow("K0", 1, otherG, agent)}, ActionCreate, StageStrong, "", nil},
 		{"new agent creates a key and absorbs weak record", []IdentifierValue{agent, ip, mac}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionCreate, StageStrong, "", []int{0}},
 		{"conflicting incoming greenbone id is not merged", []IdentifierValue{g, ip, mac}, []Candidate{fuzzyRow("K0", 20, ip, mac), fuzzyRow("K1", 10, otherG, ip, mac)}, ActionCreate, StageStrong, "", []int{0}},
@@ -103,7 +103,7 @@ func TestCountingStrongRules(t *testing.T) {
 	})
 }
 
-func TestCountingStrongUpgradeSafeguards(t *testing.T) {
+func TestCountingStrongReuseSafeguards(t *testing.T) {
 	agentA := fuzzyValue(TypeAgentID, "A")
 	agentB := fuzzyValue(TypeAgentID, "B")
 	machineX := IdentifierValue{Type: TypeMachineID, Value: strings.Repeat("a", 32), Scope: Scope{"kind": "linux_machine_id"}}
@@ -111,17 +111,25 @@ func TestCountingStrongUpgradeSafeguards(t *testing.T) {
 	cloud := fuzzyValue(TypeCloudIdentifier, "instance")
 	otherScope := machineX.Clone()
 	otherScope.Scope["realm"] = "other"
+	tlsA := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("a", 64))
+	tlsB := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("b", 64))
 	runCountingCases(t, GreenboneMatchPolicy(), []countingCase{
-		{"machine id upgrades an agent-only key", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, agentA)}, ActionCreate, StageStrong, "", []int{0}},
+		{"machine id enriches an agent-only key", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, agentA)}, ActionReuse, StageStrong, "K0", nil},
 		{"agent-only scan reuses a machine key", []IdentifierValue{agentA}, []Candidate{fuzzyRow("K0", 10, machineX, agentA)}, ActionReuse, StageStrong, "K0", nil},
 		{"different machines stay separate despite matching agent", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, machineY, agentA)}, ActionCreate, StageStrong, "", nil},
 		{"same machine overrides different agent", []IdentifierValue{machineX, agentB}, []Candidate{fuzzyRow("K0", 10, machineX, agentA)}, ActionReuse, StageStrong, "K0", nil},
 		{"reuse richer asset and absorb agent-only record", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 30, agentA), fuzzyRow("K1", 10, machineX, agentA)}, ActionReuse, StageStrong, "K1", []int{0}},
-		{"create absorbs only the compatible source", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 30, machineY, agentA), fuzzyRow("K1", 10, agentA)}, ActionCreate, StageStrong, "", []int{1}},
+		{"reuse excludes the conflicting source", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 30, machineY, agentA), fuzzyRow("K1", 10, agentA)}, ActionReuse, StageStrong, "K1", nil},
 		{"richer stored identity can share a lower type", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, cloud, agentA)}, ActionReuse, StageStrong, "K0", nil},
 		{"merge cannot reintroduce an incoming machine conflict", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, cloud, agentA), fuzzyRow("K1", 30, cloud, machineY, agentA)}, ActionReuse, StageStrong, "K0", nil},
 		{"different machine scopes cannot fall back to agent", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, otherScope, agentA)}, ActionCreate, StageStrong, "", nil},
 		{"shared agent does not prove a missing cloud id", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, machineX, agentA), fuzzyRow("K1", 30, cloud, agentA)}, ActionReuse, StageStrong, "K0", nil},
+		{"incoming links complementary strong records", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 30, agentA), fuzzyRow("K1", 10, machineX)}, ActionReuse, StageStrong, "K1", []int{0}},
+		{"complementary records preserve reversed indices", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, machineX), fuzzyRow("K1", 30, agentA)}, ActionReuse, StageStrong, "K0", []int{1}},
+		{"incoming does not bridge different deciding ids", []IdentifierValue{agentA, agentB}, []Candidate{fuzzyRow("K0", 30, agentA), fuzzyRow("K1", 10, agentB)}, ActionReuse, StageStrong, "K0", nil},
+		{"incoming evidence below a machine match can link an old agent", []IdentifierValue{machineX, agentB}, []Candidate{fuzzyRow("K0", 30, machineX, agentA), fuzzyRow("K1", 10, agentB)}, ActionReuse, StageStrong, "K0", []int{1}},
+		{"unknown machine ids cannot join an agent-only destination", []IdentifierValue{agentA}, []Candidate{fuzzyRow("K0", 30, agentA), fuzzyRow("K1", 20, machineX, agentA), fuzzyRow("K2", 10, machineY, agentA)}, ActionReuse, StageStrong, "K0", nil},
+		{"partial tls sets are never unioned into a match", []IdentifierValue{agentA, tlsA}, []Candidate{fuzzyRow("K0", 30, agentA, tlsB), fuzzyRow("K1", 10, tlsA, tlsB)}, ActionReuse, StageStrong, "K0", nil},
 	})
 }
 

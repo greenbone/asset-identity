@@ -33,7 +33,7 @@ Ensure (create_and_strong_reuse)
   gvm_asset_identity_policy_free (policy);
 }
 
-Ensure (strong_identity_upgrade_and_conflict)
+Ensure (strong_reuse_enrichment_and_conflict)
 {
   gvm_asset_identity_policy_t *policy = default_policy ();
   gvm_asset_identity_observation_t *agent =
@@ -51,16 +51,19 @@ Ensure (strong_identity_upgrade_and_conflict)
   g_ptr_array_add (rows, candidate ("agent-only", agent));
 
   gvm_asset_identity_decision_t *result = decide (input, rows, policy);
-  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
   assert_that (result->stage, is_equal_to (GVM_ASSET_IDENTITY_STAGE_STRONG));
-  assert_that (result->needs_new_key, is_true);
-  assert_that (result->has_selected_index, is_false);
-  assert_that (result->merge_indices->len, is_equal_to (1));
-  assert_that (g_array_index (result->merge_indices, gsize, 0),
-               is_equal_to (0));
+  assert_that (result->needs_new_key, is_false);
+  assert_that (result->has_selected_index, is_true);
+  assert_that (result->selected_key, is_equal_to_string ("agent-only"));
+  assert_that (result->selected_index, is_equal_to (0));
+  assert_that (result->merge_indices->len, is_equal_to (0));
   gvm_asset_identity_decision_free (result);
 
   g_ptr_array_add (rows, candidate ("machine", input));
+  gvm_asset_identity_candidate_t *stored = g_ptr_array_index (rows, 1);
+  /* The incoming scan links separate Agent-only and Machine-only records. */
+  g_ptr_array_remove_index (stored->identifiers, 0);
   result = decide (input, rows, policy);
   assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
   assert_that (result->selected_key, is_equal_to_string ("machine"));
@@ -70,6 +73,9 @@ Ensure (strong_identity_upgrade_and_conflict)
                is_equal_to (0));
   gvm_asset_identity_decision_free (result);
 
+  /* The caller stores the incoming Agent ID on the reused Machine key. */
+  g_ptr_array_add (stored->identifiers, gvm_asset_identity_identifier_new (
+                                          GVM_ASSET_IDENTITY_AGENT_ID, "A"));
   g_ptr_array_remove_index (rows, 0);
   result = decide (agent, rows, policy);
   assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
@@ -78,9 +84,8 @@ Ensure (strong_identity_upgrade_and_conflict)
   assert_that (result->merge_indices->len, is_equal_to (0));
   gvm_asset_identity_decision_free (result);
 
-  gvm_asset_identity_candidate_t *stored = g_ptr_array_index (rows, 0);
   gvm_asset_identity_identifier_t *stored_machine =
-    g_ptr_array_index (stored->identifiers, 1);
+    g_ptr_array_index (stored->identifiers, 0);
   g_free (stored_machine->value);
   stored_machine->value = g_strdup ("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
   result = decide (input, rows, policy);
@@ -501,7 +506,7 @@ main (void)
 {
   TestSuite *suite = create_test_suite ();
   add_test (suite, create_and_strong_reuse);
-  add_test (suite, strong_identity_upgrade_and_conflict);
+  add_test (suite, strong_reuse_enrichment_and_conflict);
   add_test (suite, create_returns_owned_merge_targets);
   add_test (suite, weak_observation_keeps_conflicting_agent_records_separate);
   add_test (suite, custom_priority_preserves_original_indices);

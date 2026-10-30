@@ -46,10 +46,9 @@ significant, including absent versus explicitly empty scope.
 | CREATE | A new key is required.         |
 | REUSE  | Use the selected existing key. |
 
-Strong types follow the configured priority. Reuse requires an existing key with an equally strong or higher-priority
-identity and a match at the highest strong type shared by both views. A shared conflict blocks lower-priority matches.
-Stronger incoming evidence returns CREATE; compatible older records can merge under the new key. For example, Machine
-X + Agent A upgrades an Agent-A-only key, while an Agent-A-only scan reuses a Machine-X + Agent-A key.
+Strong types follow the configured priority. Compare the highest strong type shared by both views; a shared conflict
+blocks lower-priority matches. Missing stronger identifiers allow a lower match. Incoming Machine X + Agent A therefore
+reuses an Agent-A-only key, and the application stores Machine X on that asset without changing its key.
 
 Among reusable candidates, the highest-priority shared match wins, then newest timestamp and asset-key ordering. When
 incoming strong IDs exist but no candidate qualifies, return CREATE without fuzzy fallback. With no incoming strong IDs,
@@ -63,8 +62,8 @@ Other strong types match any equal scoped value.
 `MergeIndices` lists the supplied candidates to move to the destination key. Retrieve each candidate and its asset key
 from the original candidate array using the returned index. On CREATE, the application generates the destination key; on
 REUSE it uses `SelectedKey`. The application applies the observation and key moves atomically. A strong source must
-match its own highest-priority strong type in the destination; records without strong IDs require full fuzzy
-containment. A weak destination cannot combine sources with conflicting strong IDs.
+match its own highest-priority strong type in the destination or, for strong REUSE, in the incoming view. Conflicting
+records remain separate; records without strong IDs require full fuzzy containment. A weak destination cannot combine sources with conflicting strong IDs.
 See [the algorithm guide](docs/how-asset-identity-works.md#8-the-returned-decision).
 
 ## Scanner identifier values

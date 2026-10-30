@@ -32,15 +32,25 @@ func planMerges(decision *Decision, incoming []IdentifierValue, views [][]Identi
 		}
 		sourceType := firstStrongType(source, policy)
 		if destinationType != "" && sourceType != "" {
-			// Absorb a source only when its strongest identity exists in the destination.
-			// This permits Agent-only records to join a Machine-ID + Agent-ID key.
-			if !strongValuesMatch(destination, source, sourceType) {
+			// A strong reuse binds incoming evidence to the selected key. Check each
+			// view separately so partial TLS sets cannot be combined into a match.
+			matches := strongValuesMatch(destination, source, sourceType)
+			if !matches && selectionPriority >= 0 {
+				matches = strongValuesMatch(incoming, source, sourceType)
+			}
+			if !matches {
 				continue
 			}
 			if selectionPriority >= 0 {
 				priority, matches := compareStrong(incoming, source, policy)
 				if priority >= 0 && priority < selectionPriority && !matches {
 					// Do not merge a source excluded by an incoming stronger conflict.
+					continue
+				}
+				priority, matches = compareStrong(destination, source, policy)
+				if priority >= 0 && priority <= selectionPriority && !matches {
+					// Multiple incoming values must not bridge different stored IDs at
+					// the deciding priority. Lower differences may follow a higher match.
 					continue
 				}
 			}

@@ -7,8 +7,8 @@ use the same algorithm.
 
 - Accept multiple identifier types and multiple values per type.
 - Compare type, canonical value, and complete scope. Duplicates add no evidence.
-- Use strong priority to reuse an equally strong or richer key, or create a stronger key and merge compatible older
-  records.
+- Reuse a key through the highest-priority shared strong match, and let the application store new evidence on that key.
+- Keep conflicting stronger identities separate and merge compatible existing records.
 - Use weak containment only when the observation has no configured strong IDs.
 - Return an error for invalid input. Preserve caller data and return independently owned results.
 - Keep timestamps and history separate from identifier equality.

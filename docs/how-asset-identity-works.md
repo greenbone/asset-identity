@@ -70,8 +70,8 @@ remains application-owned even when identifiers carry scope.
 | 6        | SSH host key        | Any equal public key           |
 | 7        | TLS public-key hash | Equal complete public-key sets |
 
-A stronger incoming identity upgrades a weaker key. An equally strong or richer existing key can be reused when
-its shared strong evidence matches. A stronger shared conflict blocks a lower-priority match.
+Reuse an existing key when its highest-priority shared strong type matches. Missing stronger IDs allow a lower match;
+a stronger shared conflict blocks it. New evidence enriches the reused asset without replacing its key.
 
 The default fuzzy types are:
 
@@ -139,10 +139,10 @@ rules are in [SPEC-001B](specs/SPEC-001B-normalization.md).
 
 The algorithm first chooses the destination key, then finds existing records that can move under it.
 
-1. **Reuse a compatible strong identity.** An existing key must have an equally strong or richer identity. Compare the
-   highest strong type present on both sides; a conflict blocks that record. Prefer the highest-priority valid match.
-2. **Create for an upgrade or no match.** If incoming strong evidence is richer than compatible stored records, or no
-   record qualifies, return `CREATE`. Weak matches cannot select a key here; compatible records may still merge.
+1. **Reuse a compatible strong identity.** Compare the highest strong type present on both sides; a conflict blocks
+   that record. Missing types are skipped. New stronger IDs can be stored on an existing key selected by a lower match.
+2. **Create when no strong record matches.** If incoming strong IDs exist but no record qualifies, return `CREATE`.
+   Weak matches cannot select a key here; compatible records may still merge.
 3. **Use fuzzy containment when no strong IDs were supplied.** Reuse a candidate containing every incoming fuzzy
    identifier. If none qualifies, return `CREATE`.
 4. **Find records that can join the destination.** Apply the strong-ID safeguards and containment rules below. Return
@@ -154,7 +154,7 @@ Here, “strong” and “fuzzy” mean the types enabled in the supplied policy
 ```mermaid
 flowchart TD
     A[Validate and normalize inputs] --> B{Incoming strong IDs?}
-    B -- Yes --> C{Compatible equally strong or richer key?}
+    B -- Yes --> C{Compatible strong match?}
     C -- Yes --> D[REUSE key selected by strong priority]
     C -- No --> E[CREATE a new key]
     B -- No --> F{Nonempty fuzzy observation contained by a candidate?}
@@ -170,25 +170,25 @@ Invalid input returns an error before a decision can be applied.
 
 ## 6. Choose a key using strong IDs
 
-### Reuse a richer key; upgrade a weaker one
+### Reuse and enrich an existing key
 
 In the Go API, the incoming record is the `Observation`; `Candidate` means an existing record.
 Machine ID has higher priority than Agent ID:
 
-| Incoming observation | Existing candidates                 | Result         | Merge indices |
-| -------------------- | ----------------------------------- | -------------- | ------------- |
-| Machine X, Agent A   | K0: Agent A                         | CREATE new key | `[0]`         |
-| Agent A              | K0: Machine X, Agent A              | REUSE K0       | `[]`          |
-| Machine X, Agent A   | K0: Machine Y, Agent A              | CREATE new key | `[]`          |
-| Machine X, Agent B   | K0: Machine X, Agent A              | REUSE K0       | `[]`          |
-| Machine X, Agent A   | K0: Agent A; K1: Machine X, Agent A | REUSE K1       | `[0]`         |
+| Incoming observation | Existing candidates        | Result         | Merge indices |
+| -------------------- | -------------------------- | -------------- | ------------- |
+| Machine X, Agent A   | K0: Agent A                | REUSE K0       | `[]`          |
+| Agent A              | K0: Machine X, Agent A     | REUSE K0       | `[]`          |
+| Machine X, Agent A   | K0: Machine Y, Agent A     | CREATE new key | `[]`          |
+| Machine X, Agent B   | K0: Machine X, Agent A     | REUSE K0       | `[]`          |
+| Machine X, Agent A   | K0: Agent A; K1: Machine X | REUSE K1       | `[0]`         |
 
-Compare each record's highest-priority strong type first: an existing key must be equally strong or richer to be reused.
-Then compare the highest-priority strong type present on both sides. Missing types are skipped; conflicting values
-block that record. Differences below a matching type do not veto the match. The same rules follow a custom policy's order.
+Compare the highest-priority strong type present on both sides. Missing types are skipped; a shared conflict blocks
+that record. Differences below a matching type do not veto it. The same rules follow a custom policy's order.
 
-`CREATE` plus merging is an upgrade, so applying it atomically keeps the asset count at one. Conflicting Machine IDs
-remain separate assets. Higher priority alone is not enough to merge; matching evidence is still required.
+When Agent A matches but the stored record lacks Machine X, reuse its key and store the incoming evidence on that asset.
+This keeps the key stable as more identifiers are discovered. Conflicting Machine IDs remain separate. The application
+retains prior evidence according to its history policy and applies any merge moves atomically.
 
 ### If several candidates match the same strong type
 
@@ -256,18 +256,22 @@ are in [SPEC-002](specs/SPEC-002-reconciliation.md#fuzzy-matching).
 identifiers and asset key. The selected destination is excluded. An empty list means there are no existing records to
 move. The library does not return copies of candidates or individual historical observations.
 
-Use the selected candidate's identifiers as the destination view on `REUSE`. Use the incoming observation's identifiers
-on `CREATE`. Then apply these rules:
+Use the stored selected candidate as the destination on `REUSE`, or the incoming observation on `CREATE`.
+Strong `REUSE` also binds the incoming strong evidence to that key.
 
-| Source and destination  | Requirement to merge                                                         |
-| ----------------------- | ---------------------------------------------------------------------------- |
-| Both have strong IDs    | Match the source's highest-priority strong type in the destination           |
-| Either lacks strong IDs | Every source fuzzy identifier occurs in the destination's nonempty fuzzy set |
+| Source and destination  | Requirement to merge                                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------------------------- |
+| Both have strong IDs    | Match the source's highest-priority type in the destination or, for strong `REUSE`, in the incoming view |
+| Either lacks strong IDs | Every source fuzzy identifier occurs in the destination's nonempty fuzzy set                             |
 
-For example, an Agent-A-only source can join a Machine-X + Agent-A destination. A Machine-Y source cannot join that
-key through Agent A. TLS requires equal complete key sets; other strong types match any equal scoped value.
-On strong `REUSE`, also leave out sources that conflict with incoming evidence above the priority that selected the key.
-An empty source fuzzy set is contained by any nonempty destination fuzzy set.
+For example, incoming Machine X + Agent A can select a Machine-X-only key and merge an Agent-A-only record into it.
+Check each view separately; partial TLS sets cannot be combined into a match. A source whose strongest type is unknown
+to both views stays separate.
+
+For strong `REUSE`, exclude incoming conflicts above the selecting priority, and stored-destination conflicts at or
+above it. Multiple incoming Agent IDs therefore cannot bridge different stored Agent IDs when Agent ID decides.
+Lower-priority differences may follow a higher match. Weak containment still uses the stored destination on `REUSE`;
+an empty source fuzzy set is contained by any nonempty destination fuzzy set.
 
 If the destination has no strong IDs, also check the proposed strong-ID sources against each other. Compare each pair at
 the highest-priority strong type present in either source. Leave both members of an incompatible pair separate;

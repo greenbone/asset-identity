@@ -44,16 +44,15 @@ ASCII names, case-insensitive, final dot ignored, no wildcards. Convert admitted
 `spki-sha256:` hashes remain eligible. `EvaluateStrongPriority` and `MatchingIdentifiers` apply the same admission
 rules.
 
-1. Compare the highest-priority strong type present in each view. A stored key can be reused only if its highest type
-   has the same or higher priority than the incoming highest type. A stronger incoming identity requires an upgrade.
-2. Compare the highest-priority strong type present in **both** views. Missing types are skipped. A conflict at this
+1. Compare the highest-priority strong type present in **both** views. Missing types are skipped. A conflict at this
    shared type excludes the candidate; a lower match cannot override it. Non-TLS types match any equal value with equal
    scope. TLS requires equal complete normalized key sets: `{A,B}` matches `{B,A}`, but not `{A}` or `{A,B,C}`.
-3. Among reusable candidates, prefer the highest-priority shared match, then newest present `LastSeen`, then smallest
-   asset key by byte order. Missing times rank last; compare UTC instants at nanosecond precision. Return `REUSE`.
-4. If incoming strong IDs exist but no candidate qualifies, return `CREATE`. Merge planning can still move compatible
-   older records under the new key. Use fuzzy matching only when no incoming configured strong ID remains after
-   admission.
+2. Prefer the highest-priority shared match, then newest present `LastSeen`, then smallest asset key by byte order.
+   Missing times rank last; compare UTC instants at nanosecond precision. Return `REUSE` even when the incoming view
+   contains a stronger ID missing from the stored record. The application stores the new evidence on the reused asset.
+3. If incoming strong IDs exist but no candidate qualifies, return `CREATE`, without fuzzy fallback. Merge planning can
+   still move compatible records under the new key. Use fuzzy matching only when no incoming configured strong ID
+   remains after admission.
 
 Lower-priority differences do not veto a higher match. Duplicate values and TLS key order do not add evidence.
 
@@ -71,20 +70,22 @@ break ties. There is no score threshold.
 
 ## Merge plan
 
-Compare each source candidate with the destination view: the stored selected candidate for `REUSE`, or the incoming
-observation for `CREATE`. The library does not combine these views before planning merges.
+The destination view is the stored selected candidate for `REUSE`, or the incoming observation for `CREATE`. Strong
+`REUSE` also binds the incoming strong evidence to the selected key.
 
-| Evidence                                | Merge requirement                                                          |
-|-----------------------------------------|----------------------------------------------------------------------------|
-| Both views have configured strong IDs   | The source's highest-priority strong type must match in the destination    |
-| Either view lacks configured strong IDs | Every source weak identifier occurs in the destination's nonempty weak set |
+| Evidence                                | Merge requirement                                                                                                     |
+|-----------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| Both views have configured strong IDs   | Match the source's highest-priority type in the destination; strong `REUSE` also accepts a match in the incoming view |
+| Either view lacks configured strong IDs | Every source weak identifier occurs in the destination's nonempty weak set                                            |
 
-A Machine-ID + Agent-ID destination can absorb an Agent-only source when the Agent ID matches. A source with a different
-Machine ID cannot join through its matching Agent ID. TLS still requires equal complete key sets; other strong types
-match any equal scoped value. Lower-priority differences do not veto that match. For strong `REUSE`, also exclude
-sources that conflict with the incoming observation at a type stronger than the match that selected the destination.
-This prevents merge planning from reintroducing an excluded record. An empty source weak set is contained by any
-nonempty destination weak set.
+Check the stored and incoming views separately: partial TLS sets cannot be combined into a match. For example, incoming
+Machine X + Agent A can link a stored Machine-X-only key with an Agent-A-only record. A source with a stronger ID
+missing from both views cannot join through a weaker ID.
+
+For strong `REUSE`, reject sources that conflict with incoming evidence above the selecting priority, or with the stored
+destination at or above that priority. Thus multiple incoming Agent IDs cannot bridge different stored Agent IDs when
+Agent ID decides. Lower-priority differences may follow a higher match. Weak containment continues to use only the
+stored destination on `REUSE`; an empty source weak set is contained by any nonempty destination weak set.
 
 If the destination has no strong IDs, also compare proposed strong-ID sources pairwise. Use the highest-priority strong
 type present in either source, with complete-set equality for TLS. Exclude both sources of each incompatible pair.
@@ -109,11 +110,11 @@ the zero-based merge indices below.
 
 | Incoming observation | Existing candidates      | Decision      | Selected key | Merge indices |
 |----------------------|--------------------------|---------------|--------------|---------------|
-| G1, A1               | K0:A1                    | STRONG CREATE | —            | `[0]`         |
+| G1, A1               | K0:A1                    | STRONG REUSE  | K0           | `[]`          |
 | A1                   | K0:G1,A1                 | STRONG REUSE  | K0           | `[]`          |
 | G1, A1               | K0:G2,A1                 | STRONG CREATE | —            | `[]`          |
 | G1, A2               | K0:G1,A1                 | STRONG REUSE  | K0           | `[]`          |
-| G1, A1               | K0:A1; K1:G1,A1          | STRONG REUSE  | K1           | `[0]`         |
+| G1, A1               | K0:A1; K1:G1             | STRONG REUSE  | K1           | `[0]`         |
 | G1, P1               | K0:P1                    | STRONG CREATE | —            | `[0]`         |
 | P1                   | K0:P1,H1                 | FUZZY REUSE   | K0           | `[]`          |
 | P1, H1               | K0:P1                    | FUZZY CREATE  | —            | `[0]`         |

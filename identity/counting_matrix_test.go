@@ -159,25 +159,25 @@ func TestCountingStrongPriorityMatrix(t *testing.T) {
 			}
 			t.Run(higher.name+"_before_"+lower.name, func(t *testing.T) {
 				cases := []countingCase{
-					{"priority beats freshness", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, lower.value), fuzzyRow("higher", 10, higher.value)}, ActionReuse, StageStrong, "higher", nil},
-					{"stronger incoming identity upgrades lower record", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, lower.value)}, ActionCreate, StageStrong, "", []int{0}},
+					{"priority beats freshness and incoming links the records", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, lower.value), fuzzyRow("higher", 10, higher.value)}, ActionReuse, StageStrong, "higher", []int{0}},
+					{"stronger incoming identity enriches existing key", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, lower.value)}, ActionReuse, StageStrong, "lower", nil},
 					{"weaker incoming identity reuses richer record", []IdentifierValue{lower.value}, []Candidate{fuzzyRow("higher", 10, higher.value, lower.value)}, ActionReuse, StageStrong, "higher", nil},
 					{"conflicting higher blocks lower match", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, higher.other, lower.value)}, ActionCreate, StageStrong, "", nil},
 					{"matching higher overrides lower conflict", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("higher", 10, higher.value, lower.other)}, ActionReuse, StageStrong, "higher", nil},
 					{"higher match prevents lower merge", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("higher", 10, higher.value), fuzzyRow("lower", 30, higher.other, lower.value)}, ActionReuse, StageStrong, "higher", nil},
 					{"reuse rich key and merge lower record", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, lower.value), fuzzyRow("higher", 10, higher.value, lower.value)}, ActionReuse, StageStrong, "higher", []int{0}},
-					{"upgrade skips conflicting source and preserves indices", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("conflict", 30, higher.other, lower.value), fuzzyRow("lower", 20, lower.value), fuzzyRow("also-lower", 10, lower.value)}, ActionCreate, StageStrong, "", []int{1, 2}},
+					{"reuse skips conflicting source and preserves indices", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("conflict", 30, higher.other, lower.value), fuzzyRow("lower", 20, lower.value), fuzzyRow("also-lower", 10, lower.value)}, ActionReuse, StageStrong, "lower", []int{2}},
 					{"reversed rows preserve the rich destination and source index", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("higher", 10, higher.value, lower.value), fuzzyRow("lower", 30, lower.value)}, ActionReuse, StageStrong, "higher", []int{1}},
 				}
 				runCountingCases(t, GreenboneMatchPolicy(), cases)
 				custom := GreenboneMatchPolicy()
 				custom.StrongOrder = []IdentifierType{lower.value.Type, higher.value.Type}
 				tt := cases[0]
-				tt.name, tt.selected = "custom priority reverses winner", "lower"
+				tt.name, tt.selected, tt.merges = "custom priority reverses winner", "lower", []int{1}
 				runCountingCases(t, custom, []countingCase{tt})
 				runCountingCases(t, custom, []countingCase{
 					{"custom higher match overrides default higher conflict", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, higher.other, lower.value)}, ActionReuse, StageStrong, "lower", nil},
-					{"custom priority upgrades in the opposite direction", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("higher", 10, higher.value)}, ActionCreate, StageStrong, "", []int{0}},
+					{"custom priority still reuses a lower match", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("higher", 10, higher.value)}, ActionReuse, StageStrong, "higher", nil},
 				})
 			})
 		}
@@ -207,6 +207,18 @@ func TestCountingStrongValueSetMatrix(t *testing.T) {
 				}
 			}
 			runCountingCases(t, GreenboneMatchPolicy(), cases)
+			// Incoming multi-values report correspondence, not permission to join
+			// conflicting stored identities at the same deciding priority.
+			tt := countingCase{
+				name:       "multiple incoming values do not bridge stored identities",
+				incoming:   []IdentifierValue{strong.value, strong.other},
+				candidates: []Candidate{fuzzyRow("K0", 30, strong.value), fuzzyRow("K1", 10, strong.other)},
+				action:     ActionReuse, stage: StageStrong, selected: "K0",
+			}
+			if strong.value.Type == TypeTLSPublicKeyHash {
+				tt.action, tt.selected = ActionCreate, ""
+			}
+			runCountingCases(t, GreenboneMatchPolicy(), []countingCase{tt})
 		})
 	}
 }
@@ -320,7 +332,7 @@ func TestCountingProgressiveStrongMatrix(t *testing.T) {
 	}
 }
 
-func TestCountingProgressiveStrongUpgradeMatrix(t *testing.T) {
+func TestCountingProgressiveStrongEnrichmentMatrix(t *testing.T) {
 	agent := fuzzyValue(TypeAgentID, "agent")
 	machine := countingStrongFixtures()[2]
 	scans := []struct {
@@ -331,10 +343,10 @@ func TestCountingProgressiveStrongUpgradeMatrix(t *testing.T) {
 		count    int
 	}{
 		{[]IdentifierValue{agent}, ActionCreate, "", nil, 1},
-		{[]IdentifierValue{machine.value, agent}, ActionCreate, "", []int{0}, 1},
-		{[]IdentifierValue{agent}, ActionReuse, "K1", nil, 1},
+		{[]IdentifierValue{machine.value, agent}, ActionReuse, "K0", nil, 1},
+		{[]IdentifierValue{agent}, ActionReuse, "K0", nil, 1},
 		{[]IdentifierValue{machine.other, agent}, ActionCreate, "", nil, 2},
-		{[]IdentifierValue{machine.value, agent}, ActionReuse, "K1", nil, 2},
+		{[]IdentifierValue{machine.value, agent}, ActionReuse, "K0", nil, 2},
 	}
 	var candidates []Candidate
 	for step, scan := range scans {
