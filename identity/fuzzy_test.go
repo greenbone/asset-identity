@@ -147,7 +147,7 @@ func TestFuzzyKernelImmutableAndConcurrent(t *testing.T) {
 // Public merge plans also match the reference for these fuzzy-only views.
 // This regression test consumes data only; Go builds never depend on C or GLib.
 func TestFuzzyKernelCReferenceFixtures(t *testing.T) {
-	file, err := os.Open("testdata/fuzzy_c_compat.jsonl")
+	file, err := os.Open("testdata/fuzzy_reference.json")
 	if err != nil {
 		t.Fatal(err)
 	}

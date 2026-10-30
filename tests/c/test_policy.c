@@ -16,7 +16,7 @@ Ensure (default_policy_is_copied_from_go)
   assert_that (policy->strong_order->len, is_equal_to (7));
   assert_that (g_array_index (policy->strong_order,
                               gvm_asset_identity_identifier_type_t, 0),
-               is_equal_to (GVM_ASSET_IDENTITY_GREENBONE_ID));
+               is_equal_to (GVM_ASSET_IDENTITY_CLOUD_IDENTIFIER));
   assert_that (policy->fuzzy->len, is_equal_to (4));
   assert_that (
     g_array_index (policy->fuzzy, gvm_asset_identity_fuzzy_member_t, 0).type,

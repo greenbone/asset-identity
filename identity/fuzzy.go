@@ -17,7 +17,8 @@ type fuzzyKernelResult struct {
 	SelectedScore float32
 }
 
-// matchFuzzyCanonical selects among canonical candidates already validated by its caller.
+// matchFuzzyCanonical selects a candidate containing every observed fuzzy identifier.
+// Inputs are canonical and already validated by the caller.
 func matchFuzzyCanonical(incoming []IdentifierValue, views [][]IdentifierValue, candidates []Candidate, policy MatchPolicy) (fuzzyKernelResult, error) {
 	fail := fuzzyKernelResult{}
 	weights, err := fuzzyWeights(policy)
@@ -29,33 +30,22 @@ func matchFuzzyCanonical(incoming []IdentifierValue, views [][]IdentifierValue, 
 	if len(observationSet) == 0 || len(candidates) == 0 {
 		return result, nil
 	}
-	candidateSets := make([]fuzzyCandidateSet, len(candidates))
-	for i, candidate := range candidates {
-		instant := time.Unix(0, 0).UTC()
-		if candidate.LastSeen != nil {
-			instant = candidate.LastSeen.UTC()
-		}
-		candidateSets[i] = fuzzyCandidateSet{
-			identifiers: fuzzySetFromCanonical(views[i], weights),
-			lastSeen:    instant.Truncate(time.Second),
-		}
-	}
 	selectedCandidateIndex := -1
 	var selectedScore float32
-	for i, candidate := range candidateSets {
-		if !fuzzySetSubset(observationSet, candidate.identifiers) {
+	var selectedLastSeen time.Time
+	for i, candidate := range candidates {
+		candidateSet := fuzzySetFromCanonical(views[i], weights)
+		if !fuzzySetSubset(observationSet, candidateSet) {
 			continue
 		}
-		score, err := fuzzyIntersectionScore(observationSet, candidate.identifiers, weights, policy.Fuzzy)
+		score, err := fuzzyIntersectionScore(observationSet, candidateSet, weights, policy.Fuzzy)
 		if err != nil {
 			return fail, err
 		}
-		// Exact score/time ties retain the first input row, as in C.
-		if selectedCandidateIndex < 0 ||
-			score > selectedScore ||
-			(score == selectedScore && candidate.lastSeen.After(candidateSets[selectedCandidateIndex].lastSeen)) {
-			selectedCandidateIndex = i
-			selectedScore = score
+		lastSeen := fuzzyInstant(candidate.LastSeen)
+		// Exact score/time ties retain the first input row.
+		if selectedCandidateIndex < 0 || score > selectedScore || (score == selectedScore && lastSeen.After(selectedLastSeen)) {
+			selectedCandidateIndex, selectedScore, selectedLastSeen = i, score, lastSeen
 		}
 	}
 	if selectedCandidateIndex >= 0 {
@@ -68,9 +58,11 @@ func matchFuzzyCanonical(incoming []IdentifierValue, views [][]IdentifierValue, 
 	return result, nil
 }
 
-type fuzzyCandidateSet struct {
-	identifiers []IdentifierValue
-	lastSeen    time.Time
+func fuzzyInstant(lastSeen *time.Time) time.Time {
+	if lastSeen == nil {
+		return time.Unix(0, 0).UTC()
+	}
+	return lastSeen.UTC().Truncate(time.Second)
 }
 
 func fuzzyWeights(policy MatchPolicy) (map[IdentifierType]float32, error) {
@@ -124,7 +116,7 @@ func fuzzyIntersectionScore(observationSet, candidateSet []IdentifierValue, weig
 				count++
 			}
 		}
-		// Explicit rounding prevents fused multiply-add from changing C scores.
+		// Explicit rounding keeps float32 accumulation order independent of fused multiply-add.
 		term := float32(float32(count) * weights[member.Type])
 		score = float32(score + term)
 		if math.IsInf(float64(score), 0) || math.IsNaN(float64(score)) {

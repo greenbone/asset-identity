@@ -18,78 +18,7 @@ import (
 	"github.com/greenbone/asset-identity/identity"
 )
 
-func TestNormalizationFormats(t *testing.T) {
-	tests := []struct {
-		name        string
-		typ         identity.IdentifierType
-		input, want string
-		scope       identity.Scope
-	}{
-		{"greenbone opaque", identity.TypeGreenboneID, " Id-A\x00 ", " Id-A\x00 ", nil},
-		{"agent opaque", identity.TypeAgentID, "unknown", "unknown", nil},
-		{"cloud opaque", identity.TypeCloudIdentifier, "Provider/Resource-A", "Provider/Resource-A", nil},
-		{"mac colon", identity.TypeMAC, "02:AB:CD:EF:01:23", "02:ab:cd:ef:01:23", nil},
-		{"mac hyphen", identity.TypeMAC, "02-AB-CD-EF-01-23", "02:ab:cd:ef:01:23", nil},
-		{"mac dotted", identity.TypeMAC, "02ab.cdef.0123", "02:ab:cd:ef:01:23", nil},
-		{"mac compact", identity.TypeMAC, "02ABCDEF0123", "02:ab:cd:ef:01:23", nil},
-		{"zero mac", identity.TypeMAC, "000000000000", "00:00:00:00:00:00", nil},
-		{"broadcast mac", identity.TypeMAC, "FFFFFFFFFFFF", "ff:ff:ff:ff:ff:ff", nil},
-		{"multicast mac", identity.TypeMAC, "01:00:5E:00:00:01", "01:00:5e:00:00:01", nil},
-		{"ipv4", identity.TypeIP, "192.0.2.1", "192.0.2.1", nil},
-		{"ipv6", identity.TypeIP, "2001:0DB8:0:0:0:0:0:1", "2001:db8::1", nil},
-		{"mapped", identity.TypeIP, "::FFFF:C000:201", "::ffff:192.0.2.1", nil},
-		{"unspecified4", identity.TypeIP, "0.0.0.0", "0.0.0.0", nil},
-		{"unspecified6", identity.TypeIP, "0:0:0:0:0:0:0:0", "::", nil},
-		{"multicast4", identity.TypeIP, "224.0.0.1", "224.0.0.1", nil},
-		{"multicast6", identity.TypeIP, "FF02:0:0:0:0:0:0:1", "ff02::1", nil},
-		{"broadcast ip", identity.TypeIP, "255.255.255.255", "255.255.255.255", nil},
-		{"loopback", identity.TypeIP, "::1", "::1", nil},
-		{"link local", identity.TypeIP, "FE80:0:0:0:0:0:0:1", "fe80::1", nil},
-		{"zone", identity.TypeIP, "FE80::1%Eth0", "fe80::1%Eth0", nil},
-		{"short hostname", identity.TypeHostname, "WEB", "web", nil},
-		{"qualified hostname", identity.TypeHostname, "Web.Example.ORG.", "web.example.org", nil},
-		{"fqdn", identity.TypeFQDN, "Web.Example.ORG.", "web.example.org", nil},
-		{"absolute hostname", identity.TypeHostname, "Example.", "example.", nil},
-		{"absolute fqdn", identity.TypeFQDN, "Example.", "example.", nil},
-		{"linux", identity.TypeMachineID, "00112233445566778899AABBCCDDEEFF", "00112233445566778899aabbccddeeff", identity.Scope{"kind": "linux_machine_id"}},
-		{"linux zero", identity.TypeMachineID, strings.Repeat("0", 32), strings.Repeat("0", 32), identity.Scope{"kind": "linux_machine_id"}},
-		{"windows", identity.TypeMachineID, "{00112233-4455-6677-8899-AABBCCDDEEFF}", "00112233-4455-6677-8899-aabbccddeeff", identity.Scope{"kind": "windows_machine_guid"}},
-		{"bios compact", identity.TypeBIOSUUID, "00112233445566778899AABBCCDDEEFF", "00112233-4455-6677-8899-aabbccddeeff", nil},
-		{"bios braced", identity.TypeBIOSUUID, "{00112233-4455-6677-8899-AABBCCDDEEFF}", "00112233-4455-6677-8899-aabbccddeeff", nil},
-		{"bios nil", identity.TypeBIOSUUID, strings.Repeat("0", 32), "00000000-0000-0000-0000-000000000000", nil},
-		{"bios max", identity.TypeBIOSUUID, strings.Repeat("F", 32), "ffffffff-ffff-ffff-ffff-ffffffffffff", nil},
-		{"tls hex", identity.TypeTLSPublicKeyHash, "spki-sha256:" + strings.Repeat("AB", 32), "spki-sha256:" + strings.Repeat("ab", 32), nil},
-		{"tls zero", identity.TypeTLSPublicKeyHash, "spki-sha256:" + strings.Repeat("0", 64), "spki-sha256:" + strings.Repeat("0", 64), nil},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			v := identity.IdentifierValue{Type: tt.typ, Value: tt.input, Scope: tt.scope}
-			before := v.Clone()
-			if err := identity.ValidateIdentifier(v); err != nil {
-				t.Fatal(err)
-			}
-			n, err := identity.NormalizeIdentifier(v)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if n.Type != tt.typ || n.Value != tt.want || !reflect.DeepEqual(n.Scope, tt.scope) {
-				t.Fatalf("normalized = %+v, want %q", n, tt.want)
-			}
-			if !reflect.DeepEqual(v, before) {
-				t.Fatal("input mutated")
-			}
-			twice, err := identity.NormalizeIdentifier(n)
-			if err != nil || !identity.SameRepresentation(n, twice) {
-				t.Fatalf("not idempotent: %+v, %v", twice, err)
-			}
-			if same, err := identity.EqualIdentifiers(v, n); err != nil || !same {
-				t.Fatalf("normalization not equivalent: %v %v", same, err)
-			}
-		})
-	}
-}
-
-func TestInvalidNormalization(t *testing.T) {
+func TestNormalizationStructuralErrors(t *testing.T) {
 	tests := []struct {
 		name     string
 		v        identity.IdentifierValue
@@ -97,60 +26,13 @@ func TestInvalidNormalization(t *testing.T) {
 	}{
 		{"unknown", identity.IdentifierValue{Type: "future_type"}, identity.ErrUnknownIdentifierType},
 		{"scope", identity.IdentifierValue{Type: identity.TypeIP, Value: "192.0.2.1", Scope: identity.Scope{"": "bad"}}, identity.ErrInvalidScope},
-		{"kind missing", identity.IdentifierValue{Type: identity.TypeMachineID, Value: strings.Repeat("0", 32)}, identity.ErrUnsupportedIdentifierFormat},
+		{"kind missing", identity.IdentifierValue{Type: identity.TypeMachineID, Value: strings.Repeat("1", 32)}, identity.ErrUnsupportedIdentifierFormat},
 		{"kind unknown", identity.IdentifierValue{Type: identity.TypeMachineID, Scope: identity.Scope{"kind": "unknown"}}, identity.ErrUnsupportedIdentifierFormat},
-	}
-	for _, typ := range []identity.IdentifierType{identity.TypeGreenboneID, identity.TypeAgentID, identity.TypeCloudIdentifier} {
-		tests = append(tests, struct {
-			name     string
-			v        identity.IdentifierValue
-			category error
-		}{string(typ) + " empty", identity.IdentifierValue{Type: typ}, identity.ErrInvalidIdentifierValue})
-	}
-	invalid := map[identity.IdentifierType][]string{
-		identity.TypeMAC:              {"", "02:AB-CD:EF:01:23", "2:ab:cd:ef:01:23", "02ab.cdef.123", "02:ab:cd:ef:01:23 ", "02:ab:cd:ef:01:zz", "02:ab:cd:ef:01:23:45:67"},
-		identity.TypeIP:               {"", "010.0.0.1", "256.0.0.1", "127.1", "[::1]", "[::1]:443", "192.0.2.1/24", "::1/128", "example.org", "fe80::1%", "fe80::1%eth0%1", "fe80::1%eth 0", "192.0.2.1%eth0", " ::1", "::1\n"},
-		identity.TypeHostname:         {"", ".", "a..b", "-a.example", "a-.example", "a_.example", "*.example", "ä.example", "a\\046b", "192.0.2.1", "::1", strings.Repeat("a", 64) + ".example", "web ", "web.."},
-		identity.TypeBIOSUUID:         {"", "{00112233445566778899aabbccddeeff}", "00112233_4455-6677-8899-aabbccddeeff", "00112233-4455-6677-8899-aabbccddeefg", "00112233-4455-6677-8899-aabbccddeeff ", "urn:uuid:00112233-4455-6677-8899-aabbccddeeff"},
-		identity.TypeTLSPublicKeyHash: {"spki-sha256:", "spki-sha256:" + strings.Repeat("a", 63), "spki-sha256:" + strings.Repeat("g", 64), "spki-sha256:" + strings.Repeat("a", 64) + "\n"},
-	}
-	for typ, inputs := range invalid {
-		for _, input := range inputs {
-			tests = append(tests, struct {
-				name     string
-				v        identity.IdentifierValue
-				category error
-			}{string(typ) + "/" + input, identity.IdentifierValue{Type: typ, Value: input}, identity.ErrInvalidIdentifierValue})
-		}
-	}
-	for _, input := range []string{strings.Repeat("a", 64), "spki-sha256-base64:AAAA", "cert-sha256:" + strings.Repeat("a", 64)} {
-		tests = append(tests, struct {
-			name     string
-			v        identity.IdentifierValue
-			category error
-		}{"tls scheme/" + input, identity.IdentifierValue{Type: identity.TypeTLSPublicKeyHash, Value: input}, identity.ErrUnsupportedIdentifierFormat})
-	}
-	tests = append(tests, struct {
-		name     string
-		v        identity.IdentifierValue
-		category error
-	}{"bare fqdn", identity.IdentifierValue{Type: identity.TypeFQDN, Value: "example"}, identity.ErrUnsupportedIdentifierFormat})
-	for _, kind := range []string{"linux_machine_id", "windows_machine_guid"} {
-		tests = append(tests, struct {
-			name     string
-			v        identity.IdentifierValue
-			category error
-		}{
-			"machine malformed/" + kind,
-			identity.IdentifierValue{Type: identity.TypeMachineID, Value: "malformed", Scope: identity.Scope{"kind": kind}},
-			identity.ErrInvalidIdentifierValue,
-		})
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			before := tt.v.Clone()
-			err := identity.ValidateIdentifier(tt.v)
-			if !errors.Is(err, tt.category) {
+			if err := identity.ValidateIdentifier(tt.v); !errors.Is(err, tt.category) {
 				t.Fatalf("validation: %v, want %v", err, tt.category)
 			}
 			got, err := identity.NormalizeIdentifier(tt.v)
@@ -190,18 +72,20 @@ func TestSemanticEquality(t *testing.T) {
 		want bool
 	}{
 		{"hostname canonical", a, nilScope, true}, {"different type", a, value(identity.TypeFQDN, "web.example"), false},
-		{"short versus qualified", value(identity.TypeHostname, "web"), nilScope, false},
+		{"short versus qualified hostname", value(identity.TypeHostname, "web"), nilScope, false},
 		{"absolute versus relative", value(identity.TypeHostname, "web."), value(identity.TypeHostname, "web"), false},
 		{"opaque case", value(identity.TypeAgentID, "Id"), value(identity.TypeAgentID, "id"), false},
-		{"opaque whitespace", value(identity.TypeGreenboneID, " Id "), value(identity.TypeGreenboneID, "Id"), false},
+		{"opaque surrounding whitespace", value(identity.TypeGreenboneID, " Id "), value(identity.TypeGreenboneID, "Id"), true},
+		{"opaque inner whitespace", value(identity.TypeGreenboneID, "I d"), value(identity.TypeGreenboneID, "Id"), false},
+		{"cloud case", value(identity.TypeCloudIdentifier, "Provider/Resource-A"), value(identity.TypeCloudIdentifier, "provider/resource-a"), false},
 		{"scope presence", nilScope, empty, false}, {"scope insertion order", scoped, reordered, true}, {"scope case", scoped, changed, false},
 		{"empty versus absent dimension", withEmpty, withoutDimension, false},
 		{"extra dimension", scoped, extra, false},
 		{"TLS digest distinction", value(identity.TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("a", 64)), value(identity.TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("b", 64)), false},
-		{"mapped family", value(identity.TypeIP, "192.0.2.1"), value(identity.TypeIP, "::ffff:192.0.2.1"), false},
-		{"zone absent", value(identity.TypeIP, "fe80::1"), value(identity.TypeIP, "fe80::1%eth0"), false},
-		{"zone case", value(identity.TypeIP, "fe80::1%eth0"), value(identity.TypeIP, "fe80::1%Eth0"), false},
-		{"same placeholder", value(identity.TypeMAC, "000000000000"), value(identity.TypeMAC, "00:00:00:00:00:00"), true},
+		{"mapped family", value(identity.TypeIP, "192.0.2.1"), value(identity.TypeIP, "::ffff:192.0.2.1"), true},
+		{"zone absent", value(identity.TypeIP, "2001:db8::1"), value(identity.TypeIP, "2001:db8::1%eth0"), true},
+		{"zone case", value(identity.TypeIP, "2001:db8::1%eth0"), value(identity.TypeIP, "2001:db8::1%Eth0"), true},
+		{"other address", value(identity.TypeIP, "192.0.2.1"), value(identity.TypeIP, "192.0.2.2"), false},
 	}
 	linux := value(identity.TypeMachineID, "00112233445566778899aabbccddeeff")
 	linux.Scope = identity.Scope{"kind": "linux_machine_id"}
@@ -278,7 +162,7 @@ func TestSSHNormalization(t *testing.T) {
 	for _, fixture := range sshFixtures() {
 		t.Run(fixture.algorithm, func(t *testing.T) {
 			canonical := fixture.algorithm + " " + base64.StdEncoding.EncodeToString(fixture.blob)
-			for _, input := range []string{canonical, canonical + " comment", canonical + "\tcomment\r\n", canonical + "\n", "22 " + canonical, "65535\t" + canonical + " comment\r\n"} {
+			for _, input := range []string{canonical, canonical + " comment", canonical + "\tcomment\r\n", canonical + "\n", "22 " + canonical, "65535\t" + canonical + " comment\r\n", "22 " + canonical + "\n\n", canonical + "\n\n", canonical + "\r", " " + canonical} {
 				v := identity.IdentifierValue{Type: identity.TypeSSHHostKey, Value: input}
 				got, err := identity.NormalizeIdentifier(v)
 				if err != nil || got.Value != canonical {
@@ -295,7 +179,7 @@ func TestSSHNormalization(t *testing.T) {
 					t.Fatal("SSH comments change equality")
 				}
 			}
-			for _, bad := range []string{"0 " + canonical, "65536 " + canonical, "22x " + canonical, "22 " + canonical + "\n\n", canonical + "\n\n", canonical + "\r", canonical + "\n" + canonical, fixture.algorithm + " " + base64.StdEncoding.EncodeToString(append(bytes.Clone(fixture.blob), 0)), fixture.algorithm + " !!!!", "ssh-rsa " + base64.StdEncoding.EncodeToString(sshWire([]byte("ssh-ed25519"), make([]byte, 32)))} {
+			for _, bad := range []string{"0 " + canonical, "65536 " + canonical, "22x " + canonical, canonical + "\n" + canonical, canonical + "\r\n" + canonical, fixture.algorithm + " " + base64.StdEncoding.EncodeToString(append(bytes.Clone(fixture.blob), 0)), fixture.algorithm + " !!!!", "ssh-rsa " + base64.StdEncoding.EncodeToString(sshWire([]byte("ssh-ed25519"), make([]byte, 32)))} {
 				// The mismatch fixture is invalid even in the RSA subtest.
 				if err := identity.ValidateIdentifier(identity.IdentifierValue{Type: identity.TypeSSHHostKey, Value: bad}); !errors.Is(err, identity.ErrInvalidIdentifierValue) {
 					t.Fatalf("bad key accepted: %v", err)

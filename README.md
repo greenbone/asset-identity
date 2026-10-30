@@ -46,26 +46,31 @@ significant, including absent versus explicitly empty scope.
 | CREATE | A new key is required.         |
 | REUSE  | Use the selected existing key. |
 
-Strong types are checked in configured priority order. At the first type with matches, the newest candidate wins; equal
-timestamps use asset-key ordering. Multiple incoming values of that type participate in the same ranking. If strong
-evidence exists but no candidate matches, return CREATE without fuzzy fallback. Otherwise fuzzy matching returns REUSE
-for a selected containing candidate, or CREATE if none exists. Default fuzzy weights are MAC (1.0), hostname (0.4), IP
-(0.4), and FQDN (0.4). FQDN matching uses the full normalized name; hostname and FQDN remain distinct identifier types.
+Strong types follow the configured priority. Compare the highest strong type shared by both views; a shared conflict
+blocks lower-priority matches. Missing stronger identifiers allow a lower match. Incoming Machine X + Agent A therefore
+reuses an Agent-A-only key, and the application stores Machine X on that asset without changing its key.
 
-At the TLS priority, the observation and candidate must have identical normalized public-key sets. Order and duplicate
-values do not matter, but an extra or missing TLS key prevents a TLS match: `{A,B}` matches `{B,A}`, not `{A}` or
-`{A,B,C}`. Other strong types retain any-value matching. Priority still applies: higher-priority identifiers can select
-an asset independently, and a TLS mismatch allows later configured strong types to be checked.
+Among reusable candidates, the highest-priority shared match wins, then newest timestamp and asset-key ordering. When
+incoming strong IDs exist but no candidate qualifies, return CREATE without fuzzy fallback. With no incoming strong IDs,
+reuse a candidate containing every incoming weak identifier, or CREATE if none qualifies. Default fuzzy weights are MAC
+(1.0), hostname (0.4), IP (0.4), and FQDN (0.4); hostname and FQDN remain distinct types.
+
+TLS compares complete normalized public-key sets, ignoring order and duplicates: `{A,B}` matches `{B,A}`, but not
+`{A}` or `{A,B,C}`. A TLS conflict cannot be bypassed by a lower-priority type; a higher-priority match still wins.
+Other strong types match any equal scoped value.
 
 `MergeIndices` lists the supplied candidates to move to the destination key. Retrieve each candidate and its asset key
 from the original candidate array using the returned index. On CREATE, the application generates the destination key; on
-REUSE it uses `SelectedKey`. The application applies the observation and key moves atomically. Strong IDs protect merge
-eligibility; records without strong IDs require full fuzzy containment. A weak destination cannot combine sources with
-conflicting strong IDs. See [the algorithm guide](docs/how-asset-identity-works.md#8-the-returned-decision).
+REUSE it uses `SelectedKey`. The application applies the observation and key moves atomically. A strong source must
+match its own highest-priority strong type in the destination or, for strong REUSE, in the incoming view. Conflicting
+records remain separate; records without strong IDs require full fuzzy containment. A weak destination cannot combine sources with conflicting strong IDs.
+See [the algorithm guide](docs/how-asset-identity-works.md#8-the-returned-decision).
 
 ## Scanner identifier values
 
-Pass scanner values directly in `IdentifierValue.Value`:
+Every identifier type has its own normalizer, run before matching. Pass raw producer values directly in
+`IdentifierValue.Value`; the library trims, normalizes, and leaves out placeholders such as `127.0.0.1`, a zero MAC or
+BIOS UUID, or `localhost`. Use `NormalizeIdentifier` to get the canonical value to store. For example:
 
 | Type                   | Scanner value                                |
 |------------------------|----------------------------------------------|
@@ -73,9 +78,10 @@ Pass scanner values directly in `IdentifierValue.Value`:
 | `TypeTLSPublicKeyHash` | `x509:<base64-DER-certificate>`              |
 
 The library removes the SSH port and normalizes the public key. For TLS, it parses the certificate and calculates the
-public-key hash internally. Callers do not need to calculate hashes or strip these value prefixes. `Decide` performs
-this normalization automatically. Existing SSH public-key lines and `spki-sha256:` values remain accepted. Certificate
-fingerprints and `SSLDetails`/`SSLInfo` metadata alone cannot supply a public key.
+public-key hash internally; during matching the certificate counts only when its CN or a DNS SAN equals an FQDN or
+hostname supplied in the same view. Callers do not need to calculate hashes or strip these value prefixes. `Decide`
+performs this normalization automatically. Existing SSH public-key lines and `spki-sha256:` values remain accepted.
+Certificate fingerprints and `SSLDetails`/`SSLInfo` metadata alone cannot supply a public key.
 
 In C, pass the same values to `gvm_asset_identity_identifier_new` and add them to the observation (or a candidate's
 identifiers):
@@ -192,7 +198,7 @@ input.
 ## Algorithm guide
 
 [How Asset Identity Works](docs/how-asset-identity-works.md) explains the decision flow, strong priority, exact TLS
-key-set matching, fuzzy containment, and Go/C usage through examples.
+key-set matching, weak evidence, and Go/C usage through examples.
 
 ## Technical reference
 

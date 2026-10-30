@@ -33,6 +33,73 @@ Ensure (create_and_strong_reuse)
   gvm_asset_identity_policy_free (policy);
 }
 
+Ensure (strong_reuse_enrichment_and_conflict)
+{
+  gvm_asset_identity_policy_t *policy = default_policy ();
+  gvm_asset_identity_observation_t *agent =
+    observation (GVM_ASSET_IDENTITY_AGENT_ID, "A");
+  gvm_asset_identity_observation_t *input =
+    observation (GVM_ASSET_IDENTITY_AGENT_ID, "A");
+  gvm_asset_identity_identifier_t *machine = gvm_asset_identity_identifier_new (
+    GVM_ASSET_IDENTITY_MACHINE_ID, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  machine->scope =
+    g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+  g_hash_table_insert (machine->scope, g_strdup ("kind"),
+                       g_strdup ("linux_machine_id"));
+  g_ptr_array_add (input->identifiers, machine);
+  GPtrArray *rows = candidates_new ();
+  g_ptr_array_add (rows, candidate ("agent-only", agent));
+
+  gvm_asset_identity_decision_t *result = decide (input, rows, policy);
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
+  assert_that (result->stage, is_equal_to (GVM_ASSET_IDENTITY_STAGE_STRONG));
+  assert_that (result->needs_new_key, is_false);
+  assert_that (result->has_selected_index, is_true);
+  assert_that (result->selected_key, is_equal_to_string ("agent-only"));
+  assert_that (result->selected_index, is_equal_to (0));
+  assert_that (result->merge_indices->len, is_equal_to (0));
+  gvm_asset_identity_decision_free (result);
+
+  g_ptr_array_add (rows, candidate ("machine", input));
+  gvm_asset_identity_candidate_t *stored = g_ptr_array_index (rows, 1);
+  /* The incoming scan links separate Agent-only and Machine-only records. */
+  g_ptr_array_remove_index (stored->identifiers, 0);
+  result = decide (input, rows, policy);
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
+  assert_that (result->selected_key, is_equal_to_string ("machine"));
+  assert_that (result->selected_index, is_equal_to (1));
+  assert_that (result->merge_indices->len, is_equal_to (1));
+  assert_that (g_array_index (result->merge_indices, gsize, 0),
+               is_equal_to (0));
+  gvm_asset_identity_decision_free (result);
+
+  /* The caller stores the incoming Agent ID on the reused Machine key. */
+  g_ptr_array_add (stored->identifiers, gvm_asset_identity_identifier_new (
+                                          GVM_ASSET_IDENTITY_AGENT_ID, "A"));
+  g_ptr_array_remove_index (rows, 0);
+  result = decide (agent, rows, policy);
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
+  assert_that (result->selected_key, is_equal_to_string ("machine"));
+  assert_that (result->selected_index, is_equal_to (0));
+  assert_that (result->merge_indices->len, is_equal_to (0));
+  gvm_asset_identity_decision_free (result);
+
+  gvm_asset_identity_identifier_t *stored_machine =
+    g_ptr_array_index (stored->identifiers, 0);
+  g_free (stored_machine->value);
+  stored_machine->value = g_strdup ("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  result = decide (input, rows, policy);
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
+  assert_that (result->has_selected_index, is_false);
+  assert_that (result->merge_indices->len, is_equal_to (0));
+  gvm_asset_identity_decision_free (result);
+
+  gvm_asset_identity_observation_free (input);
+  gvm_asset_identity_observation_free (agent);
+  g_ptr_array_unref (rows);
+  gvm_asset_identity_policy_free (policy);
+}
+
 Ensure (custom_priority_preserves_original_indices)
 {
   gvm_asset_identity_observation_t *input =
@@ -236,11 +303,16 @@ Ensure (scoped_semantic_equality_preserves_absent_and_empty)
 
 static void
 check_raw_strong_match (gvm_asset_identity_identifier_type_t type,
-                        const gchar *raw, const gchar *canonical)
+                        const gchar *raw, const gchar *canonical,
+                        const gchar *host)
 {
   gvm_asset_identity_policy_t *policy = default_policy ();
   gvm_asset_identity_observation_t *views[] = {observation (type, raw),
                                                observation (type, canonical)};
+  for (guint i = 0; host && i < G_N_ELEMENTS (views); i++)
+    g_ptr_array_add (
+      views[i]->identifiers,
+      gvm_asset_identity_identifier_new (GVM_ASSET_IDENTITY_HOSTNAME, host));
   for (guint i = 0; i < G_N_ELEMENTS (views); i++)
     {
       GPtrArray *rows = candidates_new ();
@@ -275,7 +347,7 @@ Ensure (raw_ssh_scanner_value_matches_public_key)
                      "YQrOjEEK90g2FjNicABlxgBFRANn3KkM72mM3sDIyN/"
                      "q8Y6f9avo/1dMv847Y+mT2f4po92qekby06dbiU=";
   gchar *raw = g_strdup_printf ("22 %s", key);
-  check_raw_strong_match (GVM_ASSET_IDENTITY_SSH_HOST_KEY, raw, key);
+  check_raw_strong_match (GVM_ASSET_IDENTITY_SSH_HOST_KEY, raw, key, NULL);
   g_free (raw);
 }
 
@@ -293,7 +365,8 @@ Ensure (raw_tls_scanner_value_matches_public_key_hash)
       check_raw_strong_match (
         GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, raw,
         "spki-sha256:"
-        "1667ab37ba6f84c9c7053970c7557507deccefdbb09c454d9d0ca0e4fe1c3319");
+        "1667ab37ba6f84c9c7053970c7557507deccefdbb09c454d9d0ca0e4fe1c3319",
+        "GAT-29");
     }
   g_free (raw);
   g_clear_error (&error);
@@ -433,6 +506,7 @@ main (void)
 {
   TestSuite *suite = create_test_suite ();
   add_test (suite, create_and_strong_reuse);
+  add_test (suite, strong_reuse_enrichment_and_conflict);
   add_test (suite, create_returns_owned_merge_targets);
   add_test (suite, weak_observation_keeps_conflicting_agent_records_separate);
   add_test (suite, custom_priority_preserves_original_indices);

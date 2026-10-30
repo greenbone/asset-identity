@@ -29,7 +29,7 @@ type MatchPolicy struct {
 // GreenboneMatchPolicy returns independently owned Greenbone defaults.
 func GreenboneMatchPolicy() MatchPolicy {
 	return MatchPolicy{
-		StrongOrder: []IdentifierType{TypeGreenboneID, TypeAgentID, TypeMachineID, TypeBIOSUUID, TypeSSHHostKey, TypeTLSPublicKeyHash, TypeCloudIdentifier},
+		StrongOrder: []IdentifierType{TypeCloudIdentifier, TypeGreenboneID, TypeMachineID, TypeBIOSUUID, TypeAgentID, TypeSSHHostKey, TypeTLSPublicKeyHash},
 		Fuzzy:       []FuzzyMember{{Type: TypeMAC, Weight: 1}, {Type: TypeHostname, Weight: .4}, {Type: TypeIP, Weight: .4}, {Type: TypeFQDN, Weight: .4}},
 	}
 }

@@ -73,45 +73,74 @@ func canonicalMAC(value string) (string, error) {
 	return address.String(), nil
 }
 
-func canonicalIP(value string) (string, error) {
+// canonicalIP unmaps IPv4-mapped IPv6 and drops the zone; one zone without whitespace is accepted on input.
+func canonicalIP(value string) (netip.Addr, error) {
 	if strings.ContainsFunc(value, unicode.IsSpace) || strings.Count(value, "%") > 1 {
-		return "", ErrInvalidIdentifierValue
+		return netip.Addr{}, ErrInvalidIdentifierValue
 	}
 	address, err := netip.ParseAddr(value)
 	if err != nil {
-		return "", ErrInvalidIdentifierValue
+		return netip.Addr{}, ErrInvalidIdentifierValue
 	}
-	return address.String(), nil
+	return address.Unmap().WithZone(""), nil
 }
 
-func canonicalDNS(value string, fqdn bool) (string, error) {
-	absolute := strings.HasSuffix(value, ".")
+var sharedPrefixes = []netip.Prefix{
+	netip.MustParsePrefix("0.0.0.0/32"),
+	netip.MustParsePrefix("127.0.0.0/8"),
+	netip.MustParsePrefix("169.254.0.0/16"),
+	netip.MustParsePrefix("224.0.0.0/4"),
+	netip.MustParsePrefix("255.255.255.255/32"),
+	netip.MustParsePrefix("::/128"),
+	netip.MustParsePrefix("::1/128"),
+	netip.MustParsePrefix("fe80::/10"),
+	netip.MustParsePrefix("ff00::/8"),
+}
+
+// isSharedAddress reports unspecified, loopback, link-local, multicast and broadcast addresses.
+func isSharedAddress(address netip.Addr) bool {
+	for _, prefix := range sharedPrefixes {
+		if prefix.Contains(address) {
+			return true
+		}
+	}
+	return false
+}
+
+// dnsLabels returns the lower-case labels of an ASCII host name; a trailing root dot is ignored. Labels use letters,
+// digits, hyphen and underscore and neither start nor end with a hyphen. An IP address is not a name.
+func dnsLabels(value string) ([]string, error) {
 	name := strings.TrimSuffix(value, ".")
 	if name == "" || len(name) > 253 {
-		return "", ErrInvalidIdentifierValue
+		return nil, ErrInvalidIdentifierValue
 	}
 	if _, err := netip.ParseAddr(name); err == nil {
-		return "", ErrInvalidIdentifierValue
+		return nil, ErrInvalidIdentifierValue
 	}
 	labels := strings.Split(name, ".")
-	for _, label := range labels {
+	for i, label := range labels {
 		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
-			return "", ErrInvalidIdentifierValue
+			return nil, ErrInvalidIdentifierValue
 		}
-		for i := range len(label) {
-			c := label[i]
-			letterOrDigit := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
-			if !letterOrDigit && c != '-' {
-				return "", ErrInvalidIdentifierValue
+		for j := range len(label) {
+			if !isLabelByte(label[j]) {
+				return nil, ErrInvalidIdentifierValue
 			}
 		}
+		labels[i] = strings.ToLower(label)
 	}
-	if fqdn && len(labels) == 1 && !absolute {
-		return "", ErrUnsupportedIdentifierFormat
+	return labels, nil
+}
+
+func isLabelByte(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_'
+}
+
+func isDigits(value string) bool {
+	for i := range len(value) {
+		if value[i] < '0' || value[i] > '9' {
+			return false
+		}
 	}
-	canonical := strings.ToLower(name)
-	if absolute && len(labels) == 1 {
-		canonical += "."
-	}
-	return canonical, nil
+	return true
 }

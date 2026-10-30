@@ -5,9 +5,12 @@
 package identity
 
 import (
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -24,47 +27,61 @@ func MatchingIdentifiers(incoming, candidate []IdentifierValue) ([]IdentifierVal
 	}
 	var matches []IdentifierValue
 	for _, incomingValue := range incomingValues {
-		matched := false
-		for _, candidateValue := range candidateValues {
-			equal, err := EqualIdentifiers(incomingValue, candidateValue)
-			if err != nil {
-				return nil, err
-			}
-			if equal {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			continue
-		}
-		duplicate := false
-		for _, existing := range matches {
-			if SameRepresentation(incomingValue, existing) {
-				duplicate = true
-				break
-			}
-		}
-		if !duplicate {
+		if fuzzySetContains(candidateValues, incomingValue) && !fuzzySetContains(matches, incomingValue) {
 			matches = append(matches, incomingValue.Clone())
 		}
 	}
 	return matches, nil
 }
 
+// canonicalMatchingView normalizes a view for matching. Placeholder values are left out. An x509 certificate is kept,
+// as its public key hash, only when its subject CN or a DNS SAN names the host: an FQDN or hostname of the same view.
 func canonicalMatchingView(input []IdentifierValue) ([]IdentifierValue, error) {
-	out := make([]IdentifierValue, len(input))
+	out := make([]IdentifierValue, 0, len(input))
+	var certificates map[int]*x509.Certificate
+	var names []string
 	for i, v := range input {
+		if payload := strings.TrimSpace(v.Value); v.Type == TypeTLSPublicKeyHash && strings.HasPrefix(payload, "x509:") && v.Validate() == nil {
+			certificate, err := parseCertificate(payload)
+			if err != nil {
+				return nil, fmt.Errorf("identifier %d: %s: %w", i, v.Type, err)
+			}
+			if certificates == nil {
+				certificates = make(map[int]*x509.Certificate)
+			}
+			certificates[len(out)] = certificate
+			out = append(out, v.Clone())
+			continue
+		}
 		canonical, err := NormalizeIdentifier(v)
+		if errors.Is(err, errPlaceholder) {
+			continue
+		}
 		if err != nil {
 			return nil, fmt.Errorf("identifier %d: %w", i, err)
 		}
-		out[i] = canonical
+		if canonical.Type == TypeFQDN || canonical.Type == TypeHostname {
+			names = append(names, canonical.Value)
+		}
+		out = append(out, canonical)
 	}
-	return out, nil
+	if len(certificates) == 0 {
+		return out, nil
+	}
+	kept := out[:0]
+	for i, v := range out {
+		if certificate, ok := certificates[i]; ok {
+			if !certificateNamesHost(certificate, names) {
+				continue
+			}
+			v.Value = spkiHash(certificate)
+		}
+		kept = append(kept, v)
+	}
+	return kept, nil
 }
 
-// StrongPriorityMatch reports correspondence at one configured priority.
+// StrongPriorityMatch reports reusable candidates at one configured priority.
 type StrongPriorityMatch struct {
 	Type              IdentifierType
 	Priority          int   // zero-based; -1 when no candidate matches
@@ -72,9 +89,9 @@ type StrongPriorityMatch struct {
 	CandidateIndices  []int // original input positions
 }
 
-// EvaluateStrongPriority reports all matches at the first matching configured priority.
-// Callers must supply admitted views. TLS requires equal normalized key sets;
-// other strong types match any incoming value.
+// EvaluateStrongPriority reports reusable candidates at the first matching priority.
+// Missing types allow lower matches; shared stronger conflicts block them.
+// TLS requires equal normalized key sets; other types match any value.
 func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidates [][]IdentifierValue) (StrongPriorityMatch, error) {
 	empty := StrongPriorityMatch{Priority: -1}
 	if err := p.Validate(); err != nil {
@@ -98,39 +115,73 @@ func EvaluateStrongPriority(p MatchPolicy, incoming []IdentifierValue, candidate
 // evaluateStrongPriority compares canonical views under a validated policy.
 func evaluateStrongPriority(p MatchPolicy, incomingValues []IdentifierValue, candidateViews [][]IdentifierValue) StrongPriorityMatch {
 	result := StrongPriorityMatch{Priority: -1}
-	for _, typ := range p.StrongOrder {
-		for _, v := range incomingValues {
-			if v.Type == typ {
-				result.HasIncomingStrong = true
-				break
-			}
-		}
+	incomingPriority := firstStrongPriority(incomingValues, p)
+	result.HasIncomingStrong = incomingPriority < len(p.StrongOrder)
+	if !result.HasIncomingStrong {
+		return result
 	}
-	for priority, typ := range p.StrongOrder {
-		var indices []int
-		for i, view := range candidateViews {
-			if strongValuesMatch(incomingValues, view, typ) {
-				indices = append(indices, i)
-			}
+	for i, view := range candidateViews {
+		priority, matches := compareStrong(incomingValues, view, p)
+		if !matches {
+			continue
 		}
-		if len(indices) > 0 {
-			result.Type = typ
+		if result.Priority < 0 || priority < result.Priority {
+			result.Type = p.StrongOrder[priority]
 			result.Priority = priority
-			result.CandidateIndices = indices
-			return result
+			result.CandidateIndices = nil
+		}
+		if priority == result.Priority {
+			result.CandidateIndices = append(result.CandidateIndices, i)
 		}
 	}
 	return result
 }
 
-// Inputs are canonical; only the deciding type participates.
-func strongValuesMatch(left, right []IdentifierValue, typ IdentifierType) bool {
+func firstStrongType(values []IdentifierValue, policy MatchPolicy) IdentifierType {
+	if priority := firstStrongPriority(values, policy); priority < len(policy.StrongOrder) {
+		return policy.StrongOrder[priority]
+	}
+	return ""
+}
+
+func firstStrongPriority(values []IdentifierValue, policy MatchPolicy) int {
+	for priority, typ := range policy.StrongOrder {
+		if hasType(values, typ) {
+			return priority
+		}
+	}
+	return len(policy.StrongOrder)
+}
+
+// The first type present on both sides decides. Missing types are skipped;
+// a shared conflict cannot be bypassed by a lower-priority match.
+func compareStrong(left, right []IdentifierValue, policy MatchPolicy) (priority int, matches bool) {
+	for priority, typ := range policy.StrongOrder {
+		if hasType(left, typ) && hasType(right, typ) {
+			return priority, strongValuesMatch(left, right, typ)
+		}
+	}
+	return -1, false
+}
+
+func hasType(values []IdentifierValue, typ IdentifierType) bool {
+	return slices.ContainsFunc(values, func(value IdentifierValue) bool { return value.Type == typ })
+}
+
+func sharesValue(left, right []IdentifierValue, typ IdentifierType) bool {
 	for _, value := range left {
 		if value.Type == typ && fuzzySetContains(right, value) {
-			return typ != TypeTLSPublicKeyHash || sameTLSIdentifiers(left, right)
+			return true
 		}
 	}
 	return false
+}
+
+func strongValuesMatch(left, right []IdentifierValue, typ IdentifierType) bool {
+	if !sharesValue(left, right, typ) {
+		return false
+	}
+	return typ != TypeTLSPublicKeyHash || sameTLSIdentifiers(left, right)
 }
 
 // Inputs are canonical. Mutual membership ignores order and duplicate representations.

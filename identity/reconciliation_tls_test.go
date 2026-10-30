@@ -19,6 +19,7 @@ func TestDecideTLSRequiresEqualKeySets(t *testing.T) {
 	b := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("b", 64))
 	c := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("c", 64))
 	rawA := fuzzyValue(TypeTLSPublicKeyHash, strings.TrimSpace(string(certificate)))
+	certificateHost := fuzzyValue(TypeHostname, "GAT-29")
 	upperB := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("B", 64))
 	scopedA := a.Clone()
 	scopedA.Scope = Scope{}
@@ -41,14 +42,15 @@ func TestDecideTLSRequiresEqualKeySets(t *testing.T) {
 		{"order", []IdentifierValue{a, b}, []Candidate{fuzzyRow("K", 10, b, a)}, "K"},
 		{"duplicate observation", []IdentifierValue{a, b, a}, []Candidate{fuzzyRow("K", 10, a, b)}, "K"},
 		{"duplicate candidate", []IdentifierValue{a, b}, []Candidate{fuzzyRow("K", 10, b, a, b)}, "K"},
-		{"raw and canonical duplicates", []IdentifierValue{rawA, a, b}, []Candidate{fuzzyRow("K", 10, upperB, a)}, "K"},
-		{"candidate raw certificate", []IdentifierValue{a, b}, []Candidate{fuzzyRow("K", 10, b, rawA)}, "K"},
+		{"raw and canonical duplicates", []IdentifierValue{rawA, certificateHost, a, b}, []Candidate{fuzzyRow("K", 10, upperB, a)}, "K"},
+		{"candidate raw certificate", []IdentifierValue{a, b}, []Candidate{fuzzyRow("K", 10, b, rawA, certificateHost)}, "K"},
+		{"candidate certificate without its host name is not eligible", []IdentifierValue{a, b}, []Candidate{fuzzyRow("K", 10, b, rawA)}, ""},
 		{"scope differs", []IdentifierValue{a, b}, []Candidate{fuzzyRow("K", 10, scopedA, b)}, ""},
 		{"additional scope", []IdentifierValue{a, b}, []Candidate{fuzzyRow("K", 10, a, b, scopedA)}, ""},
 		{"other types do not affect TLS equality", []IdentifierValue{a, b, ip}, []Candidate{fuzzyRow("K", 10, a, b, cloud)}, "K"},
 		{"higher priority remains decisive", []IdentifierValue{g, a, b}, []Candidate{fuzzyRow("K", 10, g, a)}, "K"},
 		{"lower priority still considered", []IdentifierValue{a, b, cloud}, []Candidate{fuzzyRow("K", 10, a, cloud)}, "K"},
-		{"TLS mismatch never falls back to fuzzy", []IdentifierValue{a, b, ip}, []Candidate{fuzzyRow("K", 10, a, ip)}, ""},
+		{"TLS mismatch with one weak type creates", []IdentifierValue{a, b, ip}, []Candidate{fuzzyRow("K", 10, a, ip)}, ""},
 		{"newer partial candidate cannot win", []IdentifierValue{a, b}, []Candidate{fuzzyRow("partial", 30, a), fuzzyRow("exact", 10, a, b)}, "exact"},
 		{"equal sets use ranking", []IdentifierValue{a, b}, []Candidate{fuzzyRow("old", 10, a, b), fuzzyRow("new", 20, b, a)}, "new"},
 	}

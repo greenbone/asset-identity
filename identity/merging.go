@@ -16,14 +16,10 @@ func planMerges(decision *Decision, incoming []IdentifierValue, views [][]Identi
 	if decision.SelectedIndex != nil {
 		destination = views[*decision.SelectedIndex]
 	}
-	winningType := firstStrongType(destination, policy)
+	destinationType := firstStrongType(destination, policy)
+	selectionPriority := -1
 	if decision.Stage == StageStrong && decision.SelectedIndex != nil {
-		for _, typ := range policy.StrongOrder {
-			if strongValuesMatch(incoming, destination, typ) {
-				winningType = typ
-				break
-			}
-		}
+		selectionPriority, _ = compareStrong(incoming, destination, policy)
 	}
 	weights, err := fuzzyWeights(policy)
 	if err != nil {
@@ -34,9 +30,29 @@ func planMerges(decision *Decision, incoming []IdentifierValue, views [][]Identi
 		if decision.SelectedIndex != nil && i == *decision.SelectedIndex {
 			continue
 		}
-		if winningType != "" && firstStrongType(source, policy) != "" {
-			if !strongValuesMatch(destination, source, winningType) {
+		sourceType := firstStrongType(source, policy)
+		if destinationType != "" && sourceType != "" {
+			// A strong reuse binds incoming evidence to the selected key. Check each
+			// view separately so partial TLS sets cannot be combined into a match.
+			matches := strongValuesMatch(destination, source, sourceType)
+			if !matches && selectionPriority >= 0 {
+				matches = strongValuesMatch(incoming, source, sourceType)
+			}
+			if !matches {
 				continue
+			}
+			if selectionPriority >= 0 {
+				priority, matches := compareStrong(incoming, source, policy)
+				if priority >= 0 && priority < selectionPriority && !matches {
+					// Do not merge a source excluded by an incoming stronger conflict.
+					continue
+				}
+				priority, matches = compareStrong(destination, source, policy)
+				if priority >= 0 && priority <= selectionPriority && !matches {
+					// Multiple incoming values must not bridge different stored IDs at
+					// the deciding priority. Lower differences may follow a higher match.
+					continue
+				}
 			}
 		} else {
 			if len(destinationFuzzy) == 0 || !fuzzySetSubset(fuzzySetFromCanonical(source, weights), destinationFuzzy) {
@@ -45,22 +61,10 @@ func planMerges(decision *Decision, incoming []IdentifierValue, views [][]Identi
 		}
 		decision.MergeIndices = append(decision.MergeIndices, i)
 	}
-	if winningType == "" {
+	if destinationType == "" {
 		excludeConflictingStrongSources(decision, views, policy)
 	}
 	return nil
-}
-
-// firstStrongType returns the highest-priority configured type present in a view.
-func firstStrongType(values []IdentifierValue, policy MatchPolicy) IdentifierType {
-	for _, typ := range policy.StrongOrder {
-		for _, value := range values {
-			if value.Type == typ {
-				return typ
-			}
-		}
-	}
-	return ""
 }
 
 type strongMergeGroup struct {
