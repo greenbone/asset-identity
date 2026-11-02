@@ -24,22 +24,13 @@ type typeCase struct {
 	placeholder bool
 }
 
-var (
-	linuxKind   = identity.Scope{"kind": "linux_machine_id"}
-	windowsKind = identity.Scope{"kind": "windows_machine_guid"}
-)
-
-func runTypeCases(t *testing.T, typ identity.IdentifierType, scope identity.Scope, cases []typeCase) {
+func runTypeCases(t *testing.T, typ identity.IdentifierType, cases []typeCase) {
 	t.Helper()
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			input := identity.IdentifierValue{Type: typ, Value: tt.raw, Scope: scope}
-			before := input.Clone()
+			input := identity.IdentifierValue{Type: typ, Value: tt.raw}
 			got, err := identity.NormalizeIdentifier(input)
 			validation := identity.ValidateIdentifier(input)
-			if !reflect.DeepEqual(input, before) {
-				t.Fatal("input mutated")
-			}
 			if tt.err != nil || tt.placeholder {
 				want := tt.err
 				if tt.placeholder {
@@ -53,7 +44,7 @@ func runTypeCases(t *testing.T, typ identity.IdentifierType, scope identity.Scop
 				}
 				return
 			}
-			if err != nil || validation != nil || got.Type != typ || got.Value != tt.want || !reflect.DeepEqual(got.Scope, scope) {
+			if err != nil || validation != nil || got.Type != typ || got.Value != tt.want {
 				t.Fatalf("got %+v err=%v validation=%v, want %q", got, err, validation, tt.want)
 			}
 			again, err := identity.NormalizeIdentifier(got)
@@ -83,7 +74,7 @@ func assertLeftOutByDecide(t *testing.T, placeholder identity.IdentifierValue) {
 }
 
 func TestNormalizeCloudIdentifier(t *testing.T) {
-	runTypeCases(t, identity.TypeCloudIdentifier, nil, []typeCase{
+	runTypeCases(t, identity.TypeCloudIdentifier, []typeCase{
 		{name: "azure resource id keeps its case", raw: "/subscriptions/ABC/resourceGroups/RG/providers/Microsoft.Compute/virtualMachines/VM1", want: "/subscriptions/ABC/resourceGroups/RG/providers/Microsoft.Compute/virtualMachines/VM1"},
 		{name: "azure vm id keeps its case", raw: "8E5F4C1A-1B2C-4D3E-9F80-0123456789AB", want: "8E5F4C1A-1B2C-4D3E-9F80-0123456789AB"},
 		{name: "aws arn is kept", raw: "arn:aws:ec2:eu-central-1:111122223333:instance/i-0abc", want: "arn:aws:ec2:eu-central-1:111122223333:instance/i-0abc"},
@@ -99,7 +90,7 @@ func TestNormalizeCloudIdentifier(t *testing.T) {
 }
 
 func TestNormalizeGreenboneID(t *testing.T) {
-	runTypeCases(t, identity.TypeGreenboneID, nil, []typeCase{
+	runTypeCases(t, identity.TypeGreenboneID, []typeCase{
 		{name: "guid", raw: "7d1c0b6e-6a3e-4c1f-9b52-1f7a2c3d4e5f", want: "7d1c0b6e-6a3e-4c1f-9b52-1f7a2c3d4e5f"},
 		{name: "surrounding space is trimmed", raw: " 7d1c0b6e-6a3e-4c1f-9b52-1f7a2c3d4e5f \n", want: "7d1c0b6e-6a3e-4c1f-9b52-1f7a2c3d4e5f"},
 		{name: "case is kept", raw: "7D1C0B6E", want: "7D1C0B6E"},
@@ -112,7 +103,7 @@ func TestNormalizeGreenboneID(t *testing.T) {
 }
 
 func TestNormalizeAgentID(t *testing.T) {
-	runTypeCases(t, identity.TypeAgentID, nil, []typeCase{
+	runTypeCases(t, identity.TypeAgentID, []typeCase{
 		{name: "spelling is kept", raw: " WIN-NJAG2ND7ATT::3fa2c1d9 ", want: "WIN-NJAG2ND7ATT::3fa2c1d9"},
 		{name: "any text", raw: "unknown", want: "unknown"},
 		{name: "too long", raw: strings.Repeat("a", 2049), err: identity.ErrInvalidIdentifierValue},
@@ -121,36 +112,30 @@ func TestNormalizeAgentID(t *testing.T) {
 }
 
 func TestNormalizeMachineID(t *testing.T) {
-	runTypeCases(t, identity.TypeMachineID, linuxKind, []typeCase{
+	runTypeCases(t, identity.TypeMachineID, []typeCase{
 		{name: "linux machine id", raw: "4c1b0c7e9f2d4a8b9c3e5f6a7b8c9d0e\n", want: "4c1b0c7e9f2d4a8b9c3e5f6a7b8c9d0e"},
 		{name: "upper case is lowered", raw: "00112233445566778899AABBCCDDEEFF", want: "00112233445566778899aabbccddeeff"},
+		{name: "windows machine guid", raw: "{4C1B0C7E-9F2D-4A8B-9C3E-5F6A7B8C9D0E}", want: "4c1b0c7e9f2d4a8b9c3e5f6a7b8c9d0e"},
+		{name: "windows machine guid without braces", raw: "4c1b0c7e-9f2d-4a8b-9c3e-5f6a7b8c9d0e", want: "4c1b0c7e9f2d4a8b9c3e5f6a7b8c9d0e"},
 		{name: "not yet written", raw: "uninitialized", placeholder: true},
 		{name: "not yet written in upper case", raw: "UNINITIALIZED\n", placeholder: true},
 		{name: "all zero", raw: strings.Repeat("0", 32), placeholder: true},
-		{name: "dashes are no linux machine id", raw: "4c1b0c7e-9f2d-4a8b-9c3e-5f6a7b8c9d0e", err: identity.ErrInvalidIdentifierValue},
+		{name: "all zero guid", raw: "00000000-0000-0000-0000-000000000000", placeholder: true},
+		{name: "braced all zero guid", raw: "{00000000-0000-0000-0000-000000000000}", placeholder: true},
+		{name: "not yet written in mixed case", raw: "Uninitialized", placeholder: true},
 		{name: "too short", raw: "4c1b0c7e", err: identity.ErrInvalidIdentifierValue},
+		{name: "33 hex digits", raw: strings.Repeat("a", 33), err: identity.ErrInvalidIdentifierValue},
+		{name: "36 hex digits without dashes", raw: strings.Repeat("a", 36), err: identity.ErrInvalidIdentifierValue},
+		{name: "braces around hex digits", raw: "{4c1b0c7e9f2d4a8b9c3e5f6a7b8c9d0e}", err: identity.ErrInvalidIdentifierValue},
 		{name: "not hex", raw: "4c1b0c7e9f2d4a8b9c3e5f6a7b8c9d0g", err: identity.ErrInvalidIdentifierValue},
+		{name: "dashes in the wrong places", raw: "4c1b0c7e9f-2d-4a8b-9c3e-5f6a7b8c9d0e", err: identity.ErrInvalidIdentifierValue},
 		{name: "malformed", raw: "malformed", err: identity.ErrInvalidIdentifierValue},
 		{name: "empty", raw: "", err: identity.ErrInvalidIdentifierValue},
 	})
-	runTypeCases(t, identity.TypeMachineID, windowsKind, []typeCase{
-		{name: "windows machine guid", raw: "{4C1B0C7E-9F2D-4A8B-9C3E-5F6A7B8C9D0E}", want: "4c1b0c7e-9f2d-4a8b-9c3e-5f6a7b8c9d0e"},
-		{name: "without braces", raw: "4c1b0c7e-9f2d-4a8b-9c3e-5f6a7b8c9d0e", want: "4c1b0c7e-9f2d-4a8b-9c3e-5f6a7b8c9d0e"},
-		{name: "all zero", raw: "00000000-0000-0000-0000-000000000000", placeholder: true},
-		{name: "malformed", raw: "malformed", err: identity.ErrInvalidIdentifierValue},
-	})
-	for _, scope := range []identity.Scope{nil, {}, {"kind": "unknown"}} {
-		for _, raw := range []string{"", "00112233445566778899aabbccddeeff"} {
-			_, err := identity.NormalizeIdentifier(identity.IdentifierValue{Type: identity.TypeMachineID, Value: raw, Scope: scope})
-			if !errors.Is(err, identity.ErrUnsupportedIdentifierFormat) {
-				t.Fatalf("kind %v, value %q: %v", scope, raw, err)
-			}
-		}
-	}
 }
 
 func TestNormalizeBIOSUUID(t *testing.T) {
-	runTypeCases(t, identity.TypeBIOSUUID, nil, []typeCase{
+	runTypeCases(t, identity.TypeBIOSUUID, []typeCase{
 		{name: "lower cased", raw: "4C4C4544-0042-3510-8054-B7C04F443232", want: "4c4c4544-0042-3510-8054-b7c04f443232"},
 		{name: "braces are removed", raw: "{4c4c4544-0042-3510-8054-b7c04f443232}", want: "4c4c4544-0042-3510-8054-b7c04f443232"},
 		{name: "without dashes", raw: "4c4c4544004235108054b7c04f443232", want: "4c4c4544-0042-3510-8054-b7c04f443232"},
@@ -171,7 +156,7 @@ func TestNormalizeBIOSUUID(t *testing.T) {
 }
 
 func TestNormalizeIP(t *testing.T) {
-	runTypeCases(t, identity.TypeIP, nil, []typeCase{
+	runTypeCases(t, identity.TypeIP, []typeCase{
 		{name: "ipv4", raw: "10.0.0.5", want: "10.0.0.5"},
 		{name: "ipv4 documentation", raw: "192.0.2.1", want: "192.0.2.1"},
 		{name: "ipv4 just below multicast", raw: "223.255.255.255", want: "223.255.255.255"},
@@ -212,7 +197,7 @@ func TestNormalizeIP(t *testing.T) {
 }
 
 func TestNormalizeMAC(t *testing.T) {
-	runTypeCases(t, identity.TypeMAC, nil, []typeCase{
+	runTypeCases(t, identity.TypeMAC, []typeCase{
 		{name: "colons", raw: "3A:CD:30:CB:82:B5", want: "3a:cd:30:cb:82:b5"},
 		{name: "dashes", raw: "3a-cd-30-cb-82-b5", want: "3a:cd:30:cb:82:b5"},
 		{name: "dots", raw: "3acd.30cb.82b5", want: "3a:cd:30:cb:82:b5"},
@@ -235,7 +220,7 @@ func TestNormalizeMAC(t *testing.T) {
 
 func TestNormalizeFQDN(t *testing.T) {
 	label63 := strings.Repeat("a", 63)
-	runTypeCases(t, identity.TypeFQDN, nil, []typeCase{
+	runTypeCases(t, identity.TypeFQDN, []typeCase{
 		{name: "root dot and case", raw: "Web-01.Corp.Example.", want: "web-01.corp.example"},
 		{name: "plain", raw: "Web.Example.ORG", want: "web.example.org"},
 		{name: "underscore", raw: "_ldap.corp.example", want: "_ldap.corp.example"},
@@ -267,7 +252,7 @@ func TestNormalizeFQDN(t *testing.T) {
 }
 
 func TestNormalizeHostname(t *testing.T) {
-	runTypeCases(t, identity.TypeHostname, nil, []typeCase{
+	runTypeCases(t, identity.TypeHostname, []typeCase{
 		{name: "qualified name is kept", raw: "WIN-NJAG2ND7ATT.corp.example", want: "win-njag2nd7att.corp.example"},
 		{name: "final dot of a qualified name is removed", raw: "Web.Example.ORG.", want: "web.example.org"},
 		{name: "single label", raw: " web-01 ", want: "web-01"},
@@ -301,7 +286,7 @@ func TestNormalizeHostname(t *testing.T) {
 
 func TestNormalizeSSHHostKey(t *testing.T) {
 	const ed25519 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
-	runTypeCases(t, identity.TypeSSHHostKey, nil, []typeCase{
+	runTypeCases(t, identity.TypeSSHHostKey, []typeCase{
 		{name: "without comment", raw: ed25519, want: ed25519},
 		{name: "comment is dropped", raw: ed25519 + " root@web-01", want: ed25519},
 		{name: "extra spaces collapse", raw: "  ssh-ed25519   AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl  ", want: ed25519},
@@ -328,7 +313,7 @@ func TestNormalizeSSHHostKey(t *testing.T) {
 }
 
 func TestNormalizeTLSPublicKeyHash(t *testing.T) {
-	runTypeCases(t, identity.TypeTLSPublicKeyHash, nil, []typeCase{
+	runTypeCases(t, identity.TypeTLSPublicKeyHash, []typeCase{
 		{name: "hash is lower cased", raw: "spki-sha256:" + strings.Repeat("AB", 32), want: "spki-sha256:" + strings.Repeat("ab", 32)},
 		{name: "zero hash is a hash", raw: "spki-sha256:" + strings.Repeat("0", 64), want: "spki-sha256:" + strings.Repeat("0", 64)},
 		{name: "surrounding space is trimmed", raw: "spki-sha256:" + strings.Repeat("a", 64) + "\n", want: "spki-sha256:" + strings.Repeat("a", 64)},
@@ -349,7 +334,7 @@ func TestEveryTypeHasANormalizer(t *testing.T) {
 		identity.TypeFQDN, identity.TypeMAC, identity.TypeHostname,
 	}
 	for _, typ := range types {
-		_, err := identity.NormalizeIdentifier(identity.IdentifierValue{Type: typ, Value: "x", Scope: linuxKind})
+		_, err := identity.NormalizeIdentifier(identity.IdentifierValue{Type: typ, Value: "x"})
 		if errors.Is(err, identity.ErrUnknownIdentifierType) {
 			t.Fatalf("%s has no normalizer", typ)
 		}

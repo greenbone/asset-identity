@@ -101,23 +101,13 @@ func TestFuzzyKernelNormalizationAndConfiguration(t *testing.T) {
 			}
 		})
 	}
-	// Equal payloads with absent, empty, or different scopes are distinct tokens.
-	for _, scope := range []Scope{{}, {"realm": "other"}} {
-		candidate := ip.Clone()
-		candidate.Scope = scope
-		got, err := matchFuzzyKernel(Observation{Identifiers: []IdentifierValue{ip}}, []Candidate{fuzzyRow("K1", 10, candidate)}, GreenboneMatchPolicy())
-		if err != nil || got.SelectedIndex != nil {
-			t.Fatalf("scopes collapsed: %+v, %v", got, err)
-		}
-	}
 }
 
 func TestFuzzyKernelImmutableAndConcurrent(t *testing.T) {
-	ip := IdentifierValue{Type: TypeIP, Value: "2001:0DB8::1", Scope: Scope{"network": "n"}}
+	ip := IdentifierValue{Type: TypeIP, Value: "2001:0DB8::1"}
 	obs := Observation{Identifiers: []IdentifierValue{ip}}
 	rows := []Candidate{fuzzyRow("survivor", 20, ip), fuzzyRow("potential", 10, ip)}
 	p := GreenboneMatchPolicy()
-	original := ip.Clone()
 	originalTime := *rows[0].LastSeen
 	originalPolicy := p.Clone()
 	var wg sync.WaitGroup
@@ -134,7 +124,7 @@ func TestFuzzyKernelImmutableAndConcurrent(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	if !reflect.DeepEqual(ip, original) || *rows[0].LastSeen != originalTime || !reflect.DeepEqual(p, originalPolicy) {
+	if obs.Identifiers[0] != ip || rows[0].Identifiers[0] != ip || *rows[0].LastSeen != originalTime || !reflect.DeepEqual(p, originalPolicy) {
 		t.Fatal("input mutated")
 	}
 	got, err := matchFuzzyKernel(obs, rows, p)

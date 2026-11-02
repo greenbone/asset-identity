@@ -27,7 +27,7 @@ eligible existing keys to move under the destination key. The application perfor
 | ----------- | ------------------------------------------------------------------------------- |
 | Observation | The eligible active identifiers describing the newly observed asset             |
 | Candidate   | An existing asset key, its eligible active identifiers, and optional `LastSeen` |
-| Identifier  | A type, a value, and an optional scope                                          |
+| Identifier  | A type and a value                                                              |
 | Policy      | Ordered strong identifier types and configured fuzzy types/weights              |
 
 One observation or candidate can contain several identifier types and several values of each type. For example, a host
@@ -39,22 +39,11 @@ query a database, or build candidates from past observations. You can collect ca
 MAC. Supply one candidate per existing key, with its complete eligible active identifiers, rather than only the
 identifier that matched the query. Otherwise weak-evidence and strong-ID safeguards would operate on incomplete data.
 
-### Scope is part of the identifier
-
-A normalized identifier is compared using all three components:
+### Identifiers compare by type and canonical value
 
 ```text
-identifier = (type, canonical value, complete scope)
+identifier = (type, canonical value)
 ```
-
-| Left identifier             | Right identifier           | Equal? |
-| --------------------------- | -------------------------- | ------ |
-| IP 192.0.2.10, network=A    | IP 192.0.2.10, network=A   | Yes    |
-| IP 192.0.2.10, network=A    | IP 192.0.2.10, network=B   | No     |
-| IP 192.0.2.10, absent scope | IP 192.0.2.10, empty scope | No     |
-
-Scope names and values are exact; map order does not matter. Absent scope is not a wildcard. Scanner/network eligibility
-remains application-owned even when identifiers carry scope.
 
 ## 3. Default identifier roles
 
@@ -107,9 +96,8 @@ Normalization makes equivalent representations comparable without changing calle
 Every type has its own normalizer and surrounding whitespace is trimmed. Greenbone, agent, and cloud IDs keep their
 case. Placeholders such as `127.0.0.1`, `00:00:00:00:00:00`, a zero BIOS UUID, or
 `localhost` identify no single machine: normalization reports them as invalid, and matching leaves them out instead of
-failing. Machine IDs require
-`Scope["kind"]` to select Linux machine-ID or Windows MachineGuid parsing. Scopes are copied and preserved, rather than
-inferred from payloads.
+failing. A machine ID is accepted as the 32 hex digits of a Linux machine-id or as the UUID of a Windows MachineGuid,
+with or without braces; both forms canonicalize to the same 32 hex digits.
 
 ### Raw SSH and TLS values
 
@@ -121,8 +109,8 @@ SHA-256 internally. Existing `spki-sha256:` values are also accepted. Callers do
 
 This means:
 
-- A renewed certificate with the same public key has the same TLS identifier, assuming the same SPKI encoding and scope.
-- The same public key presented on two ports contributes one distinct TLS identifier when scopes are equal.
+- A renewed certificate with the same public key has the same TLS identifier, assuming the same SPKI encoding.
+- The same public key presented on two ports contributes one distinct TLS identifier.
 - A certificate with a different public key contributes a different TLS identifier.
 - Issuer CN, serial number, validity dates, and whole-certificate fingerprints cannot replace the public-key input.
 
@@ -201,8 +189,7 @@ separate merge rules decide whether other records can join it.
 
 ### TLS compares the complete public-key set
 
-When TLS is the deciding type, all distinct normalized TLS keys and their scopes must be equal. Order and duplicates do
-not matter:
+When TLS is the deciding type, all distinct normalized TLS keys must be equal. Order and duplicates do not matter:
 
 | Incoming keys | Candidate keys | TLS match? |
 | ------------- | -------------- | ---------- |
@@ -212,14 +199,14 @@ not matter:
 | A, B          | A, B, C        | No         |
 | A, B          | A, C           | No         |
 
-These are public-key identities, not certificate rows. The same key and scope count once. When TLS is the highest
+These are public-key identities, not certificate rows. The same key counts once. When TLS is the highest
 shared strong type, unequal sets block the record. A higher-priority match, such as Agent ID, still wins even when
 TLS keys differ.
 
 ## 7. Choose a key when no strong IDs were supplied
 
 Compare only the configured fuzzy identifiers: MAC, hostname, IP, and FQDN by default. Normalize them and ignore duplicate
-values. Type and complete scope remain part of each identifier.
+values. The type remains part of each identifier.
 
 **Reuse requires a candidate to contain every incoming fuzzy identifier.**
 Additional candidate identifiers are allowed. An observation with no fuzzy identifiers returns `CREATE`.

@@ -12,7 +12,7 @@
 Ensure (default_policy_is_copied_from_go)
 {
   gvm_asset_identity_policy_t *policy = default_policy ();
-  assert_that (gvm_asset_identity_abi_version (), is_equal_to (1));
+  assert_that (gvm_asset_identity_abi_version (), is_equal_to (2));
   assert_that (policy->strong_order->len, is_equal_to (7));
   assert_that (g_array_index (policy->strong_order,
                               gvm_asset_identity_identifier_type_t, 0),
@@ -194,25 +194,6 @@ Ensure (null_pointers_and_container_contents_are_rejected)
   gvm_asset_identity_policy_free (policy);
 }
 
-Ensure (invalid_scope_contents_are_rejected)
-{
-  gvm_asset_identity_observation_t *input =
-    observation (GVM_ASSET_IDENTITY_AGENT_ID, "a");
-  GPtrArray *rows = candidates_new ();
-  gvm_asset_identity_policy_t *policy = default_policy ();
-  gvm_asset_identity_identifier_t *id =
-    g_ptr_array_index (input->identifiers, 0);
-  id->scope = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
-  g_hash_table_insert (id->scope, g_strdup (""), g_strdup ("realm"));
-  expect_failure (input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT);
-  g_hash_table_remove_all (id->scope);
-  g_hash_table_insert (id->scope, g_strdup ("issuer"), NULL);
-  expect_failure (input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT);
-  gvm_asset_identity_observation_free (input);
-  g_ptr_array_unref (rows);
-  gvm_asset_identity_policy_free (policy);
-}
-
 Ensure (aggregate_input_budget_is_checked_during_c_conversion)
 {
   gvm_asset_identity_policy_t *policy = default_policy ();
@@ -268,6 +249,5 @@ main (void)
   add_test (suite, candidate_keys_and_timestamps_are_validated);
   add_test (suite, timestamp_endpoints_and_glib_booleans_are_supported);
   add_test (suite, null_pointers_and_container_contents_are_rejected);
-  add_test (suite, invalid_scope_contents_are_rejected);
   return run_test_suite (suite, create_text_reporter ());
 }

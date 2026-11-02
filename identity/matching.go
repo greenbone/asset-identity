@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// MatchingIdentifiers returns distinct canonical matches in incoming order with owned scopes.
+// MatchingIdentifiers returns distinct canonical matches in incoming order.
 // Both views are validated; equality does not establish matching eligibility.
 func MatchingIdentifiers(incoming, candidate []IdentifierValue) ([]IdentifierValue, error) {
 	incomingValues, err := canonicalMatchingView(incoming)
@@ -28,7 +28,7 @@ func MatchingIdentifiers(incoming, candidate []IdentifierValue) ([]IdentifierVal
 	var matches []IdentifierValue
 	for _, incomingValue := range incomingValues {
 		if fuzzySetContains(candidateValues, incomingValue) && !fuzzySetContains(matches, incomingValue) {
-			matches = append(matches, incomingValue.Clone())
+			matches = append(matches, incomingValue)
 		}
 	}
 	return matches, nil
@@ -50,7 +50,7 @@ func canonicalMatchingView(input []IdentifierValue) ([]IdentifierValue, error) {
 				certificates = make(map[int]*x509.Certificate)
 			}
 			certificates[len(out)] = certificate
-			out = append(out, v.Clone())
+			out = append(out, v)
 			continue
 		}
 		canonical, err := NormalizeIdentifier(v)

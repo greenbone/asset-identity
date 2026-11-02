@@ -25,22 +25,16 @@ func TestNormalizationStructuralErrors(t *testing.T) {
 		category error
 	}{
 		{"unknown", identity.IdentifierValue{Type: "future_type"}, identity.ErrUnknownIdentifierType},
-		{"scope", identity.IdentifierValue{Type: identity.TypeIP, Value: "192.0.2.1", Scope: identity.Scope{"": "bad"}}, identity.ErrInvalidScope},
-		{"kind missing", identity.IdentifierValue{Type: identity.TypeMachineID, Value: strings.Repeat("1", 32)}, identity.ErrUnsupportedIdentifierFormat},
-		{"kind unknown", identity.IdentifierValue{Type: identity.TypeMachineID, Scope: identity.Scope{"kind": "unknown"}}, identity.ErrUnsupportedIdentifierFormat},
+		{"single label fqdn", identity.IdentifierValue{Type: identity.TypeFQDN, Value: "web"}, identity.ErrUnsupportedIdentifierFormat},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			before := tt.v.Clone()
 			if err := identity.ValidateIdentifier(tt.v); !errors.Is(err, tt.category) {
 				t.Fatalf("validation: %v, want %v", err, tt.category)
 			}
 			got, err := identity.NormalizeIdentifier(tt.v)
 			if !errors.Is(err, tt.category) || !reflect.DeepEqual(got, identity.IdentifierValue{}) {
 				t.Fatalf("normalize: %+v %v", got, err)
-			}
-			if !reflect.DeepEqual(before, tt.v) {
-				t.Fatal("invalid input mutated")
 			}
 		})
 	}
@@ -51,51 +45,27 @@ func TestSemanticEquality(t *testing.T) {
 		return identity.IdentifierValue{Type: typ, Value: s}
 	}
 	a := value(identity.TypeHostname, "Web.Example.")
-	nilScope := value(identity.TypeHostname, "web.example")
-	empty := nilScope
-	empty.Scope = identity.Scope{}
-	scoped := a
-	scoped.Scope = identity.Scope{"namespace": "A", "optional": ""}
-	reordered := nilScope
-	reordered.Scope = identity.Scope{"optional": "", "namespace": "A"}
-	changed := reordered.Clone()
-	changed.Scope["namespace"] = "a"
-	withEmpty := a.Clone()
-	withEmpty.Scope = identity.Scope{"optional": ""}
-	withoutDimension := a.Clone()
-	withoutDimension.Scope = identity.Scope{}
-	extra := reordered.Clone()
-	extra.Scope["extra"] = "dimension"
+	canonical := value(identity.TypeHostname, "web.example")
 	tests := []struct {
 		name string
 		a, b identity.IdentifierValue
 		want bool
 	}{
-		{"hostname canonical", a, nilScope, true}, {"different type", a, value(identity.TypeFQDN, "web.example"), false},
-		{"short versus qualified hostname", value(identity.TypeHostname, "web"), nilScope, false},
+		{"hostname canonical", a, canonical, true}, {"different type", a, value(identity.TypeFQDN, "web.example"), false},
+		{"short versus qualified hostname", value(identity.TypeHostname, "web"), canonical, false},
 		{"absolute versus relative", value(identity.TypeHostname, "web."), value(identity.TypeHostname, "web"), false},
 		{"opaque case", value(identity.TypeAgentID, "Id"), value(identity.TypeAgentID, "id"), false},
 		{"opaque surrounding whitespace", value(identity.TypeGreenboneID, " Id "), value(identity.TypeGreenboneID, "Id"), true},
 		{"opaque inner whitespace", value(identity.TypeGreenboneID, "I d"), value(identity.TypeGreenboneID, "Id"), false},
 		{"cloud case", value(identity.TypeCloudIdentifier, "Provider/Resource-A"), value(identity.TypeCloudIdentifier, "provider/resource-a"), false},
-		{"scope presence", nilScope, empty, false}, {"scope insertion order", scoped, reordered, true}, {"scope case", scoped, changed, false},
-		{"empty versus absent dimension", withEmpty, withoutDimension, false},
-		{"extra dimension", scoped, extra, false},
 		{"TLS digest distinction", value(identity.TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("a", 64)), value(identity.TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("b", 64)), false},
 		{"mapped family", value(identity.TypeIP, "192.0.2.1"), value(identity.TypeIP, "::ffff:192.0.2.1"), true},
 		{"zone absent", value(identity.TypeIP, "2001:db8::1"), value(identity.TypeIP, "2001:db8::1%eth0"), true},
 		{"zone case", value(identity.TypeIP, "2001:db8::1%eth0"), value(identity.TypeIP, "2001:db8::1%Eth0"), true},
 		{"other address", value(identity.TypeIP, "192.0.2.1"), value(identity.TypeIP, "192.0.2.2"), false},
+		{"machine id as linux hex and as windows guid", value(identity.TypeMachineID, "00112233445566778899aabbccddeeff"), value(identity.TypeMachineID, "{00112233-4455-6677-8899-AABBCCDDEEFF}"), true},
+		{"other machine id", value(identity.TypeMachineID, "00112233445566778899aabbccddeeff"), value(identity.TypeMachineID, "10112233445566778899aabbccddeeff"), false},
 	}
-	linux := value(identity.TypeMachineID, "00112233445566778899aabbccddeeff")
-	linux.Scope = identity.Scope{"kind": "linux_machine_id"}
-	windows := value(identity.TypeMachineID, linux.Value)
-	windows.Scope = identity.Scope{"kind": "windows_machine_guid"}
-	tests = append(tests, struct {
-		name string
-		a, b identity.IdentifierValue
-		want bool
-	}{"machine lineage", linux, windows, false})
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, pair := range [][2]identity.IdentifierValue{{tt.a, tt.b}, {tt.b, tt.a}} {
@@ -135,25 +105,6 @@ func TestEqualityErrorPrecedence(t *testing.T) {
 		same, err := identity.EqualIdentifiers(tt.a, tt.b)
 		if same || !errors.Is(err, tt.category) || !strings.Contains(err.Error(), tt.operand) {
 			t.Fatalf("%v %v", same, err)
-		}
-	}
-}
-
-func TestNormalizedScopeOwnership(t *testing.T) {
-	for _, scope := range []identity.Scope{nil, {}, {"Namespace": " Mixed ", "empty": "", "extra": "x"}} {
-		v := identity.IdentifierValue{Type: identity.TypeHostname, Value: "WEB", Scope: scope}
-		before := v.Clone()
-		for range 3 {
-			got, err := identity.NormalizeIdentifier(v)
-			if err != nil || !reflect.DeepEqual(got.Scope, scope) {
-				t.Fatalf("scope changed: %+v %v", got, err)
-			}
-			if got.Scope != nil {
-				got.Scope["new"] = "changed"
-			}
-			if !reflect.DeepEqual(v, before) {
-				t.Fatal("scope alias")
-			}
 		}
 	}
 }
@@ -251,7 +202,7 @@ func TestNormalizationDoesNotChangeModelBehavior(t *testing.T) {
 }
 
 func TestConcurrentNormalization(t *testing.T) {
-	v := identity.IdentifierValue{Type: identity.TypeHostname, Value: "WEB.EXAMPLE.", Scope: identity.Scope{"namespace": "A"}}
+	v := identity.IdentifierValue{Type: identity.TypeHostname, Value: "WEB.EXAMPLE."}
 	var wg sync.WaitGroup
 	for range 8 {
 		wg.Go(func() {
@@ -263,12 +214,8 @@ func TestConcurrentNormalization(t *testing.T) {
 				if same, err := identity.EqualIdentifiers(v, got); err != nil || !same {
 					t.Error("nondeterministic equality")
 				}
-				got.Scope["namespace"] = "independent"
 			}
 		})
 	}
 	wg.Wait()
-	if v.Scope["namespace"] != "A" {
-		t.Fatal("concurrent copies mutate caller")
-	}
 }

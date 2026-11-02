@@ -42,10 +42,6 @@ Ensure (repeated_multiple_strong_values_keep_inputs_owned)
   g_ptr_array_add (
     input->identifiers,
     gvm_asset_identity_identifier_new (GVM_ASSET_IDENTITY_GREENBONE_ID, "g2"));
-  gvm_asset_identity_identifier_t *id =
-    g_ptr_array_index (input->identifiers, 0);
-  id->scope = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
-  g_hash_table_insert (id->scope, g_strdup ("issuer"), g_strdup ("realm"));
   GPtrArray *rows = candidates_new ();
   gboolean valid = TRUE;
   for (guint i = 0; i < 1000; i++)
@@ -60,8 +56,10 @@ Ensure (repeated_multiple_strong_values_keep_inputs_owned)
       g_clear_error (&error);
     }
   assert_that (valid, is_true);
-  assert_that (g_hash_table_lookup (id->scope, "issuer"),
-               is_equal_to_string ("realm"));
+  assert_that (((gvm_asset_identity_identifier_t *) g_ptr_array_index (
+                  input->identifiers, 1))
+                 ->value,
+               is_equal_to_string ("g2"));
   gvm_asset_identity_observation_free (input);
   g_ptr_array_unref (rows);
   gvm_asset_identity_policy_free (policy);

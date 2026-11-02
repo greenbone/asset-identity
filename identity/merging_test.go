@@ -42,7 +42,6 @@ func TestMergePlan(t *testing.T) {
 		{"fuzzy reuse respects destination strong ID", []IdentifierValue{ip}, []Candidate{fuzzyRow("K1", 2, agent, ip), fuzzyRow("K2", 1, otherAgent, ip)}, ActionReuse, "K1", nil},
 		{"shared observation does not bridge distinct strong IDs", []IdentifierValue{agent, otherAgent}, []Candidate{fuzzyRow("K1", 2, agent), fuzzyRow("K2", 1, otherAgent)}, ActionReuse, "K1", nil},
 		{"different strong types do not establish identity", []IdentifierValue{agent, ip}, []Candidate{fuzzyRow("K1", 1, fuzzyValue(TypeGreenboneID, "g"), ip)}, ActionCreate, "", nil},
-		{"scope prevents weak containment", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K1", 1, IdentifierValue{Type: TypeIP, Value: ip.Value, Scope: Scope{"network": "other"}})}, ActionCreate, "", nil},
 		{"weak observation leaves conflicting strong sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, agent, ip, host), fuzzyRow("K2", 2, otherAgent, ip, mac)}, ActionCreate, "", nil},
 		{"weak observation can still absorb weak sources", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, agent, ip, host), fuzzyRow("K2", 2, otherAgent, ip, mac), fuzzyRow("K3", 3, ip)}, ActionCreate, "", []int{2}},
 		{"reversing conflicting candidates changes no merge outcome", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K2", 2, otherAgent, ip, mac), fuzzyRow("K1", 1, agent, ip, host)}, ActionCreate, "", nil},
@@ -74,7 +73,7 @@ func TestMergePlan(t *testing.T) {
 }
 
 // Compare the grouped optimization with the original pairwise rule, including
-// non-transitive overlaps, scopes, duplicate values, and different strong types.
+// non-transitive overlaps, duplicate values, and different strong types.
 func TestGroupedMergesMatchPairwiseRule(t *testing.T) {
 	policy := GreenboneMatchPolicy()
 	random := rand.New(rand.NewSource(42))
@@ -91,14 +90,7 @@ func TestGroupedMergesMatchPairwiseRule(t *testing.T) {
 				if typ == TypeTLSPublicKeyHash {
 					value = "spki-sha256:" + strings.Repeat([]string{"a", "b", "c"}[random.Intn(3)], 64)
 				}
-				var scope Scope
-				switch random.Intn(3) {
-				case 1:
-					scope = Scope{}
-				case 2:
-					scope = Scope{"realm": "r"}
-				}
-				views[i] = append(views[i], IdentifierValue{Type: typ, Value: value, Scope: scope})
+				views[i] = append(views[i], IdentifierValue{Type: typ, Value: value})
 			}
 		}
 		decision := Decision{}
@@ -147,11 +139,9 @@ func TestGroupedMergesMatchPairwiseRule(t *testing.T) {
 func TestStrongSetKeyPreservesRepresentation(t *testing.T) {
 	values := []IdentifierValue{
 		{Type: TypeAgentID, Value: "a"},
-		{Type: TypeAgentID, Value: "a", Scope: Scope{}},
 		{Type: TypeAgentID, Value: "\xff"},
 		{Type: TypeAgentID, Value: "\ufffd"},
-		{Type: TypeAgentID, Value: "a", Scope: Scope{"\xff": "x"}},
-		{Type: TypeAgentID, Value: "a", Scope: Scope{"\ufffd": "x"}},
+		{Type: TypeAgentID, Value: "x\ny"},
 	}
 	seen := make(map[string]bool)
 	for _, value := range values {

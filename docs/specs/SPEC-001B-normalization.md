@@ -8,11 +8,11 @@ See [SPEC-001A](SPEC-001A-identifier-model.md) for the model.
 | Function              | Result                                                                 |
 |-----------------------|------------------------------------------------------------------------|
 | `ValidateIdentifier`  | Validate structure, format, and payload without changing input         |
-| `NormalizeIdentifier` | Return a canonical value with a copied scope, or a zero value on error |
-| `EqualIdentifiers`    | Normalize both values and compare type, value, and complete scope      |
+| `NormalizeIdentifier` | Return the identifier with its canonical value, or zero on error       |
+| `EqualIdentifiers`    | Normalize both values and compare type and value                       |
 
-Normalization trims surrounding whitespace, preserves type and scope, and is deterministic and idempotent. Equality
-validates `a` before `b`, even when their types or scopes differ. Structural `Validate` methods and observation
+Normalization trims surrounding whitespace, preserves the type, and is deterministic and idempotent. Equality
+validates `a` before `b`, even when their types differ. Structural `Validate` methods and observation
 constructors do not normalize payloads. No lookups, namespace inference, or history processing occur.
 
 ## Supported formats
@@ -20,8 +20,8 @@ constructors do not normalize payloads. No lookups, namespace inference, or hist
 | Type                                     | Accepted input → canonical value                                                               |
 |------------------------------------------|------------------------------------------------------------------------------------------------|
 | Greenbone ID, Agent ID, cloud identifier | Nonempty opaque string, at most 2048 bytes → trimmed bytes, preserving case                    |
-| Linux machine ID                         | Exactly 32 hex digits → lowercase compact hex                                                  |
-| Windows machine GUID, BIOS UUID          | Compact, hyphenated, or braced hyphenated UUID → lowercase hyphenated UUID                     |
+| Machine ID                               | 32 hex digits or hyphenated or braced UUID → 32 lowercase hex digits                           |
+| BIOS UUID                                | Compact, hyphenated, or braced hyphenated UUID → lowercase hyphenated UUID                     |
 | SSH host key                             | `[port] <algorithm> <base64-blob> [comment]` → algorithm and canonical padded base64 blob      |
 | TLS public-key hash                      | `x509:<base64-DER>` or `spki-sha256:<64 hex digits>` → `spki-sha256:<lowercase digest>`        |
 | MAC                                      | 48-bit colon, hyphen, dotted, or compact hex → six lowercase colon-separated octets            |
@@ -33,7 +33,7 @@ constructors do not normalize payloads. No lookups, namespace inference, or hist
 
 `ValidateIdentifier` and `NormalizeIdentifier` reject these as `ErrInvalidIdentifierValue`:
 
-- Machine IDs: all zero; Linux also accepts `uninitialized` in any case as a placeholder.
+- Machine IDs: all zero, and `uninitialized` in any case.
 - BIOS UUIDs: all zero, all F, or `03000200-0400-0500-0006-000700080009`.
 - MACs: all zero or broadcast.
 - IPs: unspecified, loopback, link-local, multicast, or broadcast.
@@ -43,10 +43,10 @@ constructors do not normalize payloads. No lookups, namespace inference, or hist
 
 ### Machine IDs and UUIDs
 
-Machine IDs require `Scope["kind"]` to be exactly `linux_machine_id` or `windows_machine_guid`. The library does not
-infer the OS; the kind remains part of equality. UUIDs accept 32 hex digits, `8-4-4-4-12` hex, or that hyphenated form
-in braces. Inner whitespace, URNs, and raw firmware bytes are unsupported; no byte swapping or version/variant filtering
-occurs.
+A machine ID is 128 bits written either as the 32 hex digits of a Linux machine-id or as the UUID of a Windows
+MachineGuid; both forms canonicalize to the same 32 hex digits, so the library needs no hint which operating system
+wrote it. UUIDs accept 32 hex digits, `8-4-4-4-12` hex, or that hyphenated form in braces. Inner whitespace, URNs, and
+raw firmware bytes are unsupported; no byte swapping or version/variant filtering occurs.
 
 ### SSH keys
 
@@ -85,8 +85,8 @@ escapes. No IDNA conversion or alias expansion occurs. Qualified names cannot ha
 
 ## Errors and verification
 
-Validation checks structure, then machine-ID kind, then payload syntax. Errors support `errors.Is`:
-`ErrUnknownIdentifierType`, `ErrInvalidScope`, `ErrInvalidIdentifierValue`, and `ErrUnsupportedIdentifierFormat`. Empty
+Validation checks structure, then payload syntax. Errors support `errors.Is`:
+`ErrUnknownIdentifierType`, `ErrInvalidIdentifierValue`, and `ErrUnsupportedIdentifierFormat`. Empty
 payloads and placeholders are invalid.
 
 The `normalization*_test.go` tests in [`identity`](../../identity) cover formats, placeholders, malformed input,

@@ -15,7 +15,7 @@ extern "C"
 {
 #endif
 
-#define GAI_WIRE_ABI_VERSION 1u
+#define GAI_WIRE_ABI_VERSION 2u
 #define GAI_WIRE_MAX_ITEMS 1048576u
 #define GAI_WIRE_MAX_STRING 16777216u
 #define GAI_WIRE_MAX_INPUT_BYTES 67108864u
@@ -53,22 +53,8 @@ extern "C"
 
   typedef struct
   {
-    gai_wire_string_t name;
-    gai_wire_string_t value;
-  } gai_wire_scope_dimension_t;
-
-  typedef struct
-  {
-    uint32_t present; /* 0: absent; 1 with count 0: explicitly empty. */
-    const gai_wire_scope_dimension_t *dimensions;
-    size_t count;
-  } gai_wire_scope_t;
-
-  typedef struct
-  {
     gai_wire_identifier_type_t type;
     gai_wire_string_t value;
-    gai_wire_scope_t scope;
   } gai_wire_identifier_t;
 
   typedef struct

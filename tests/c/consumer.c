@@ -26,7 +26,7 @@ main (void)
                                                 &decision, &error);
   int failed =
     !success || !decision || decision->action != GVM_ASSET_IDENTITY_CREATE
-    || !decision->needs_new_key || gvm_asset_identity_abi_version () != 1;
+    || !decision->needs_new_key || gvm_asset_identity_abi_version () != 2;
   gvm_asset_identity_decision_free (decision);
   g_clear_error (&error);
   gvm_asset_identity_observation_free (observation);

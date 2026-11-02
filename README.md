@@ -38,8 +38,7 @@ func main() {
 }
 ```
 
-Pass caller-prepared active views; normalization does not establish producer trust. Identifier scopes remain
-significant, including absent versus explicitly empty scope.
+Pass caller-prepared active views; normalization does not establish producer trust.
 
 | Action | Meaning                        |
 |--------|--------------------------------|
@@ -57,7 +56,7 @@ reuse a candidate containing every incoming weak identifier, or CREATE if none q
 
 TLS compares complete normalized public-key sets, ignoring order and duplicates: `{A,B}` matches `{B,A}`, but not
 `{A}` or `{A,B,C}`. A TLS conflict cannot be bypassed by a lower-priority type; a higher-priority match still wins.
-Other strong types match any equal scoped value.
+Other strong types match any equal value.
 
 `MergeIndices` lists the supplied candidates to move to the destination key. Retrieve each candidate and its asset key
 from the original candidate array using the returned index. On CREATE, the application generates the destination key; on
@@ -203,7 +202,7 @@ key-set matching, weak evidence, and Go/C usage through examples.
 ## Technical reference
 
 - [SPEC-001](docs/specs/SPEC-001-identifiers.md): identifier requirements.
-- [SPEC-001A](docs/specs/SPEC-001A-identifier-model.md): model, scope, timestamps, ownership.
+- [SPEC-001A](docs/specs/SPEC-001A-identifier-model.md): model, timestamps, ownership.
 - [SPEC-001B](docs/specs/SPEC-001B-normalization.md): formats, normalization, equality.
 - [SPEC-002](docs/specs/SPEC-002-reconciliation.md): reconciliation and C compatibility.
 
