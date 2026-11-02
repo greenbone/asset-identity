@@ -27,35 +27,26 @@ var scannerCertificate string
 func TestTLSScannerCertificate(t *testing.T) {
 	raw := strings.TrimSpace(scannerCertificate)
 	const want = "spki-sha256:1667ab37ba6f84c9c7053970c7557507deccefdbb09c454d9d0ca0e4fe1c3319"
-	for _, scope := range []identity.Scope{nil, {}, {"realm": "r"}} {
-		input := identity.IdentifierValue{Type: identity.TypeTLSPublicKeyHash, Value: raw, Scope: scope}
-		before := input.Clone()
-		if err := identity.ValidateIdentifier(input); err != nil {
-			t.Fatal(err)
-		}
-		normalized, err := identity.NormalizeIdentifier(input)
-		if err != nil || normalized.Value != want || normalized.Type != input.Type || !reflect.DeepEqual(normalized.Scope, scope) {
-			t.Fatalf("certificate: %+v %v", normalized, err)
-		}
-		again, err := identity.NormalizeIdentifier(normalized)
-		if err != nil || !identity.SameRepresentation(normalized, again) {
-			t.Fatalf("not idempotent: %+v %v", again, err)
-		}
-		if equal, err := identity.EqualIdentifiers(input, normalized); err != nil || !equal {
-			t.Fatalf("certificate differs from its SPKI hash: %v %v", equal, err)
-		}
-		host := identity.IdentifierValue{Type: identity.TypeHostname, Value: "gat-29"}
-		for _, pair := range [][2]identity.IdentifierValue{{input, normalized}, {normalized, input}} {
-			decision, err := identity.Decide(identity.Observation{Identifiers: []identity.IdentifierValue{pair[0], host}}, []identity.Candidate{{AssetKey: "existing", Identifiers: []identity.IdentifierValue{pair[1], host}}}, identity.GreenboneMatchPolicy())
-			if err != nil || decision.Action != identity.ActionReuse || decision.Stage != identity.StageStrong || decision.SelectedKey != "existing" {
-				t.Fatalf("raw/canonical matching: %+v %v", decision, err)
-			}
-		}
-		if normalized.Scope != nil {
-			normalized.Scope["new"] = "changed"
-		}
-		if !reflect.DeepEqual(input, before) {
-			t.Fatal("normalization mutated input or shared scope storage")
+	input := identity.IdentifierValue{Type: identity.TypeTLSPublicKeyHash, Value: raw}
+	if err := identity.ValidateIdentifier(input); err != nil {
+		t.Fatal(err)
+	}
+	normalized, err := identity.NormalizeIdentifier(input)
+	if err != nil || normalized.Value != want || normalized.Type != input.Type {
+		t.Fatalf("certificate: %+v %v", normalized, err)
+	}
+	again, err := identity.NormalizeIdentifier(normalized)
+	if err != nil || !identity.SameRepresentation(normalized, again) {
+		t.Fatalf("not idempotent: %+v %v", again, err)
+	}
+	if equal, err := identity.EqualIdentifiers(input, normalized); err != nil || !equal {
+		t.Fatalf("certificate differs from its SPKI hash: %v %v", equal, err)
+	}
+	host := identity.IdentifierValue{Type: identity.TypeHostname, Value: "gat-29"}
+	for _, pair := range [][2]identity.IdentifierValue{{input, normalized}, {normalized, input}} {
+		decision, err := identity.Decide(identity.Observation{Identifiers: []identity.IdentifierValue{pair[0], host}}, []identity.Candidate{{AssetKey: "existing", Identifiers: []identity.IdentifierValue{pair[1], host}}}, identity.GreenboneMatchPolicy())
+		if err != nil || decision.Action != identity.ActionReuse || decision.Stage != identity.StageStrong || decision.SelectedKey != "existing" {
+			t.Fatalf("raw/canonical matching: %+v %v", decision, err)
 		}
 	}
 }

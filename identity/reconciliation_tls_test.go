@@ -21,8 +21,6 @@ func TestDecideTLSRequiresEqualKeySets(t *testing.T) {
 	rawA := fuzzyValue(TypeTLSPublicKeyHash, strings.TrimSpace(string(certificate)))
 	certificateHost := fuzzyValue(TypeHostname, "GAT-29")
 	upperB := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("B", 64))
-	scopedA := a.Clone()
-	scopedA.Scope = Scope{}
 	g := fuzzyValue(TypeGreenboneID, "G")
 	cloud := fuzzyValue(TypeCloudIdentifier, "cloud")
 	ip := fuzzyValue(TypeIP, "192.0.2.1")
@@ -45,8 +43,6 @@ func TestDecideTLSRequiresEqualKeySets(t *testing.T) {
 		{"raw and canonical duplicates", []IdentifierValue{rawA, certificateHost, a, b}, []Candidate{fuzzyRow("K", 10, upperB, a)}, "K"},
 		{"candidate raw certificate", []IdentifierValue{a, b}, []Candidate{fuzzyRow("K", 10, b, rawA, certificateHost)}, "K"},
 		{"candidate certificate without its host name is not eligible", []IdentifierValue{a, b}, []Candidate{fuzzyRow("K", 10, b, rawA)}, ""},
-		{"scope differs", []IdentifierValue{a, b}, []Candidate{fuzzyRow("K", 10, scopedA, b)}, ""},
-		{"additional scope", []IdentifierValue{a, b}, []Candidate{fuzzyRow("K", 10, a, b, scopedA)}, ""},
 		{"other types do not affect TLS equality", []IdentifierValue{a, b, ip}, []Candidate{fuzzyRow("K", 10, a, b, cloud)}, "K"},
 		{"higher priority remains decisive", []IdentifierValue{g, a, b}, []Candidate{fuzzyRow("K", 10, g, a)}, "K"},
 		{"lower priority still considered", []IdentifierValue{a, b, cloud}, []Candidate{fuzzyRow("K", 10, a, cloud)}, "K"},

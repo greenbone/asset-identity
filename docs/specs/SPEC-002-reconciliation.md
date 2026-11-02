@@ -19,8 +19,7 @@ history, or use the wall clock.
 `Stage` is `STRONG` or `FUZZY`. Either action can have `MergeIndices`: original candidate positions to move to the
 destination key. Preserve candidate ordering until applying the result. An empty merge list means no moves. Invalid
 input returns an error and a zero decision. Inputs are not changed or retained; returned data is independent. Concurrent
-calls may share immutable inputs. Complete scope, including nil versus empty, matters in every comparison. See [
-`reconciliation.go`](../../identity/reconciliation.go) for the Go types.
+calls may share immutable inputs. See [`reconciliation.go`](../../identity/reconciliation.go) for the Go types.
 
 ## Policy
 
@@ -45,8 +44,8 @@ ASCII names, case-insensitive, final dot ignored, no wildcards. Convert admitted
 rules.
 
 1. Compare the highest-priority strong type present in **both** views. Missing types are skipped. A conflict at this
-   shared type excludes the candidate; a lower match cannot override it. Non-TLS types match any equal value with equal
-   scope. TLS requires equal complete normalized key sets: `{A,B}` matches `{B,A}`, but not `{A}` or `{A,B,C}`.
+   shared type excludes the candidate; a lower match cannot override it. Non-TLS types match any equal value. TLS
+   requires equal complete normalized key sets: `{A,B}` matches `{B,A}`, but not `{A}` or `{A,B,C}`.
 2. Prefer the highest-priority shared match, then newest present `LastSeen`, then smallest asset key by byte order.
    Missing times rank last; compare UTC instants at nanosecond precision. Return `REUSE` even when the incoming view
    contains a stronger ID missing from the stored record. The application stores the new evidence on the reused asset.
@@ -58,7 +57,7 @@ Lower-priority differences do not veto a higher match. Duplicate values and TLS 
 
 ## Fuzzy matching
 
-Keep configured weak types and deduplicate by type, normalized value, and scope. Return `REUSE` only for a candidate
+Keep configured weak types and deduplicate by type and normalized value. Return `REUSE` only for a candidate
 containing **every incoming weak identifier**. Otherwise return `CREATE`. An empty weak observation or no candidates
 also returns `CREATE`. Partial overlap does not qualify.
 
@@ -105,7 +104,7 @@ categories.
 
 ## Examples
 
-`G` = Greenbone ID, `A` = Agent ID, `P` = IP, `H` = hostname, `M` = MAC. Scopes are equal. Candidate order determines
+`G` = Greenbone ID, `A` = Agent ID, `P` = IP, `H` = hostname, `M` = MAC. Candidate order determines
 the zero-based merge indices below.
 
 | Incoming observation | Existing candidates      | Decision      | Selected key | Merge indices |
@@ -131,8 +130,8 @@ The public header is [`gvm_asset_identity.h`](../../include/gvm_asset_identity.h
 - Constructors return owned objects; parents own their children. Matching free functions accept NULL.
 - `decide` borrows immutable inputs and returns an owned decision; on failure the decision is NULL. Output slots must
   not alias inputs or each other. Initialize `GError *` to NULL and free it with `g_clear_error`.
-- Use real GLib arrays, owned string-to-string scope tables, and NUL-terminated strings without embedded NUL bytes. A
-  NULL scope differs from an empty table. Pointers must reference live, aligned objects of the declared types.
+- Use real GLib arrays and NUL-terminated strings without embedded NUL bytes. Pointers must reference live, aligned
+  objects of the declared types.
 - Timestamps contain presence, signed Unix seconds, and nanoseconds (0–999999999), within UTC years 1–9999. Absent
   timestamps have zero seconds/nanoseconds. No Go pointer crosses the ABI.
 - Per call: at most 1,048,576 entries per collection, 16 MiB per string, and 64 MiB of private wire arrays/string bytes.
@@ -149,10 +148,10 @@ and sysroot.
 ## Verification
 
 Run `make test`, `make test-install`, `go test -race ./...`, `CGO_ENABLED=0 go test ./...`, and `go vet ./...`.
-The [counting matrix](../../identity/counting_matrix_test.go) covers strong/weak combinations, priorities, scopes,
+The [counting matrix](../../identity/counting_matrix_test.go) covers strong/weak combinations, priorities,
 candidate ordering, merge plans, and progressive counts. Other Go and C tests cover validation, formats, ownership, and
 concurrency.
 
 The 78 [C reference fixtures](../../identity/testdata/fuzzy_reference.json) check fuzzy selection, exact score bits, and
-merge indices for canonical values with equal scopes, distinct keys, and whole-second timestamps. This library rejects
+merge indices for canonical values, distinct keys, and whole-second timestamps. This library rejects
 empty or duplicate keys rather than skipping rows as the reference C code does.

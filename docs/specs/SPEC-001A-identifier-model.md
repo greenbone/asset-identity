@@ -7,7 +7,7 @@ in [SPEC-001B](SPEC-001B-normalization.md).
 
 | Type                    | Contents                                                      |
 |-------------------------|---------------------------------------------------------------|
-| `IdentifierValue`       | `Type`, raw string `Value`, and `Scope` (`map[string]string`) |
+| `IdentifierValue`       | `Type` and raw string `Value`                                 |
 | `IdentifierObservation` | An identifier and optional `ObservedAt` timestamp             |
 | `ObservationHistory`    | An ordered slice of identifier observations                   |
 
@@ -28,12 +28,9 @@ order does not define matching priority.
 | `TypeMAC`              | `mac`                             |
 | `TypeHostname`         | `hostname`                        |
 
-## Scope and equality
+## Equality
 
-Scope names and values are exact; names must be nonempty. Map order does not matter. A missing dimension differs from an
-empty value; `nil` scope differs from `Scope{}`. Neither is a wildcard.
-
-`SameRepresentation` compares type, raw value, and complete scope without validation.
+`SameRepresentation` compares type and raw value without validation.
 `EqualIdentifiers` compares normalized values. Neither comparison includes timestamps or history.
 
 ## Timestamps and history
@@ -46,13 +43,13 @@ monotonic-clock data. History keeps input order and duplicates; applications dec
 
 | Operation                         | Behavior                                                                                              |
 |-----------------------------------|-------------------------------------------------------------------------------------------------------|
-| `Validate` methods                | Check supported type, scope names, and any present timestamp; history returns the first indexed error |
-| `Clone` methods                   | Copy scopes, timestamp storage, and history; preserve nil/empty distinctions and timezone             |
+| `Validate` methods                | Check supported type and any present timestamp; history returns the first indexed error               |
+| `Clone` methods                   | Copy timestamp storage and history; preserve nil versus empty history and timezone                    |
 | `IdentifierObservation.Normalize` | Clone and normalize only the timestamp; do not validate or normalize the payload                      |
 | `NewObservation`                  | Copy, normalize the timestamp, and validate; return a zero observation on error                       |
 | `NewObservationHistory`           | Apply the constructor to each entry; return nil and the first indexed error on failure                |
 
 Direct struct construction does not validate. Structural validation does not check payload syntax. Errors support
-`errors.Is`: `ErrUnknownIdentifierType`, `ErrInvalidScope`, and `ErrInvalidObservationTime`. Operations do not mutate
+`errors.Is`: `ErrUnknownIdentifierType` and `ErrInvalidObservationTime`. Operations do not mutate
 inputs or return partial histories; callers must synchronize their own mutations.
 See [SPEC-002](SPEC-002-reconciliation.md#c-api) for C ownership.

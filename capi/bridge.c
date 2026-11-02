@@ -38,8 +38,6 @@ gvm_asset_identity_identifier_free (gvm_asset_identity_identifier_t *identifier)
   if (!identifier)
     return;
   g_free (identifier->value);
-  if (identifier->scope)
-    g_hash_table_unref (identifier->scope);
   g_free (identifier);
 }
 
@@ -188,10 +186,8 @@ wire_string (const gchar *text, gai_wire_string_t *value, gsize *remaining,
 }
 
 static void
-free_input_identifiers (const gai_wire_identifier_t *values, gsize count)
+free_input_identifiers (const gai_wire_identifier_t *values)
 {
-  for (gsize i = 0; values && i < count; i++)
-    g_free ((gpointer) values[i].scope.dimensions);
   g_free ((gpointer) values);
 }
 
@@ -221,30 +217,6 @@ wire_identifiers (const GPtrArray *identifiers,
       items[i].type = identifier->type;
       if (!wire_string (identifier->value, &items[i].value, remaining, error))
         return FALSE;
-      if (!identifier->scope)
-        continue;
-      gsize size = g_hash_table_size (identifier->scope);
-      if (size > GAI_WIRE_MAX_ITEMS)
-        return fail (error, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT,
-                     "scope exceeds item limit");
-      if (!take_input_bytes (size, sizeof (gai_wire_scope_dimension_t),
-                             remaining, GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT,
-                             error))
-        return FALSE;
-      gai_wire_scope_dimension_t *dimensions =
-        g_new0 (gai_wire_scope_dimension_t, size);
-      items[i].scope = (gai_wire_scope_t){1, dimensions, size};
-      GHashTableIter iter;
-      gpointer key, content;
-      g_hash_table_iter_init (&iter, identifier->scope);
-      gsize j = 0;
-      while (g_hash_table_iter_next (&iter, &key, &content))
-        {
-          if (!wire_string (key, &dimensions[j].name, remaining, error)
-              || !wire_string (content, &dimensions[j].value, remaining, error))
-            return FALSE;
-          j++;
-        }
     }
   return TRUE;
 }
@@ -385,10 +357,9 @@ gvm_asset_identity_decide (const gvm_asset_identity_observation_t *observation,
 cleanup:
   gai_wire_error_free (failure);
   gai_wire_decision_free (result);
-  free_input_identifiers (converted_observation.identifiers,
-                          converted_observation.identifier_count);
+  free_input_identifiers (converted_observation.identifiers);
   for (gsize i = 0; rows && i < candidates->len; i++)
-    free_input_identifiers (rows[i].identifiers, rows[i].identifier_count);
+    free_input_identifiers (rows[i].identifiers);
   g_free (rows);
   g_free ((gpointer) converted_policy.strong_order);
   g_free ((gpointer) converted_policy.fuzzy);

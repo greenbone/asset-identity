@@ -11,7 +11,7 @@
 
 G_BEGIN_DECLS
 
-#define GVM_ASSET_IDENTITY_ABI_VERSION 1u
+#define GVM_ASSET_IDENTITY_ABI_VERSION 2u
 #define GVM_ASSET_IDENTITY_ERROR (gvm_asset_identity_error_quark ())
 
 typedef enum
@@ -40,7 +40,6 @@ typedef struct
 {
   gvm_asset_identity_identifier_type_t type;
   gchar *value;
-  GHashTable *scope; /* Owned string-to-string map; NULL differs from empty. */
 } gvm_asset_identity_identifier_t;
 
 typedef struct

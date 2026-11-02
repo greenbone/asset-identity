@@ -42,10 +42,6 @@ Ensure (strong_reuse_enrichment_and_conflict)
     observation (GVM_ASSET_IDENTITY_AGENT_ID, "A");
   gvm_asset_identity_identifier_t *machine = gvm_asset_identity_identifier_new (
     GVM_ASSET_IDENTITY_MACHINE_ID, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-  machine->scope =
-    g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
-  g_hash_table_insert (machine->scope, g_strdup ("kind"),
-                       g_strdup ("linux_machine_id"));
   g_ptr_array_add (input->identifiers, machine);
   GPtrArray *rows = candidates_new ();
   g_ptr_array_add (rows, candidate ("agent-only", agent));
@@ -271,15 +267,11 @@ Ensure (fuzzy_time_uses_epoch_whole_seconds_and_input_order)
   gvm_asset_identity_policy_free (policy);
 }
 
-Ensure (scoped_semantic_equality_preserves_absent_and_empty)
+Ensure (semantic_equality_matches_canonical_forms)
 {
   gvm_asset_identity_policy_t *policy = default_policy ();
   gvm_asset_identity_observation_t *input = observation (
     GVM_ASSET_IDENTITY_BIOS_UUID, "00112233445566778899AABBCCDDEEFF");
-  gvm_asset_identity_identifier_t *id =
-    g_ptr_array_index (input->identifiers, 0);
-  id->scope = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
-  g_hash_table_insert (id->scope, g_strdup ("issuer"), g_strdup ("realm"));
   gvm_asset_identity_candidate_t *row = candidate ("K", input);
   gvm_asset_identity_identifier_t *other =
     g_ptr_array_index (row->identifiers, 0);
@@ -290,11 +282,25 @@ Ensure (scoped_semantic_equality_preserves_absent_and_empty)
   gvm_asset_identity_decision_t *result = decide (input, rows, policy);
   assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
   gvm_asset_identity_decision_free (result);
-  g_hash_table_unref (other->scope);
-  other->scope = NULL;
-  g_hash_table_remove_all (id->scope);
-  result = decide (input, rows, policy);
-  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
+  gvm_asset_identity_observation_free (input);
+  g_ptr_array_unref (rows);
+  gvm_asset_identity_policy_free (policy);
+}
+
+Ensure (machine_id_forms_match)
+{
+  gvm_asset_identity_policy_t *policy = default_policy ();
+  gvm_asset_identity_observation_t *input = observation (
+    GVM_ASSET_IDENTITY_MACHINE_ID, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+  gvm_asset_identity_candidate_t *row = candidate ("K", input);
+  gvm_asset_identity_identifier_t *other =
+    g_ptr_array_index (row->identifiers, 0);
+  g_free (other->value);
+  other->value = g_strdup ("{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}");
+  GPtrArray *rows = candidates_new ();
+  g_ptr_array_add (rows, row);
+  gvm_asset_identity_decision_t *result = decide (input, rows, policy);
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
   gvm_asset_identity_decision_free (result);
   gvm_asset_identity_observation_free (input);
   g_ptr_array_unref (rows);
@@ -514,7 +520,8 @@ main (void)
   add_test (suite, strong_no_match_and_multiple_values);
   add_test (suite, fuzzy_containment_returns_merge_plan);
   add_test (suite, fuzzy_time_uses_epoch_whole_seconds_and_input_order);
-  add_test (suite, scoped_semantic_equality_preserves_absent_and_empty);
+  add_test (suite, semantic_equality_matches_canonical_forms);
+  add_test (suite, machine_id_forms_match);
   add_test (suite, raw_ssh_scanner_value_matches_public_key);
   add_test (suite, raw_tls_scanner_value_matches_public_key_hash);
   add_test (suite, malformed_scanner_values_return_input_errors);

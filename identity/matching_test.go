@@ -127,20 +127,14 @@ func TestMatchingIdentifiers(t *testing.T) {
 	}{
 		{"bios canonical", identity.IdentifierValue{Type: identity.TypeBIOSUUID, Value: "{00112233-4455-6677-8899-AABBCCDDEEFF}"}, identity.IdentifierValue{Type: identity.TypeBIOSUUID, Value: "00112233445566778899aabbccddeeff"}, true},
 		{"opaque distinct case", identity.IdentifierValue{Type: identity.TypeAgentID, Value: "A"}, identity.IdentifierValue{Type: identity.TypeAgentID, Value: "a"}, false},
-		{"scope differs", identity.IdentifierValue{Type: identity.TypeGreenboneID, Value: "G", Scope: identity.Scope{"issuer": "a"}}, identity.IdentifierValue{Type: identity.TypeGreenboneID, Value: "G", Scope: identity.Scope{"issuer": "b"}}, false},
-		{"nil versus empty", identity.IdentifierValue{Type: identity.TypeAgentID, Value: "A"}, identity.IdentifierValue{Type: identity.TypeAgentID, Value: "A", Scope: identity.Scope{}}, false},
 		{"different types", identity.IdentifierValue{Type: identity.TypeGreenboneID, Value: "A"}, identity.IdentifierValue{Type: identity.TypeAgentID, Value: "A"}, false},
-		{"scope insertion order", identity.IdentifierValue{Type: identity.TypeGreenboneID, Value: "G", Scope: identity.Scope{"a": "1", "b": "2"}}, identity.IdentifierValue{Type: identity.TypeGreenboneID, Value: "G", Scope: identity.Scope{"b": "2", "a": "1"}}, true},
+		{"machine id as linux hex and as windows guid", identity.IdentifierValue{Type: identity.TypeMachineID, Value: "00112233445566778899AABBCCDDEEFF"}, identity.IdentifierValue{Type: identity.TypeMachineID, Value: "{00112233-4455-6677-8899-aabbccddeeff}"}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			left, right := tt.left.Clone(), tt.right.Clone()
 			matches, err := identity.MatchingIdentifiers([]identity.IdentifierValue{tt.left, tt.left}, []identity.IdentifierValue{tt.right, tt.right})
 			if err != nil || (len(matches) == 1) != tt.want || len(matches) > 1 {
 				t.Fatalf("matches = %+v, %v", matches, err)
-			}
-			if !reflect.DeepEqual(left, tt.left) || !reflect.DeepEqual(right, tt.right) {
-				t.Fatal("inputs changed")
 			}
 			if tt.want {
 				expected, err := identity.NormalizeIdentifier(tt.left)
@@ -149,12 +143,6 @@ func TestMatchingIdentifiers(t *testing.T) {
 				}
 				if !identity.SameRepresentation(matches[0], expected) {
 					t.Fatal("not canonical")
-				}
-				if matches[0].Scope != nil {
-					matches[0].Scope["new"] = "changed"
-					if !reflect.DeepEqual(left, tt.left) {
-						t.Fatal("output aliases scope")
-					}
 				}
 			}
 		})
@@ -285,12 +273,11 @@ func TestRankStrongCandidates(t *testing.T) {
 
 func TestMatchingFoundationsConcurrentImmutableInputs(t *testing.T) {
 	p := identity.GreenboneMatchPolicy()
-	value := identity.IdentifierValue{Type: identity.TypeGreenboneID, Value: "G", Scope: identity.Scope{"issuer": "a"}}
+	value := identity.IdentifierValue{Type: identity.TypeGreenboneID, Value: "G"}
 	incoming := []identity.IdentifierValue{value}
 	candidates := [][]identity.IdentifierValue{{value}}
 	when := time.Now()
 	ranking := []identity.StrongRankingCandidate{{AssetKey: "A", LastSeen: &when}, {AssetKey: "B"}}
-	before := value.Clone()
 	timeBefore := when
 	var wg sync.WaitGroup
 	for range 16 {
@@ -309,7 +296,7 @@ func TestMatchingFoundationsConcurrentImmutableInputs(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	if !reflect.DeepEqual(value, before) || when != timeBefore || !reflect.DeepEqual(p, identity.GreenboneMatchPolicy()) {
+	if incoming[0] != value || candidates[0][0] != value || when != timeBefore || !reflect.DeepEqual(p, identity.GreenboneMatchPolicy()) {
 		t.Fatal("shared input mutated")
 	}
 }

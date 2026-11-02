@@ -53,8 +53,8 @@ func countingStrongFixtures() []countingStrongFixture {
 	return []countingStrongFixture{
 		{"cloud", fuzzyValue(TypeCloudIdentifier, "provider/instance-1"), fuzzyValue(TypeCloudIdentifier, "provider/instance-2")},
 		{"greenbone", fuzzyValue(TypeGreenboneID, "G1"), fuzzyValue(TypeGreenboneID, "G2")},
-		{"linux_machine", IdentifierValue{Type: TypeMachineID, Value: strings.Repeat("a", 32), Scope: Scope{"kind": "linux_machine_id"}}, IdentifierValue{Type: TypeMachineID, Value: strings.Repeat("b", 32), Scope: Scope{"kind": "linux_machine_id"}}},
-		{"windows_machine", IdentifierValue{Type: TypeMachineID, Value: "00112233-4455-6677-8899-aabbccddeeff", Scope: Scope{"kind": "windows_machine_guid"}}, IdentifierValue{Type: TypeMachineID, Value: "11112233-4455-6677-8899-aabbccddeeff", Scope: Scope{"kind": "windows_machine_guid"}}},
+		{"linux_machine", IdentifierValue{Type: TypeMachineID, Value: strings.Repeat("a", 32)}, IdentifierValue{Type: TypeMachineID, Value: strings.Repeat("b", 32)}},
+		{"windows_machine", IdentifierValue{Type: TypeMachineID, Value: "00112233-4455-6677-8899-aabbccddeeff"}, IdentifierValue{Type: TypeMachineID, Value: "11112233-4455-6677-8899-aabbccddeeff"}},
 		{"bios", fuzzyValue(TypeBIOSUUID, "00112233-4455-6677-8899-aabbccddeeff"), fuzzyValue(TypeBIOSUUID, "11112233-4455-6677-8899-aabbccddeeff")},
 		{"agent", fuzzyValue(TypeAgentID, "A1"), fuzzyValue(TypeAgentID, "A2")},
 		{"ssh", fuzzyValue(TypeSSHHostKey, sshKey("a")), fuzzyValue(TypeSSHHostKey, sshKey("b"))},
@@ -219,41 +219,6 @@ func TestCountingStrongValueSetMatrix(t *testing.T) {
 				tt.action, tt.selected = ActionCreate, ""
 			}
 			runCountingCases(t, GreenboneMatchPolicy(), []countingCase{tt})
-		})
-	}
-}
-
-func TestCountingScopeMatrix(t *testing.T) {
-	var values []IdentifierValue
-	values = append(values, countingWeakValues(15, false)...)
-	for _, strong := range countingStrongFixtures() {
-		values = append(values, strong.value)
-	}
-	for index, value := range values {
-		t.Run(fmt.Sprintf("%s_%d", value.Type, index), func(t *testing.T) {
-			var cases []countingCase
-			for _, incomingScanner := range []string{"scanner-a", "scanner-b"} {
-				for _, storedScanner := range []string{"scanner-a", "scanner-b"} {
-					incoming, stored := value.Clone(), value.Clone()
-					if incoming.Scope == nil {
-						incoming.Scope = Scope{}
-						stored.Scope = Scope{}
-					}
-					incoming.Scope["scanner"], stored.Scope["scanner"] = incomingScanner, storedScanner
-					tt := countingCase{
-						name: incomingScanner + "/" + storedScanner, incoming: []IdentifierValue{incoming},
-						candidates: []Candidate{fuzzyRow("K", 10, stored)}, action: ActionCreate, stage: StageStrong,
-					}
-					if index < 4 {
-						tt.stage = StageFuzzy
-					}
-					if incomingScanner == storedScanner {
-						tt.action, tt.selected = ActionReuse, "K"
-					}
-					cases = append(cases, tt)
-				}
-			}
-			runCountingCases(t, GreenboneMatchPolicy(), cases)
 		})
 	}
 }

@@ -48,11 +48,8 @@ candidate (const gchar *key, const gvm_asset_identity_observation_t *source)
     {
       const gvm_asset_identity_identifier_t *id =
         g_ptr_array_index (source->identifiers, i);
-      gvm_asset_identity_identifier_t *copy =
-        gvm_asset_identity_identifier_new (id->type, id->value);
-      if (id->scope)
-        copy->scope = g_hash_table_ref (id->scope);
-      g_ptr_array_add (result->identifiers, copy);
+      g_ptr_array_add (result->identifiers,
+                       gvm_asset_identity_identifier_new (id->type, id->value));
     }
   return result;
 }

@@ -163,30 +163,11 @@ func excludeConflictingStrongSources(decision *Decision, views [][]IdentifierVal
 	decision.MergeIndices = indices
 }
 
-// Quoting preserves arbitrary opaque bytes. Sorting makes set and scope order
-// irrelevant, while the nil marker preserves absent versus empty scope.
+// Quoting preserves arbitrary opaque bytes. Sorting makes set order irrelevant.
 func strongSetKey(values []IdentifierValue) string {
 	tokens := make([]string, 0, len(values))
 	for _, value := range values {
-		scope := "nil"
-		if value.Scope != nil {
-			names := make([]string, 0, len(value.Scope))
-			for name := range value.Scope {
-				names = append(names, name)
-			}
-			slices.Sort(names)
-			var encoded strings.Builder
-			encoded.WriteByte('[')
-			for _, name := range names {
-				encoded.WriteString(strconv.Quote(name))
-				encoded.WriteByte(':')
-				encoded.WriteString(strconv.Quote(value.Scope[name]))
-				encoded.WriteByte(',')
-			}
-			encoded.WriteByte(']')
-			scope = encoded.String()
-		}
-		tokens = append(tokens, strconv.Quote(value.Value)+"/"+scope)
+		tokens = append(tokens, strconv.Quote(value.Value))
 	}
 	slices.Sort(tokens)
 	return strings.Join(slices.Compact(tokens), "\n")

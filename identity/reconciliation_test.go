@@ -142,23 +142,6 @@ func TestDecideFuzzyUsesCWholeSeconds(t *testing.T) {
 	}
 }
 
-func TestDecidePreservesScopeIdentity(t *testing.T) {
-	for _, typ := range []IdentifierType{TypeGreenboneID, TypeIP} {
-		for _, scope := range []Scope{{}, {"realm": "other"}} {
-			value := "G"
-			if typ == TypeIP {
-				value = "192.168.1.10"
-			}
-			left := IdentifierValue{Type: typ, Value: value}
-			right := IdentifierValue{Type: typ, Value: value, Scope: scope}
-			got, err := Decide(Observation{Identifiers: []IdentifierValue{left}}, []Candidate{fuzzyRow("K", 10, right)}, GreenboneMatchPolicy())
-			if err != nil || got.Action != ActionCreate || got.SelectedIndex != nil {
-				t.Fatalf("scope identity changed: %+v %v", got, err)
-			}
-		}
-	}
-}
-
 func TestDecideRejectsDuplicateKeysBeforeMatching(t *testing.T) {
 	ip := fuzzyValue(TypeIP, "192.0.2.1")
 	for _, values := range [][]IdentifierValue{nil, {ip}, {fuzzyValue(TypeGreenboneID, "G")}} {
@@ -209,21 +192,20 @@ func TestDecideStrongMultiplicity(t *testing.T) {
 }
 
 func TestDecideStrongMultipleValuesPreserveNormalizationAndInputs(t *testing.T) {
-	upper := IdentifierValue{Type: TypeBIOSUUID, Value: "00112233445566778899AABBCCDDEEFF", Scope: Scope{"realm": "r"}}
-	same := upper.Clone()
+	upper := IdentifierValue{Type: TypeBIOSUUID, Value: "00112233445566778899AABBCCDDEEFF"}
+	same := upper
 	same.Value = "{00112233-4455-6677-8899-aabbccddeeff}"
-	other := upper.Clone()
+	other := upper
 	other.Value = "11112233445566778899aabbccddeeff"
 	obs := Observation{Identifiers: []IdentifierValue{upper, same, other}}
 	rows := []Candidate{fuzzyRow("K", 10, upper), fuzzyRow("newer", 20, other)}
-	before := upper.Clone()
 	got, err := Decide(obs, rows, GreenboneMatchPolicy())
 	if err != nil || got.Action != ActionReuse || got.SelectedKey != "newer" {
 		t.Fatalf("multiple canonical values: %+v %v", got, err)
 	}
 	*got.SelectedIndex = 99
 	again, err := Decide(obs, rows, GreenboneMatchPolicy())
-	if err != nil || *again.SelectedIndex != 1 || !reflect.DeepEqual(upper, before) {
+	if err != nil || *again.SelectedIndex != 1 || obs.Identifiers[0] != upper || rows[0].Identifiers[0] != upper {
 		t.Fatal("result or normalization mutates inputs")
 	}
 }
@@ -293,8 +275,7 @@ func TestDecideDisabledStrongMembership(t *testing.T) {
 }
 
 func TestDecideImmutableInputs(t *testing.T) {
-	ip := IdentifierValue{Type: TypeIP, Value: "2001:0DB8::1", Scope: Scope{"realm": "r"}}
-	before := ip.Clone()
+	ip := IdentifierValue{Type: TypeIP, Value: "2001:0DB8::1"}
 	policy := GreenboneMatchPolicy()
 	originalPolicy := policy.Clone()
 	rows := []Candidate{fuzzyRow("K1", 20, ip), fuzzyRow("K2", 10, ip)}
@@ -312,7 +293,7 @@ func TestDecideImmutableInputs(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	if !reflect.DeepEqual(ip, before) || !reflect.DeepEqual(policy, originalPolicy) {
+	if rows[0].Identifiers[0] != ip || rows[1].Identifiers[0] != ip || !reflect.DeepEqual(policy, originalPolicy) {
 		t.Fatal("mutated input")
 	}
 }

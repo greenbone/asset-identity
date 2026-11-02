@@ -87,40 +87,6 @@ func encodedType(value identity.IdentifierType) C.gai_wire_identifier_type_t {
 	panic("unsupported output identifier type")
 }
 
-func (d *decoder) scope(value C.gai_wire_scope_t) (identity.Scope, error) {
-	if value.present > 1 {
-		return nil, fmt.Errorf("invalid scope presence")
-	}
-	if value.present == 0 && (value.count != 0 || value.dimensions != nil) {
-		return nil, fmt.Errorf("absent scope has dimensions")
-	}
-	if err := d.array(unsafe.Pointer(value.dimensions), value.count, C.sizeof_gai_wire_scope_dimension_t, unsafe.Alignof(C.gai_wire_scope_dimension_t{})); err != nil {
-		return nil, err
-	}
-	if value.present == 0 {
-		return nil, nil
-	}
-	scope := make(identity.Scope, int(value.count))
-	for _, dimension := range unsafe.Slice(value.dimensions, int(value.count)) {
-		name, err := d.string(dimension.name)
-		if err != nil {
-			return nil, err
-		}
-		content, err := d.string(dimension.value)
-		if err != nil {
-			return nil, err
-		}
-		if name == "" {
-			return nil, fmt.Errorf("empty scope dimension name")
-		}
-		if _, exists := scope[name]; exists {
-			return nil, fmt.Errorf("duplicate scope dimension %q", name)
-		}
-		scope[name] = content
-	}
-	return scope, nil
-}
-
 func (d *decoder) identifiers(ptr *C.gai_wire_identifier_t, count C.size_t) ([]identity.IdentifierValue, error) {
 	if err := d.array(unsafe.Pointer(ptr), count, C.sizeof_gai_wire_identifier_t, unsafe.Alignof(C.gai_wire_identifier_t{})); err != nil {
 		return nil, err
@@ -135,11 +101,7 @@ func (d *decoder) identifiers(ptr *C.gai_wire_identifier_t, count C.size_t) ([]i
 		if err != nil {
 			return nil, err
 		}
-		scope, err := d.scope(value.scope)
-		if err != nil {
-			return nil, err
-		}
-		values[i] = identity.IdentifierValue{Type: typ, Value: text, Scope: scope}
+		values[i] = identity.IdentifierValue{Type: typ, Value: text}
 	}
 	return values, nil
 }

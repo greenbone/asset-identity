@@ -8,7 +8,6 @@ package identity
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"time"
 )
 
@@ -33,21 +32,14 @@ const (
 var (
 	// ErrUnknownIdentifierType identifies unsupported or empty type names.
 	ErrUnknownIdentifierType = errors.New("unknown identifier type")
-	// ErrInvalidScope identifies an empty scope dimension name.
-	ErrInvalidScope = errors.New("invalid identifier scope")
 	// ErrInvalidObservationTime identifies a UTC instant outside years 1..9999.
 	ErrInvalidObservationTime = errors.New("invalid observation time")
 )
 
-// Scope contains named namespace dimensions. Nil means absent, while a non-nil
-// empty map means explicitly present and empty. Neither means globally unique.
-type Scope map[string]string
-
-// IdentifierValue preserves its payload bytes and scope without normalization.
+// IdentifierValue preserves its payload bytes without normalization.
 type IdentifierValue struct {
 	Type  IdentifierType
 	Value string
-	Scope Scope
 }
 
 // IdentifierObservation associates a value with a present or missing timestamp.
@@ -60,33 +52,23 @@ type IdentifierObservation struct {
 // ObservationHistory preserves observation order; callers own retention.
 type ObservationHistory []IdentifierObservation
 
-// Validate checks only the supported type and generic scope structure.
+// Validate checks only the supported type.
 // It neither changes input nor certifies type-specific payload validity.
 func (v IdentifierValue) Validate() error {
 	switch v.Type {
 	case TypeGreenboneID, TypeAgentID, TypeMachineID, TypeBIOSUUID,
 		TypeSSHHostKey, TypeTLSPublicKeyHash, TypeCloudIdentifier,
 		TypeIP, TypeFQDN, TypeMAC, TypeHostname:
+		return nil
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownIdentifierType, v.Type)
 	}
-	if _, exists := v.Scope[""]; exists {
-		return fmt.Errorf("%w: empty dimension name", ErrInvalidScope)
-	}
-	return nil
 }
 
-// Clone returns an independent copy, preserving absent versus empty scope.
-func (v IdentifierValue) Clone() IdentifierValue {
-	v.Scope = maps.Clone(v.Scope)
-	return v
-}
-
-// SameRepresentation compares exact type, payload bytes, and scope dimensions.
+// SameRepresentation compares exact type and payload bytes.
 // It does not validate, normalize, or establish semantic identifier equality.
 func SameRepresentation(a, b IdentifierValue) bool {
-	return a.Type == b.Type && a.Value == b.Value &&
-		(a.Scope == nil) == (b.Scope == nil) && maps.Equal(a.Scope, b.Scope)
+	return a.Type == b.Type && a.Value == b.Value
 }
 
 // Validate checks structural validity and the UTC year range 1 through 9999.
@@ -104,9 +86,8 @@ func (o IdentifierObservation) Validate() error {
 	return nil
 }
 
-// Clone copies scope and timestamp storage, preserving presence and timezone.
+// Clone copies the timestamp storage, preserving presence and timezone.
 func (o IdentifierObservation) Clone() IdentifierObservation {
-	o.Identifier = o.Identifier.Clone()
 	if o.ObservedAt != nil {
 		instant := *o.ObservedAt
 		o.ObservedAt = &instant
@@ -115,7 +96,7 @@ func (o IdentifierObservation) Clone() IdentifierObservation {
 }
 
 // Normalize returns a defensive copy with a UTC timestamp and no monotonic
-// reading. It does not validate or normalize identifier types, values, or scopes.
+// reading. It does not validate or normalize identifier types or values.
 func (o IdentifierObservation) Normalize() IdentifierObservation {
 	o = o.Clone()
 	if o.ObservedAt != nil {

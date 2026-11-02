@@ -106,11 +106,11 @@ func TestCountingStrongRules(t *testing.T) {
 func TestCountingStrongReuseSafeguards(t *testing.T) {
 	agentA := fuzzyValue(TypeAgentID, "A")
 	agentB := fuzzyValue(TypeAgentID, "B")
-	machineX := IdentifierValue{Type: TypeMachineID, Value: strings.Repeat("a", 32), Scope: Scope{"kind": "linux_machine_id"}}
-	machineY := IdentifierValue{Type: TypeMachineID, Value: strings.Repeat("b", 32), Scope: Scope{"kind": "linux_machine_id"}}
+	machineX := IdentifierValue{Type: TypeMachineID, Value: strings.Repeat("a", 32)}
+	machineY := IdentifierValue{Type: TypeMachineID, Value: strings.Repeat("b", 32)}
+	machineXAsGUID := IdentifierValue{Type: TypeMachineID, Value: "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"}
+	machineYAsGUID := IdentifierValue{Type: TypeMachineID, Value: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"}
 	cloud := fuzzyValue(TypeCloudIdentifier, "instance")
-	otherScope := machineX.Clone()
-	otherScope.Scope["realm"] = "other"
 	tlsA := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("a", 64))
 	tlsB := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("b", 64))
 	runCountingCases(t, GreenboneMatchPolicy(), []countingCase{
@@ -118,11 +118,12 @@ func TestCountingStrongReuseSafeguards(t *testing.T) {
 		{"agent-only scan reuses a machine key", []IdentifierValue{agentA}, []Candidate{fuzzyRow("K0", 10, machineX, agentA)}, ActionReuse, StageStrong, "K0", nil},
 		{"different machines stay separate despite matching agent", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, machineY, agentA)}, ActionCreate, StageStrong, "", nil},
 		{"same machine overrides different agent", []IdentifierValue{machineX, agentB}, []Candidate{fuzzyRow("K0", 10, machineX, agentA)}, ActionReuse, StageStrong, "K0", nil},
+		{"same machine written as a guid reuses the hex key", []IdentifierValue{machineXAsGUID, agentB}, []Candidate{fuzzyRow("K0", 10, machineX, agentA)}, ActionReuse, StageStrong, "K0", nil},
+		{"other machine written as a guid stays apart", []IdentifierValue{machineYAsGUID, agentA}, []Candidate{fuzzyRow("K0", 10, machineX, agentA)}, ActionCreate, StageStrong, "", nil},
 		{"reuse richer asset and absorb agent-only record", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 30, agentA), fuzzyRow("K1", 10, machineX, agentA)}, ActionReuse, StageStrong, "K1", []int{0}},
 		{"reuse excludes the conflicting source", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 30, machineY, agentA), fuzzyRow("K1", 10, agentA)}, ActionReuse, StageStrong, "K1", nil},
 		{"richer stored identity can share a lower type", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, cloud, agentA)}, ActionReuse, StageStrong, "K0", nil},
 		{"merge cannot reintroduce an incoming machine conflict", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, cloud, agentA), fuzzyRow("K1", 30, cloud, machineY, agentA)}, ActionReuse, StageStrong, "K0", nil},
-		{"different machine scopes cannot fall back to agent", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, otherScope, agentA)}, ActionCreate, StageStrong, "", nil},
 		{"shared agent does not prove a missing cloud id", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, machineX, agentA), fuzzyRow("K1", 30, cloud, agentA)}, ActionReuse, StageStrong, "K0", nil},
 		{"incoming links complementary strong records", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 30, agentA), fuzzyRow("K1", 10, machineX)}, ActionReuse, StageStrong, "K1", []int{0}},
 		{"complementary records preserve reversed indices", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, machineX), fuzzyRow("K1", 30, agentA)}, ActionReuse, StageStrong, "K0", []int{1}},

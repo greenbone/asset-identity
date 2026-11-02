@@ -24,9 +24,8 @@ var errPlaceholder = errors.New("placeholder value")
 
 const maxOpaqueLength = 2048
 
-// normalizers holds one normalizer per identifier type. Input is trimmed of surrounding whitespace, nonempty, and a
-// machine id carries a supported kind.
-var normalizers = map[IdentifierType]func(value string, scope Scope) (string, error){
+// normalizers holds one normalizer per identifier type. Input is trimmed of surrounding whitespace and nonempty.
+var normalizers = map[IdentifierType]func(value string) (string, error){
 	TypeCloudIdentifier:  normalizeOpaque,
 	TypeGreenboneID:      normalizeOpaque,
 	TypeAgentID:          normalizeOpaque,
@@ -46,18 +45,16 @@ func ValidateIdentifier(value IdentifierValue) error {
 	return err
 }
 
-// NormalizeIdentifier returns a canonical payload and an independently owned scope.
+// NormalizeIdentifier returns the identifier with its canonical payload.
 func NormalizeIdentifier(value IdentifierValue) (IdentifierValue, error) {
 	canonical, err := canonicalIdentifierValue(value)
 	if err != nil {
 		return IdentifierValue{}, err
 	}
-	result := value.Clone()
-	result.Value = canonical
-	return result, nil
+	return IdentifierValue{Type: value.Type, Value: canonical}, nil
 }
 
-// EqualIdentifiers compares canonical type, payload, and scope.
+// EqualIdentifiers compares canonical type and payload.
 // Both inputs are validated, with errors reported from a before b.
 func EqualIdentifiers(a, b IdentifierValue) (bool, error) {
 	left, err := NormalizeIdentifier(a)
@@ -75,14 +72,11 @@ func canonicalIdentifierValue(value IdentifierValue) (string, error) {
 	if err := value.Validate(); err != nil {
 		return "", err
 	}
-	if value.Type == TypeMachineID && value.Scope["kind"] != "linux_machine_id" && value.Scope["kind"] != "windows_machine_guid" {
-		return "", fmt.Errorf("%s: kind: %w", value.Type, ErrUnsupportedIdentifierFormat)
-	}
 	payload := strings.TrimSpace(value.Value)
 	if payload == "" {
 		return "", fmt.Errorf("%s: empty payload: %w", value.Type, ErrInvalidIdentifierValue)
 	}
-	canonical, err := normalizers[value.Type](payload, value.Scope)
+	canonical, err := normalizers[value.Type](payload)
 	if errors.Is(err, errPlaceholder) {
 		return "", fmt.Errorf("%s: %w: %w", value.Type, ErrInvalidIdentifierValue, err)
 	}
@@ -92,28 +86,25 @@ func canonicalIdentifierValue(value IdentifierValue) (string, error) {
 	return canonical, nil
 }
 
-func normalizeOpaque(value string, _ Scope) (string, error) {
+func normalizeOpaque(value string) (string, error) {
 	if len(value) > maxOpaqueLength {
 		return "", ErrInvalidIdentifierValue
 	}
 	return value, nil
 }
 
-func normalizeMachineID(value string, scope Scope) (string, error) {
+// normalizeMachineID takes the 128 bits of a machine id in any of their written forms, the 32 hex digits of a Linux
+// machine-id or the UUID of a Windows MachineGuid, with or without braces, and returns them as 32 lowercase hex digits.
+func normalizeMachineID(value string) (string, error) {
 	if strings.EqualFold(value, "uninitialized") {
 		return "", errPlaceholder
 	}
-	var canonical string
-	var err error
-	if scope["kind"] == "linux_machine_id" {
-		canonical, err = canonicalHex(value, 32)
-	} else {
-		canonical, err = canonicalUUID(value)
-	}
+	canonical, err := canonicalUUID(value)
 	if err != nil {
 		return "", err
 	}
-	if strings.Trim(canonical, "0-") == "" {
+	canonical = strings.ReplaceAll(canonical, "-", "")
+	if strings.Trim(canonical, "0") == "" {
 		return "", errPlaceholder
 	}
 	return canonical, nil
@@ -125,7 +116,7 @@ var placeholderBIOSUUIDs = []string{
 	"03000200-0400-0500-0006-000700080009",
 }
 
-func normalizeBIOSUUID(value string, _ Scope) (string, error) {
+func normalizeBIOSUUID(value string) (string, error) {
 	canonical, err := canonicalUUID(value)
 	if err != nil {
 		return "", err
@@ -138,15 +129,15 @@ func normalizeBIOSUUID(value string, _ Scope) (string, error) {
 	return canonical, nil
 }
 
-func normalizeSSHHostKey(value string, _ Scope) (string, error) {
+func normalizeSSHHostKey(value string) (string, error) {
 	return canonicalSSHKey(value)
 }
 
-func normalizeTLSPublicKeyHash(value string, _ Scope) (string, error) {
+func normalizeTLSPublicKeyHash(value string) (string, error) {
 	return canonicalSPKIHash(value)
 }
 
-func normalizeIP(value string, _ Scope) (string, error) {
+func normalizeIP(value string) (string, error) {
 	address, err := canonicalIP(value)
 	if err != nil {
 		return "", err
@@ -157,7 +148,7 @@ func normalizeIP(value string, _ Scope) (string, error) {
 	return address.String(), nil
 }
 
-func normalizeMAC(value string, _ Scope) (string, error) {
+func normalizeMAC(value string) (string, error) {
 	canonical, err := canonicalMAC(value)
 	if err != nil {
 		return "", err
@@ -168,7 +159,7 @@ func normalizeMAC(value string, _ Scope) (string, error) {
 	return canonical, nil
 }
 
-func normalizeFQDN(value string, _ Scope) (string, error) {
+func normalizeFQDN(value string) (string, error) {
 	labels, err := dnsLabels(value)
 	if err != nil {
 		return "", err
@@ -186,7 +177,7 @@ func normalizeFQDN(value string, _ Scope) (string, error) {
 	return canonical, nil
 }
 
-func normalizeHostname(value string, _ Scope) (string, error) {
+func normalizeHostname(value string) (string, error) {
 	labels, err := dnsLabels(value)
 	if err != nil {
 		return "", err
