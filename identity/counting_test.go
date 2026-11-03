@@ -103,6 +103,20 @@ func TestCountingStrongRules(t *testing.T) {
 	})
 }
 
+func TestCountingStrongDestinationMergesWeakRecords(t *testing.T) {
+	agent := fuzzyValue(TypeAgentID, "A")
+	ip := fuzzyValue(TypeIP, "192.0.2.1")
+	host := fuzzyValue(TypeHostname, "host-x")
+	mac := fuzzyValue(TypeMAC, "02:00:00:00:00:01")
+	runCountingCases(t, GreenboneMatchPolicy(), []countingCase{
+		{"create merges a weak record with identical weak identifiers", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 1, ip, host)}, ActionCreate, StageStrong, "", []int{0}},
+		{"create merges all contained weak records", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 2, ip), fuzzyRow("K1", 1, ip, host)}, ActionCreate, StageStrong, "", []int{0, 1}},
+		{"create does not merge a weak record with an additional mac", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 1, ip, host, mac)}, ActionCreate, StageStrong, "", nil},
+		{"reuse merges a weak record contained in the selected asset", []IdentifierValue{agent}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, agent, ip, host)}, ActionReuse, StageStrong, "K1", []int{0}},
+		{"reuse does not use incoming weak additions for containment", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 2, agent, ip), fuzzyRow("K1", 1, ip, host)}, ActionReuse, StageStrong, "K0", nil},
+	})
+}
+
 func TestCountingStrongReuseSafeguards(t *testing.T) {
 	agentA := fuzzyValue(TypeAgentID, "A")
 	agentB := fuzzyValue(TypeAgentID, "B")
