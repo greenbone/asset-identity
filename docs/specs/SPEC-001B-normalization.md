@@ -20,6 +20,7 @@ constructors do not normalize payloads. No lookups, namespace inference, or hist
 | Type                                     | Accepted input → canonical value                                                               |
 |------------------------------------------|------------------------------------------------------------------------------------------------|
 | Greenbone ID, Agent ID, cloud identifier | Nonempty opaque string, at most 2048 bytes → trimmed bytes, preserving case                    |
+| Image reference                          | Same as above; the producer passes `registry/repository@sha256:<digest>`                       |
 | Machine ID                               | 32 hex digits or hyphenated or braced UUID → 32 lowercase hex digits                           |
 | BIOS UUID                                | Compact, hyphenated, or braced hyphenated UUID → lowercase hyphenated UUID                     |
 | SSH host key                             | `[port] <algorithm> <base64-blob> [comment]` → algorithm and canonical padded base64 blob      |

@@ -37,6 +37,7 @@ var normalizers = map[IdentifierType]func(value string) (string, error){
 	TypeFQDN:             normalizeFQDN,
 	TypeMAC:              normalizeMAC,
 	TypeHostname:         normalizeHostname,
+	TypeImageReference:   normalizeOpaque,
 }
 
 // ValidateIdentifier checks type-specific payload syntax without mutating input.
