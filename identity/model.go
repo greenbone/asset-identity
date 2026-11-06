@@ -27,6 +27,7 @@ const (
 	TypeFQDN             IdentifierType = "fqdn"
 	TypeMAC              IdentifierType = "mac"
 	TypeHostname         IdentifierType = "hostname"
+	TypeImageReference   IdentifierType = "image_reference"
 )
 
 var (
@@ -58,7 +59,7 @@ func (v IdentifierValue) Validate() error {
 	switch v.Type {
 	case TypeGreenboneID, TypeAgentID, TypeMachineID, TypeBIOSUUID,
 		TypeSSHHostKey, TypeTLSPublicKeyHash, TypeCloudIdentifier,
-		TypeIP, TypeFQDN, TypeMAC, TypeHostname:
+		TypeIP, TypeFQDN, TypeMAC, TypeHostname, TypeImageReference:
 		return nil
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownIdentifierType, v.Type)

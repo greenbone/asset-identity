@@ -93,8 +93,8 @@ Normalization makes equivalent representations comparable without changing calle
 | SSH `22 ecdsa-sha2-nistp256 <key>`                 | `ecdsa-sha2-nistp256 <canonical-key>`  |
 | TLS `x509:<base64-DER-certificate>`                | `spki-sha256:<public-key-digest>`      |
 
-Every type has its own normalizer and surrounding whitespace is trimmed. Greenbone, agent, and cloud IDs keep their
-case. Placeholders such as `127.0.0.1`, `00:00:00:00:00:00`, a zero BIOS UUID, or
+Every type has its own normalizer and surrounding whitespace is trimmed. Greenbone, agent, and cloud IDs and image
+references keep their case. Placeholders such as `127.0.0.1`, `00:00:00:00:00:00`, a zero BIOS UUID, or
 `localhost` identify no single machine: normalization reports them as invalid, and matching leaves them out instead of
 failing. A machine ID is accepted as the 32 hex digits of a Linux machine-id or as the UUID of a Windows MachineGuid,
 with or without braces; both forms canonicalize to the same 32 hex digits.

@@ -27,6 +27,7 @@ order does not define matching priority.
 | `TypeFQDN`             | `fqdn`                            |
 | `TypeMAC`              | `mac`                             |
 | `TypeHostname`         | `hostname`                        |
+| `TypeImageReference`   | `image_reference`                 |
 
 ## Equality
 
