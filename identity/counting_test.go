@@ -65,7 +65,7 @@ func TestCountingWeakEvidence(t *testing.T) {
 	otherHost := fuzzyValue(TypeHostname, "host-y")
 	mac := fuzzyValue(TypeMAC, "02:00:00:00:00:01")
 	otherMAC := fuzzyValue(TypeMAC, "02:00:00:00:00:02")
-	runCountingCases(t, GreenboneMatchPolicy(), []countingCase{
+	runCountingCases(t, policyWithAllIdentityTypesStrong(), []countingCase{
 		{"exact ip", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 1, ip)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"add hostname", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 1, ip)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"observation subset", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 1, ip, host)}, ActionReuse, StageFuzzy, "K0", nil},
@@ -93,13 +93,13 @@ func TestCountingStrongRules(t *testing.T) {
 	cloud := fuzzyValue(TypeCloudIdentifier, "c")
 	tlsA := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("a", 64))
 	tlsB := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("b", 64))
-	runCountingCases(t, GreenboneMatchPolicy(), []countingCase{
+	runCountingCases(t, policyWithAllIdentityTypesStrong(), []countingCase{
 		{"cloud priority beats newer greenbone match", []IdentifierValue{cloud, g}, []Candidate{fuzzyRow("K0", 20, g), fuzzyRow("K1", 10, cloud)}, ActionReuse, StageStrong, "K1", []int{0}},
-		{"conflicting higher type blocks a lower match", []IdentifierValue{g, agent}, []Candidate{fuzzyRow("K0", 1, otherG, agent)}, ActionCreate, StageStrong, "", nil},
-		{"new agent creates a key and absorbs weak record", []IdentifierValue{agent, ip, mac}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionCreate, StageStrong, "", []int{0}},
-		{"conflicting incoming greenbone id is not merged", []IdentifierValue{g, ip, mac}, []Candidate{fuzzyRow("K0", 20, ip, mac), fuzzyRow("K1", 10, otherG, ip, mac)}, ActionCreate, StageStrong, "", []int{0}},
+		{"conflicting higher type blocks a lower match", []IdentifierValue{g, agent}, []Candidate{fuzzyRow("K0", 1, otherG, agent)}, ActionCreate, StageFuzzy, "", nil},
+		{"new agent creates a key and absorbs weak record", []IdentifierValue{agent, ip, mac}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
+		{"conflicting incoming greenbone id is not merged", []IdentifierValue{g, ip, mac}, []Candidate{fuzzyRow("K0", 20, ip, mac), fuzzyRow("K1", 10, otherG, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"conflicting incoming mac is not merged", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 20, ip, host), fuzzyRow("K1", 10, ip, host, otherMAC)}, ActionReuse, StageFuzzy, "K0", nil},
-		{"tls mismatch does not fall back to weak evidence", []IdentifierValue{tlsA, tlsB, ip, mac}, []Candidate{fuzzyRow("K0", 1, tlsA, ip, mac)}, ActionCreate, StageStrong, "", nil},
+		{"tls mismatch does not fall back to weak evidence", []IdentifierValue{tlsA, tlsB, ip, mac}, []Candidate{fuzzyRow("K0", 1, tlsA, ip, mac)}, ActionCreate, StageFuzzy, "", nil},
 	})
 }
 
@@ -108,10 +108,10 @@ func TestCountingStrongDestinationMergesWeakRecords(t *testing.T) {
 	ip := fuzzyValue(TypeIP, "192.0.2.1")
 	host := fuzzyValue(TypeHostname, "host-x")
 	mac := fuzzyValue(TypeMAC, "02:00:00:00:00:01")
-	runCountingCases(t, GreenboneMatchPolicy(), []countingCase{
-		{"create merges a weak record with identical weak identifiers", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 1, ip, host)}, ActionCreate, StageStrong, "", []int{0}},
-		{"create merges all contained weak records", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 2, ip), fuzzyRow("K1", 1, ip, host)}, ActionCreate, StageStrong, "", []int{0, 1}},
-		{"create does not merge a weak record with an additional mac", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 1, ip, host, mac)}, ActionCreate, StageStrong, "", nil},
+	runCountingCases(t, policyWithAllIdentityTypesStrong(), []countingCase{
+		{"create merges a weak record with identical weak identifiers", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 1, ip, host)}, ActionReuse, StageFuzzy, "K0", nil},
+		{"create merges all contained weak records", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 2, ip), fuzzyRow("K1", 1, ip, host)}, ActionCreate, StageFuzzy, "", nil},
+		{"create does not merge a weak record with an additional mac", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 1, ip, host, mac)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"reuse merges a weak record contained in the selected asset", []IdentifierValue{agent}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, agent, ip, host)}, ActionReuse, StageStrong, "K1", []int{0}},
 		{"reuse does not use incoming weak additions for containment", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 2, agent, ip), fuzzyRow("K1", 1, ip, host)}, ActionReuse, StageStrong, "K0", nil},
 	})
@@ -127,13 +127,13 @@ func TestCountingStrongReuseSafeguards(t *testing.T) {
 	cloud := fuzzyValue(TypeCloudIdentifier, "instance")
 	tlsA := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("a", 64))
 	tlsB := fuzzyValue(TypeTLSPublicKeyHash, "spki-sha256:"+strings.Repeat("b", 64))
-	runCountingCases(t, GreenboneMatchPolicy(), []countingCase{
+	runCountingCases(t, policyWithAllIdentityTypesStrong(), []countingCase{
 		{"machine id enriches an agent-only key", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, agentA)}, ActionReuse, StageStrong, "K0", nil},
 		{"agent-only scan reuses a machine key", []IdentifierValue{agentA}, []Candidate{fuzzyRow("K0", 10, machineX, agentA)}, ActionReuse, StageStrong, "K0", nil},
-		{"different machines stay separate despite matching agent", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, machineY, agentA)}, ActionCreate, StageStrong, "", nil},
+		{"different machines stay separate despite matching agent", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, machineY, agentA)}, ActionCreate, StageFuzzy, "", nil},
 		{"same machine overrides different agent", []IdentifierValue{machineX, agentB}, []Candidate{fuzzyRow("K0", 10, machineX, agentA)}, ActionReuse, StageStrong, "K0", nil},
 		{"same machine written as a guid reuses the hex key", []IdentifierValue{machineXAsGUID, agentB}, []Candidate{fuzzyRow("K0", 10, machineX, agentA)}, ActionReuse, StageStrong, "K0", nil},
-		{"other machine written as a guid stays apart", []IdentifierValue{machineYAsGUID, agentA}, []Candidate{fuzzyRow("K0", 10, machineX, agentA)}, ActionCreate, StageStrong, "", nil},
+		{"other machine written as a guid stays apart", []IdentifierValue{machineYAsGUID, agentA}, []Candidate{fuzzyRow("K0", 10, machineX, agentA)}, ActionCreate, StageFuzzy, "", nil},
 		{"reuse richer asset and absorb agent-only record", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 30, agentA), fuzzyRow("K1", 10, machineX, agentA)}, ActionReuse, StageStrong, "K1", []int{0}},
 		{"reuse excludes the conflicting source", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 30, machineY, agentA), fuzzyRow("K1", 10, agentA)}, ActionReuse, StageStrong, "K1", nil},
 		{"richer stored identity can share a lower type", []IdentifierValue{machineX, agentA}, []Candidate{fuzzyRow("K0", 10, cloud, agentA)}, ActionReuse, StageStrong, "K0", nil},
@@ -163,12 +163,12 @@ func TestCountingProgressiveDiscovery(t *testing.T) {
 		{[]IdentifierValue{ip, host, mac}, ActionReuse, nil},
 		{[]IdentifierValue{ip}, ActionReuse, nil},
 		{[]IdentifierValue{ip}, ActionReuse, nil},
-		{[]IdentifierValue{agent, ip, host, mac}, ActionCreate, []int{0}},
+		{[]IdentifierValue{agent, ip, host, mac}, ActionReuse, nil},
 		{[]IdentifierValue{ip}, ActionReuse, nil},
 	}
 	var candidates []Candidate
 	for step, scan := range scans {
-		decision, err := Decide(Observation{Identifiers: scan.values}, candidates, GreenboneMatchPolicy())
+		decision, err := Decide(Observation{Identifiers: scan.values}, candidates, policyWithAllIdentityTypesStrong())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -213,7 +213,7 @@ func TestCountingTLSEligibility(t *testing.T) {
 	alt := fuzzyValue(TypeFQDN, "alt.example.com")
 	host := fuzzyValue(TypeHostname, "WEB01")
 	// Test certificate admission independently of weak fallback and merge containment.
-	runCountingCases(t, MatchPolicy{StrongOrder: GreenboneMatchPolicy().StrongOrder}, []countingCase{
+	runCountingCases(t, MatchPolicy{StrongOrder: policyWithAllIdentityTypesStrong().StrongOrder}, []countingCase{
 		{"a certificate issued to the host's fqdn is strong evidence", []IdentifierValue{tls, fqdn}, []Candidate{fuzzyRow("A", 1, hash)}, ActionReuse, StageStrong, "A", nil},
 		{"a san naming the host counts", []IdentifierValue{tls, alt}, []Candidate{fuzzyRow("A", 1, hash)}, ActionReuse, StageStrong, "A", nil},
 		{"a san equal to the hostname counts", []IdentifierValue{tls, host}, []Candidate{fuzzyRow("A", 1, hash)}, ActionReuse, StageStrong, "A", nil},
@@ -222,18 +222,18 @@ func TestCountingTLSEligibility(t *testing.T) {
 		{"an observation without a host name does not use the certificate", []IdentifierValue{tls, ip1}, []Candidate{fuzzyRow("A", 1, hash, ip1)}, ActionCreate, StageFuzzy, "", nil},
 		{"a wildcard certificate never names the host", []IdentifierValue{wildcardTLS, fqdn}, []Candidate{fuzzyRow("A", 1, wildcardTLS, fqdn)}, ActionCreate, StageFuzzy, "", nil},
 		{"a stored hash stays eligible", []IdentifierValue{hash}, []Candidate{fuzzyRow("A", 1, hash)}, ActionReuse, StageStrong, "A", nil},
-		{"the candidate side is checked too", []IdentifierValue{hash}, []Candidate{fuzzyRow("A", 1, tls, fqdn2)}, ActionCreate, StageStrong, "", nil},
+		{"the candidate side is checked too", []IdentifierValue{hash}, []Candidate{fuzzyRow("A", 1, tls, fqdn2)}, ActionCreate, StageFuzzy, "", nil},
 	})
 	broken := "x509:" + certificate[5:20] + "\n" + certificate[20:]
 	for _, names := range [][]IdentifierValue{nil, {fqdn}} {
 		for _, bad := range []string{"x509:!!!!", broken} {
-			_, err := Decide(Observation{Identifiers: append([]IdentifierValue{fuzzyValue(TypeTLSPublicKeyHash, bad)}, names...)}, nil, GreenboneMatchPolicy())
+			_, err := Decide(Observation{Identifiers: append([]IdentifierValue{fuzzyValue(TypeTLSPublicKeyHash, bad)}, names...)}, nil, policyWithAllIdentityTypesStrong())
 			if !errors.Is(err, ErrInvalidIdentifierValue) {
 				t.Fatalf("names %v: an undecodable certificate must fail the decision: %v", names, err)
 			}
 		}
 	}
-	strong, err := EvaluateStrongPriority(GreenboneMatchPolicy(), []IdentifierValue{tls}, [][]IdentifierValue{{tls}})
+	strong, err := EvaluateStrongPriority(policyWithAllIdentityTypesStrong(), []IdentifierValue{tls}, [][]IdentifierValue{{tls}})
 	if err != nil || len(strong.CandidateIndices) != 0 {
 		t.Fatalf("EvaluateStrongPriority must apply the certificate name rule: %+v %v", strong, err)
 	}
@@ -265,4 +265,11 @@ func testCertificate(t *testing.T, commonName string, dnsNames ...string) string
 		t.Fatal(err)
 	}
 	return "x509:" + base64.StdEncoding.EncodeToString(der)
+}
+
+func policyWithAllIdentityTypesStrong() MatchPolicy {
+	policy := GreenboneMatchPolicy()
+	policy.StrongOrder = append(policy.StrongOrder, policy.Continuity...)
+	policy.Continuity = nil
+	return policy
 }

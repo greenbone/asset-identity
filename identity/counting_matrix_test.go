@@ -90,7 +90,7 @@ func TestCountingWeakMatrix(t *testing.T) {
 			cases = append(cases, tt)
 		}
 	}
-	runCountingCases(t, GreenboneMatchPolicy(), cases)
+	runCountingCases(t, policyWithAllIdentityTypesStrong(), cases)
 }
 
 func TestCountingStrongWeakMatrix(t *testing.T) {
@@ -115,14 +115,14 @@ func TestCountingStrongWeakMatrix(t *testing.T) {
 							}
 							tt := countingCase{
 								name:     fmt.Sprintf("incoming_%04b/stored_%04b", incomingMask, storedMask),
-								incoming: incoming, candidates: []Candidate{fuzzyRow("K", 10, stored...)}, action: ActionCreate, stage: StageStrong,
+								incoming: incoming, candidates: []Candidate{fuzzyRow("K", 10, stored...)}, action: ActionCreate, stage: StageFuzzy,
 							}
 							switch relation {
 							case "same":
-								tt.action, tt.selected = ActionReuse, "K"
+								tt.action, tt.selected, tt.stage = ActionReuse, "K", StageStrong
 							case "incoming_only":
-								if incomingMask != 0 && storedMask&incomingMask == storedMask {
-									tt.merges = []int{0}
+								if incomingMask&storedMask != 0 {
+									tt.action, tt.selected = ActionReuse, "K"
 								}
 							case "stored_only":
 								tt.stage = StageFuzzy
@@ -135,7 +135,7 @@ func TestCountingStrongWeakMatrix(t *testing.T) {
 							cases = append(cases, tt)
 						}
 					}
-					runCountingCases(t, GreenboneMatchPolicy(), cases)
+					runCountingCases(t, policyWithAllIdentityTypesStrong(), cases)
 				})
 			}
 		})
@@ -155,15 +155,15 @@ func TestCountingStrongPriorityMatrix(t *testing.T) {
 					{"priority beats freshness and incoming links the records", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, lower.value), fuzzyRow("higher", 10, higher.value)}, ActionReuse, StageStrong, "higher", []int{0}},
 					{"stronger incoming identity enriches existing key", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, lower.value)}, ActionReuse, StageStrong, "lower", nil},
 					{"weaker incoming identity reuses richer record", []IdentifierValue{lower.value}, []Candidate{fuzzyRow("higher", 10, higher.value, lower.value)}, ActionReuse, StageStrong, "higher", nil},
-					{"conflicting higher blocks lower match", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, higher.other, lower.value)}, ActionCreate, StageStrong, "", nil},
+					{"conflicting higher blocks lower match", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, higher.other, lower.value)}, ActionCreate, StageFuzzy, "", nil},
 					{"matching higher overrides lower conflict", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("higher", 10, higher.value, lower.other)}, ActionReuse, StageStrong, "higher", nil},
 					{"higher match prevents lower merge", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("higher", 10, higher.value), fuzzyRow("lower", 30, higher.other, lower.value)}, ActionReuse, StageStrong, "higher", nil},
 					{"reuse rich key and merge lower record", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("lower", 30, lower.value), fuzzyRow("higher", 10, higher.value, lower.value)}, ActionReuse, StageStrong, "higher", []int{0}},
 					{"reuse skips conflicting source and preserves indices", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("conflict", 30, higher.other, lower.value), fuzzyRow("lower", 20, lower.value), fuzzyRow("also-lower", 10, lower.value)}, ActionReuse, StageStrong, "lower", []int{2}},
 					{"reversed rows preserve the rich destination and source index", []IdentifierValue{higher.value, lower.value}, []Candidate{fuzzyRow("higher", 10, higher.value, lower.value), fuzzyRow("lower", 30, lower.value)}, ActionReuse, StageStrong, "higher", []int{1}},
 				}
-				runCountingCases(t, GreenboneMatchPolicy(), cases)
-				custom := GreenboneMatchPolicy()
+				runCountingCases(t, policyWithAllIdentityTypesStrong(), cases)
+				custom := policyWithAllIdentityTypesStrong()
 				custom.StrongOrder = []IdentifierType{lower.value.Type, higher.value.Type}
 				tt := cases[0]
 				tt.name, tt.selected, tt.merges = "custom priority reverses winner", "lower", []int{1}
@@ -187,19 +187,19 @@ func TestCountingStrongValueSetMatrix(t *testing.T) {
 				for j, stored := range sets {
 					tt := countingCase{
 						name: fmt.Sprintf("incoming_set_%d/stored_set_%d", i, j), incoming: incoming,
-						candidates: []Candidate{fuzzyRow("K", 10, stored...)}, action: ActionCreate, stage: StageStrong,
+						candidates: []Candidate{fuzzyRow("K", 10, stored...)}, action: ActionCreate, stage: StageFuzzy,
 					}
 					matches := masks[i]&masks[j] != 0
 					if strong.value.Type == TypeTLSPublicKeyHash {
 						matches = masks[i] == masks[j] // TLS needs the complete set.
 					}
 					if matches {
-						tt.action, tt.selected = ActionReuse, "K"
+						tt.action, tt.selected, tt.stage = ActionReuse, "K", StageStrong
 					}
 					cases = append(cases, tt)
 				}
 			}
-			runCountingCases(t, GreenboneMatchPolicy(), cases)
+			runCountingCases(t, policyWithAllIdentityTypesStrong(), cases)
 			// Incoming multi-values report correspondence, not permission to join
 			// conflicting stored identities at the same deciding priority.
 			tt := countingCase{
@@ -209,9 +209,9 @@ func TestCountingStrongValueSetMatrix(t *testing.T) {
 				action:     ActionReuse, stage: StageStrong, selected: "K0",
 			}
 			if strong.value.Type == TypeTLSPublicKeyHash {
-				tt.action, tt.selected = ActionCreate, ""
+				tt.action, tt.selected, tt.stage = ActionCreate, "", StageFuzzy
 			}
-			runCountingCases(t, GreenboneMatchPolicy(), []countingCase{tt})
+			runCountingCases(t, policyWithAllIdentityTypesStrong(), []countingCase{tt})
 		})
 	}
 }
@@ -224,7 +224,7 @@ func TestCountingCandidateOrderMatrix(t *testing.T) {
 		t.Run(strong.name, func(t *testing.T) {
 			cases := []countingCase{
 				{"strong reuse merges equal strong evidence", []IdentifierValue{strong.value, ip, host}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.value, otherIP), fuzzyRow("K2", 10, strong.other, ip)}, ActionReuse, StageStrong, "K0", []int{1}},
-				{"strong create absorbs weak subsets", []IdentifierValue{strong.value, ip, host, mac}, []Candidate{fuzzyRow("K0", 30, ip, host), fuzzyRow("K1", 20, ip, mac), fuzzyRow("K2", 10, strong.other, ip)}, ActionCreate, StageStrong, "", []int{0, 1}},
+				{"strong create absorbs weak subsets", []IdentifierValue{strong.value, ip, host, mac}, []Candidate{fuzzyRow("K0", 30, ip, host), fuzzyRow("K1", 20, ip, mac), fuzzyRow("K2", 10, strong.other, ip)}, ActionCreate, StageFuzzy, "", nil},
 				{"weak ambiguity leaves compatible strong sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.value, ip, mac), fuzzyRow("K2", 10, mac)}, ActionCreate, StageFuzzy, "", nil},
 				{"weak create excludes conflicting strong sources", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.other, ip, mac), fuzzyRow("K2", 10, mac)}, ActionCreate, StageFuzzy, "", nil},
 				{"weak ambiguity leaves conflicting destinations separate", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.other, ip), fuzzyRow("K2", 10, host)}, ActionCreate, StageFuzzy, "", nil},
@@ -241,7 +241,7 @@ func TestCountingCandidateOrderMatrix(t *testing.T) {
 							tt.merges = append(tt.merges, newIndex)
 						}
 					}
-					runCountingCases(t, GreenboneMatchPolicy(), []countingCase{tt})
+					runCountingCases(t, policyWithAllIdentityTypesStrong(), []countingCase{tt})
 				}
 			}
 		})
@@ -263,17 +263,17 @@ func TestCountingProgressiveStrongMatrix(t *testing.T) {
 			}{
 				{[]IdentifierValue{ip}, ActionCreate, StageFuzzy, "", nil, 1},
 				{[]IdentifierValue{ip, host}, ActionReuse, StageFuzzy, "K0", nil, 1},
-				{[]IdentifierValue{strong.value, ip, host, mac}, ActionCreate, StageStrong, "", []int{0}, 1},
-				{[]IdentifierValue{strong.value, otherIP}, ActionReuse, StageStrong, "K2", nil, 1},
-				{[]IdentifierValue{ip}, ActionReuse, StageFuzzy, "K2", nil, 1},
-				{[]IdentifierValue{strong.other, ip}, ActionCreate, StageStrong, "", nil, 2},
+				{[]IdentifierValue{strong.value, ip, host, mac}, ActionReuse, StageFuzzy, "K0", nil, 1},
+				{[]IdentifierValue{strong.value, otherIP}, ActionReuse, StageStrong, "K0", nil, 1},
+				{[]IdentifierValue{ip}, ActionReuse, StageFuzzy, "K0", nil, 1},
+				{[]IdentifierValue{strong.other, ip}, ActionCreate, StageFuzzy, "", nil, 2},
 				{[]IdentifierValue{ip}, ActionCreate, StageFuzzy, "", nil, 3},
-				{[]IdentifierValue{strong.value, ip}, ActionReuse, StageStrong, "K2", []int{2}, 2},
+				{[]IdentifierValue{strong.value, ip}, ActionReuse, StageStrong, "K0", []int{2}, 2},
 			}
 			var candidates []Candidate
 			for step, scan := range scans {
 				t.Run(fmt.Sprintf("scan_%d", step), func(t *testing.T) {
-					decision := decideCountingCase(t, GreenboneMatchPolicy(), countingCase{
+					decision := decideCountingCase(t, policyWithAllIdentityTypesStrong(), countingCase{
 						incoming: scan.incoming, candidates: candidates, action: scan.action,
 						stage: scan.stage, selected: scan.selected, merges: scan.merges,
 					})
@@ -309,9 +309,14 @@ func TestCountingProgressiveStrongEnrichmentMatrix(t *testing.T) {
 	var candidates []Candidate
 	for step, scan := range scans {
 		t.Run(fmt.Sprintf("scan_%d", step), func(t *testing.T) {
-			decision := decideCountingCase(t, GreenboneMatchPolicy(), countingCase{
+			decision := decideCountingCase(t, policyWithAllIdentityTypesStrong(), countingCase{
 				incoming: scan.incoming, candidates: candidates, action: scan.action,
-				stage: StageStrong, selected: scan.selected, merges: scan.merges,
+				stage: func() MatchingStage {
+					if step == 0 || scan.action == ActionCreate {
+						return StageFuzzy
+					}
+					return StageStrong
+				}(), selected: scan.selected, merges: scan.merges,
 			})
 			candidates = applyCountingDecision(scan.incoming, candidates, decision, step)
 			if len(candidates) != scan.count {

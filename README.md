@@ -3,7 +3,7 @@
 # asset-identity
 
 A Go library for identifier normalization and strong-first asset reconciliation.
-`libgvm_asset_identity.so` exposes the same algorithm through a GLib C API (ABI 1). Applications supply eligible
+`libgvm_asset_identity.so` exposes the same algorithm through a GLib C API (ABI 3). Applications supply eligible
 identifiers and candidates; they own scanner boundaries, authorization, persistence, and merge approval.
 
 ## Build status
@@ -45,28 +45,25 @@ Pass caller-prepared active views; normalization does not establish producer tru
 | CREATE | A new key is required.         |
 | REUSE  | Use the selected existing key. |
 
-Strong types follow the configured priority. Compare the highest strong type shared by both views; a shared conflict
-blocks lower-priority matches. Missing stronger identifiers allow a lower match. Incoming Machine X + Agent A therefore
-reuses an Agent-A-only key, and the application stores Machine X on that asset without changing its key.
+Matching runs in three stages:
 
-Among reusable candidates, the highest-priority shared match wins, then newest timestamp and asset-key ordering. When
-incoming strong IDs exist but no candidate qualifies, return CREATE without fuzzy fallback.
+1. **Strong:** Cloud ID → Greenbone ID → Machine ID → BIOS UUID. The highest shared type decides. A conflict excludes
+   that candidate; missing IDs are allowed. Matching candidates use priority, newest timestamp, then asset key.
+2. **Continuity:** Agent ID, SSH key, or TLS public key. Any shared value can select one compatible asset. Other
+   continuity or weak differences do not veto a unique match. TLS needs only one shared eligible key.
+3. **Fuzzy:** Keep the issue #11 rules: shared weak evidence, no conflicting MAC/name values, and a shared MAC for
+   changed IPs. Reuse only one qualifying candidate; timestamps and scores do not resolve ambiguity.
 
-Without incoming strong IDs, reuse exactly one compatible candidate with shared weak evidence. Missing identifiers are
-allowed. Conflicting MAC or name values block reuse; a shared MAC allows a changed IP. No match or multiple matches
-returns CREATE, regardless of timestamps or scores. Fuzzy decisions never merge records. Default fuzzy weights remain
-MAC (1.0), hostname (0.4), IP (0.4), and FQDN (0.4); hostname and FQDN are distinct types.
+Strong conflicts remain excluded from later stages. Multiple continuity matches restrict fuzzy matching to those
+candidates. With no continuity matches, fuzzy matching considers all candidates without a strong conflict. If neither
+stage resolves a key, return CREATE with no merges.
 
-TLS compares complete normalized public-key sets, ignoring order and duplicates: `{A,B}` matches `{B,A}`, but not
-`{A}` or `{A,B,C}`. A TLS conflict cannot be bypassed by a lower-priority type; a higher-priority match still wins.
-Other strong types match any equal value.
+Default fuzzy weights remain MAC (1.0), hostname (0.4), IP (0.4), and FQDN (0.4).
 
-`MergeIndices` lists the supplied candidates to move to the destination key. Retrieve each candidate and its asset key
-from the original candidate array using the returned index. On CREATE, the application generates the destination key; on
-REUSE it uses `SelectedKey`. The application applies the observation and key moves atomically. A strong source must
-match its own highest-priority strong type in the destination or, for strong REUSE, in the incoming view. Conflicting
-records remain separate. These merge rules apply only to strong-stage decisions; weak sources require full containment
-in the destination's weak identifiers.
+`MergeIndices` contains original candidate positions. Only strong-stage decisions can merge records. Their existing
+safeguards remain: incoming Agent/SSH/TLS evidence can link related records, and contained weak records may join.
+Continuity reuse never authorizes merging other assets that share a service key. The application stores new evidence,
+retains history, and applies any moves atomically.
 See [the algorithm guide](docs/how-asset-identity-works.md#8-the-returned-decision).
 
 ## Scanner identifier values
@@ -200,8 +197,8 @@ input.
 
 ## Algorithm guide
 
-[How Asset Identity Works](docs/how-asset-identity-works.md) explains the decision flow, strong priority, exact TLS
-key-set matching, weak evidence, and Go/C usage through examples.
+[How Asset Identity Works](docs/how-asset-identity-works.md) explains the decision flow, strong priority, continuity,
+weak evidence, and Go/C usage through examples.
 
 ## Technical reference
 

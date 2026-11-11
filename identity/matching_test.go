@@ -17,9 +17,13 @@ import (
 
 func TestGreenboneMatchPolicy(t *testing.T) {
 	p := identity.GreenboneMatchPolicy()
-	want := []identity.IdentifierType{identity.TypeCloudIdentifier, identity.TypeGreenboneID, identity.TypeMachineID, identity.TypeBIOSUUID, identity.TypeAgentID, identity.TypeSSHHostKey, identity.TypeTLSPublicKeyHash}
+	want := []identity.IdentifierType{identity.TypeCloudIdentifier, identity.TypeGreenboneID, identity.TypeMachineID, identity.TypeBIOSUUID}
 	if !reflect.DeepEqual(p.StrongOrder, want) {
 		t.Fatalf("strong order = %v", p.StrongOrder)
+	}
+	continuity := []identity.IdentifierType{identity.TypeAgentID, identity.TypeSSHHostKey, identity.TypeTLSPublicKeyHash}
+	if !reflect.DeepEqual(p.Continuity, continuity) {
+		t.Fatalf("continuity = %v", p.Continuity)
 	}
 	fuzzy := []identity.FuzzyMember{{Type: identity.TypeMAC, Weight: 1}, {Type: identity.TypeHostname, Weight: .4}, {Type: identity.TypeIP, Weight: .4}, {Type: identity.TypeFQDN, Weight: .4}}
 	if !reflect.DeepEqual(p.Fuzzy, fuzzy) {
@@ -30,13 +34,15 @@ func TestGreenboneMatchPolicy(t *testing.T) {
 	}
 	copy := p.Clone()
 	copy.StrongOrder[0] = identity.TypeIP
+	copy.Continuity[0] = identity.TypeIP
 	copy.Fuzzy[0].Weight = 9
 	if !reflect.DeepEqual(p, identity.GreenboneMatchPolicy()) {
 		t.Fatal("defaults or clone share storage")
 	}
 	p.StrongOrder[0] = identity.TypeIP
+	p.Continuity[0] = identity.TypeIP
 	p.Fuzzy[0].Weight = 9
-	if fresh := identity.GreenboneMatchPolicy(); !reflect.DeepEqual(fresh.StrongOrder, want) || !reflect.DeepEqual(fresh.Fuzzy, fuzzy) {
+	if fresh := identity.GreenboneMatchPolicy(); !reflect.DeepEqual(fresh.StrongOrder, want) || !reflect.DeepEqual(fresh.Fuzzy, fuzzy) || !reflect.DeepEqual(fresh.Continuity, continuity) {
 		t.Fatal("separate default policies share storage")
 	}
 }

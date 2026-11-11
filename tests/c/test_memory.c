@@ -106,7 +106,9 @@ Ensure (default_policy_containers_are_independent)
                               *second = default_policy ();
   g_array_set_size (first->strong_order, 0);
   g_array_set_size (first->fuzzy, 0);
-  assert_that (second->strong_order->len, is_equal_to (7));
+  g_array_set_size (first->continuity, 0);
+  assert_that (second->continuity->len, is_equal_to (3));
+  assert_that (second->strong_order->len, is_equal_to (4));
   assert_that (second->fuzzy->len, is_equal_to (4));
   gvm_asset_identity_policy_free (first);
   gvm_asset_identity_policy_free (second);

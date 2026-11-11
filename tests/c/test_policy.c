@@ -12,11 +12,15 @@
 Ensure (default_policy_is_copied_from_go)
 {
   gvm_asset_identity_policy_t *policy = default_policy ();
-  assert_that (gvm_asset_identity_abi_version (), is_equal_to (2));
-  assert_that (policy->strong_order->len, is_equal_to (7));
+  assert_that (gvm_asset_identity_abi_version (), is_equal_to (3));
+  assert_that (policy->strong_order->len, is_equal_to (4));
   assert_that (g_array_index (policy->strong_order,
                               gvm_asset_identity_identifier_type_t, 0),
                is_equal_to (GVM_ASSET_IDENTITY_CLOUD_IDENTIFIER));
+  assert_that (policy->continuity->len, is_equal_to (3));
+  assert_that (
+    g_array_index (policy->continuity, gvm_asset_identity_identifier_type_t, 0),
+    is_equal_to (GVM_ASSET_IDENTITY_AGENT_ID));
   assert_that (policy->fuzzy->len, is_equal_to (4));
   assert_that (
     g_array_index (policy->fuzzy, gvm_asset_identity_fuzzy_member_t, 0).type,
@@ -237,10 +241,44 @@ Ensure (aggregate_input_budget_is_checked_during_c_conversion)
   gvm_asset_identity_policy_free (policy);
 }
 
+Ensure (continuity_policy_validation)
+{
+  gvm_asset_identity_policy_t *policy = gvm_asset_identity_policy_new ();
+  gvm_asset_identity_observation_t *input =
+    gvm_asset_identity_observation_new ();
+  GPtrArray *rows = candidates_new ();
+  gvm_asset_identity_identifier_type_t type = GVM_ASSET_IDENTITY_AGENT_ID;
+  g_array_append_val (policy->continuity, type);
+  g_array_append_val (policy->continuity, type);
+  expect_failure (input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY);
+  g_array_set_size (policy->continuity, 1);
+  g_array_append_val (policy->strong_order, type);
+  expect_failure (input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY);
+  g_array_set_size (policy->strong_order, 0);
+  gvm_asset_identity_fuzzy_member_t member = {GVM_ASSET_IDENTITY_AGENT_ID, 1};
+  g_array_append_val (policy->fuzzy, member);
+  expect_failure (input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY);
+  g_array_set_size (policy->fuzzy, 0);
+  g_array_index (policy->continuity, gvm_asset_identity_identifier_type_t, 0) =
+    999;
+  expect_failure (input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY);
+  GArray *saved = policy->continuity;
+  policy->continuity = NULL;
+  expect_failure (input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY);
+  policy->continuity = g_array_new (FALSE, FALSE, sizeof (char));
+  expect_failure (input, rows, policy, GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY);
+  g_array_unref (policy->continuity);
+  policy->continuity = saved;
+  g_ptr_array_unref (rows);
+  gvm_asset_identity_observation_free (input);
+  gvm_asset_identity_policy_free (policy);
+}
+
 int
 main (void)
 {
   TestSuite *suite = create_test_suite ();
+  add_test (suite, continuity_policy_validation);
   add_test (suite, aggregate_input_budget_is_checked_during_c_conversion);
   add_test (suite, default_policy_is_copied_from_go);
   add_test (suite, fqdn_matches_as_weak_evidence);

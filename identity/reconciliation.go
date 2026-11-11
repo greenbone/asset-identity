@@ -34,8 +34,9 @@ const (
 type MatchingStage string
 
 const (
-	StageStrong MatchingStage = "STRONG"
-	StageFuzzy  MatchingStage = "FUZZY"
+	StageStrong     MatchingStage = "STRONG"
+	StageContinuity MatchingStage = "CONTINUITY"
+	StageFuzzy      MatchingStage = "FUZZY"
 )
 
 // Decision selects an existing asset key or requests a new key.
@@ -98,10 +99,7 @@ func Decide(observation Observation, candidates []Candidate, policy MatchPolicy)
 // selectKey uses canonical views validated by Decide.
 func selectKey(observation Observation, candidates []Candidate, views [][]IdentifierValue, policy MatchPolicy) (Decision, error) {
 	match := evaluateStrongPriority(policy, observation.Identifiers, views)
-	if match.HasIncomingStrong {
-		if len(match.CandidateIndices) == 0 {
-			return Decision{Action: ActionCreate, Stage: StageStrong, NeedsNewKey: true}, nil
-		}
+	if len(match.CandidateIndices) > 0 {
 		ranking := make([]StrongRankingCandidate, len(match.CandidateIndices))
 		for i, index := range match.CandidateIndices {
 			ranking[i] = StrongRankingCandidate{AssetKey: candidates[index].AssetKey, LastSeen: candidates[index].LastSeen}
@@ -113,7 +111,32 @@ func selectKey(observation Observation, candidates []Candidate, views [][]Identi
 		index := match.CandidateIndices[order[0]]
 		return Decision{Action: ActionReuse, Stage: StageStrong, SelectedKey: candidates[index].AssetKey, SelectedIndex: &index}, nil
 	}
-	result, err := matchFuzzyCanonical(observation.Identifiers, views, candidates, policy)
+	eligible := make([][]IdentifierValue, len(views))
+	var continuityMatches []int
+	for i, view := range views {
+		priority, matches := compareStrong(observation.Identifiers, view, policy)
+		if priority >= 0 && !matches {
+			continue
+		}
+		eligible[i] = view
+		for _, typ := range policy.Continuity {
+			if sharesValue(observation.Identifiers, view, typ) {
+				continuityMatches = append(continuityMatches, i)
+				break
+			}
+		}
+	}
+	if len(continuityMatches) == 1 {
+		index := continuityMatches[0]
+		return Decision{Action: ActionReuse, Stage: StageContinuity, SelectedKey: candidates[index].AssetKey, SelectedIndex: &index}, nil
+	}
+	if len(continuityMatches) > 1 {
+		eligible = make([][]IdentifierValue, len(views))
+		for _, index := range continuityMatches {
+			eligible[index] = views[index]
+		}
+	}
+	result, err := matchFuzzyCanonical(observation.Identifiers, eligible, candidates, policy)
 	if err != nil {
 		return Decision{}, err
 	}

@@ -23,13 +23,15 @@ type FuzzyMember struct {
 // MatchPolicy configures strong priority and ordered fuzzy weights.
 type MatchPolicy struct {
 	StrongOrder []IdentifierType
+	Continuity  []IdentifierType
 	Fuzzy       []FuzzyMember
 }
 
 // GreenboneMatchPolicy returns independently owned Greenbone defaults.
 func GreenboneMatchPolicy() MatchPolicy {
 	return MatchPolicy{
-		StrongOrder: []IdentifierType{TypeCloudIdentifier, TypeGreenboneID, TypeMachineID, TypeBIOSUUID, TypeAgentID, TypeSSHHostKey, TypeTLSPublicKeyHash},
+		StrongOrder: []IdentifierType{TypeCloudIdentifier, TypeGreenboneID, TypeMachineID, TypeBIOSUUID},
+		Continuity:  []IdentifierType{TypeAgentID, TypeSSHHostKey, TypeTLSPublicKeyHash},
 		Fuzzy:       []FuzzyMember{{Type: TypeMAC, Weight: 1}, {Type: TypeHostname, Weight: .4}, {Type: TypeIP, Weight: .4}, {Type: TypeFQDN, Weight: .4}},
 	}
 }
@@ -37,6 +39,7 @@ func GreenboneMatchPolicy() MatchPolicy {
 // Clone copies membership slices, preserving nil versus empty.
 func (p MatchPolicy) Clone() MatchPolicy {
 	p.StrongOrder = slices.Clone(p.StrongOrder)
+	p.Continuity = slices.Clone(p.Continuity)
 	p.Fuzzy = slices.Clone(p.Fuzzy)
 	return p
 }
@@ -53,6 +56,16 @@ func (p MatchPolicy) Validate() error {
 		}
 		strong[typ] = true
 	}
+	continuity := make(map[IdentifierType]bool, len(p.Continuity))
+	for i, typ := range p.Continuity {
+		if err := (IdentifierValue{Type: typ}).Validate(); err != nil {
+			return fmt.Errorf("%w: continuity member %d: %w", ErrInvalidMatchPolicy, i, err)
+		}
+		if continuity[typ] || strong[typ] {
+			return fmt.Errorf("%w: repeated continuity type %q", ErrInvalidMatchPolicy, typ)
+		}
+		continuity[typ] = true
+	}
 	fuzzy := make(map[IdentifierType]bool, len(p.Fuzzy))
 	for i, member := range p.Fuzzy {
 		if err := (IdentifierValue{Type: member.Type}).Validate(); err != nil {
@@ -61,8 +74,8 @@ func (p MatchPolicy) Validate() error {
 		if fuzzy[member.Type] {
 			return fmt.Errorf("%w: duplicate fuzzy type %q", ErrInvalidMatchPolicy, member.Type)
 		}
-		if strong[member.Type] {
-			return fmt.Errorf("%w: type %q participates in both stages", ErrInvalidMatchPolicy, member.Type)
+		if strong[member.Type] || continuity[member.Type] {
+			return fmt.Errorf("%w: type %q participates in multiple stages", ErrInvalidMatchPolicy, member.Type)
 		}
 		if member.Weight <= 0 || math.IsNaN(member.Weight) || math.IsInf(member.Weight, 0) {
 			return fmt.Errorf("%w: fuzzy member %d: weight must be finite and positive", ErrInvalidMatchPolicy, i)

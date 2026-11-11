@@ -45,7 +45,7 @@ func TestTLSScannerCertificate(t *testing.T) {
 	host := identity.IdentifierValue{Type: identity.TypeHostname, Value: "gat-29"}
 	for _, pair := range [][2]identity.IdentifierValue{{input, normalized}, {normalized, input}} {
 		decision, err := identity.Decide(identity.Observation{Identifiers: []identity.IdentifierValue{pair[0], host}}, []identity.Candidate{{AssetKey: "existing", Identifiers: []identity.IdentifierValue{pair[1], host}}}, identity.GreenboneMatchPolicy())
-		if err != nil || decision.Action != identity.ActionReuse || decision.Stage != identity.StageStrong || decision.SelectedKey != "existing" {
+		if err != nil || decision.Action != identity.ActionReuse || decision.Stage != identity.StageContinuity || decision.SelectedKey != "existing" {
 			t.Fatalf("raw/canonical matching: %+v %v", decision, err)
 		}
 	}

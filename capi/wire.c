@@ -50,6 +50,7 @@ gai_wire_policy_free (gai_wire_policy_t *policy)
     return;
   free ((void *) policy->strong_order);
   free ((void *) policy->fuzzy);
+  free ((void *) policy->continuity);
   free (policy);
 }
 
