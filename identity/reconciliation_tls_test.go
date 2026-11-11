@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestDecideTLSRequiresEqualKeySets(t *testing.T) {
+func TestConfiguredStrongTLSRequiresEqualKeySets(t *testing.T) {
 	certificate, err := os.ReadFile("testdata/tls_scanner_certificate.txt")
 	if err != nil {
 		t.Fatal(err)
@@ -52,8 +52,13 @@ func TestDecideTLSRequiresEqualKeySets(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Decide(Observation{Identifiers: tt.incoming}, tt.candidates, GreenboneMatchPolicy())
-			if err != nil || got.Stage != StageStrong || got.SelectedKey != tt.key {
+			got, err := Decide(Observation{Identifiers: tt.incoming}, tt.candidates, policyWithAllIdentityTypesStrong())
+			if err != nil || got.Stage != func() MatchingStage {
+				if tt.key == "" {
+					return StageFuzzy
+				}
+				return StageStrong
+			}() || got.SelectedKey != tt.key {
 				t.Fatalf("decision=%+v error=%v", got, err)
 			}
 			if tt.key == "" {

@@ -12,8 +12,8 @@ lib="$stage$LIBDIR"
 include="$stage$INCLUDEDIR"
 pc="$lib/pkgconfig/libgvm_asset_identity.pc"
 test -f "$lib/libgvm_asset_identity.so.$VERSION-$GOARCH"
-test "$(readlink "$lib/libgvm_asset_identity.so")" = libgvm_asset_identity.so.1
-test "$(readlink "$lib/libgvm_asset_identity.so.1")" = "libgvm_asset_identity.so.$VERSION-$GOARCH"
+test "$(readlink "$lib/libgvm_asset_identity.so")" = libgvm_asset_identity.so.3
+test "$(readlink "$lib/libgvm_asset_identity.so.3")" = "libgvm_asset_identity.so.$VERSION-$GOARCH"
 cmp include/gvm_asset_identity.h "$include/gvm_asset_identity.h"
 test -f "$pc"
 test "$(pkg-config --modversion "$pc")" = "$VERSION"
@@ -35,7 +35,7 @@ make uninstall DESTDIR="$stage" PREFIX="$PREFIX" LIBDIR="$LIBDIR" INCLUDEDIR="$I
 test -f "$lib/unrelated-file"
 test ! -e "$lib/libgvm_asset_identity.so.$VERSION-$GOARCH"
 test ! -L "$lib/libgvm_asset_identity.so"
-test ! -L "$lib/libgvm_asset_identity.so.1"
+test ! -L "$lib/libgvm_asset_identity.so.3"
 test ! -e "$include/gvm_asset_identity.h"
 test ! -e "$pc"
 printf 'Staged installation, C consumer, Cgreen suites and scoped uninstall passed.\n'

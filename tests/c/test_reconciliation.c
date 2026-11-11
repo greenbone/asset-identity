@@ -23,7 +23,9 @@ Ensure (create_and_strong_reuse)
       result = decide (input, rows, policy);
       assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
       assert_that (result->stage,
-                   is_equal_to (GVM_ASSET_IDENTITY_STAGE_STRONG));
+                   is_equal_to (types[i] == GVM_ASSET_IDENTITY_AGENT_ID
+                                  ? GVM_ASSET_IDENTITY_STAGE_CONTINUITY
+                                  : GVM_ASSET_IDENTITY_STAGE_STRONG));
       assert_that (result->selected_key, is_equal_to_string ("K"));
       assert_that (result->has_selected_index, is_true);
       gvm_asset_identity_decision_free (result);
@@ -48,7 +50,8 @@ Ensure (strong_reuse_enrichment_and_conflict)
 
   gvm_asset_identity_decision_t *result = decide (input, rows, policy);
   assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
-  assert_that (result->stage, is_equal_to (GVM_ASSET_IDENTITY_STAGE_STRONG));
+  assert_that (result->stage,
+               is_equal_to (GVM_ASSET_IDENTITY_STAGE_CONTINUITY));
   assert_that (result->needs_new_key, is_false);
   assert_that (result->has_selected_index, is_true);
   assert_that (result->selected_key, is_equal_to_string ("agent-only"));
@@ -162,7 +165,7 @@ Ensure (strong_no_match_and_multiple_values)
   g_ptr_array_add (rows, candidate ("weak", weak));
   gvm_asset_identity_decision_t *result = decide (input, rows, policy);
   assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
-  assert_that (result->stage, is_equal_to (GVM_ASSET_IDENTITY_STAGE_STRONG));
+  assert_that (result->stage, is_equal_to (GVM_ASSET_IDENTITY_STAGE_FUZZY));
   gvm_asset_identity_decision_free (result);
   g_ptr_array_add (rows, candidate ("strong", input));
   g_ptr_array_add (input->identifiers,
@@ -332,9 +335,9 @@ Ensure (machine_id_forms_match)
 }
 
 static void
-check_raw_strong_match (gvm_asset_identity_identifier_type_t type,
-                        const gchar *raw, const gchar *canonical,
-                        const gchar *host)
+check_raw_continuity_match (gvm_asset_identity_identifier_type_t type,
+                            const gchar *raw, const gchar *canonical,
+                            const gchar *host)
 {
   gvm_asset_identity_policy_t *policy = default_policy ();
   gvm_asset_identity_observation_t *views[] = {observation (type, raw),
@@ -350,7 +353,7 @@ check_raw_strong_match (gvm_asset_identity_identifier_type_t type,
       gvm_asset_identity_decision_t *result = decide (views[i], rows, policy);
       assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
       assert_that (result->stage,
-                   is_equal_to (GVM_ASSET_IDENTITY_STAGE_STRONG));
+                   is_equal_to (GVM_ASSET_IDENTITY_STAGE_CONTINUITY));
       assert_that (result->selected_key, is_equal_to_string ("existing"));
       assert_that (result->selected_index, is_equal_to (0));
       assert_that (result->needs_new_key, is_false);
@@ -377,7 +380,7 @@ Ensure (raw_ssh_scanner_value_matches_public_key)
                      "YQrOjEEK90g2FjNicABlxgBFRANn3KkM72mM3sDIyN/"
                      "q8Y6f9avo/1dMv847Y+mT2f4po92qekby06dbiU=";
   gchar *raw = g_strdup_printf ("22 %s", key);
-  check_raw_strong_match (GVM_ASSET_IDENTITY_SSH_HOST_KEY, raw, key, NULL);
+  check_raw_continuity_match (GVM_ASSET_IDENTITY_SSH_HOST_KEY, raw, key, NULL);
   g_free (raw);
 }
 
@@ -392,7 +395,7 @@ Ensure (raw_tls_scanner_value_matches_public_key_hash)
   if (loaded)
     {
       g_strchomp (raw); /* Remove the fixture file's line ending only. */
-      check_raw_strong_match (
+      check_raw_continuity_match (
         GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, raw,
         "spki-sha256:"
         "1667ab37ba6f84c9c7053970c7557507deccefdbb09c454d9d0ca0e4fe1c3319",
@@ -421,7 +424,7 @@ Ensure (malformed_scanner_values_return_input_errors)
   gvm_asset_identity_policy_free (policy);
 }
 
-Ensure (tls_requires_equal_public_key_sets)
+Ensure (tls_shared_public_key_establishes_continuity)
 {
   const gchar *a =
     "spki-sha256:"
@@ -446,8 +449,8 @@ Ensure (tls_requires_equal_public_key_sets)
   gvm_asset_identity_decision_free (result);
   g_ptr_array_remove_index (row->identifiers, 1);
   result = decide (input, rows, policy);
-  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
-  assert_that (result->needs_new_key, is_true);
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
+  assert_that (result->needs_new_key, is_false);
   gvm_asset_identity_decision_free (result);
   g_ptr_array_add (row->identifiers,
                    gvm_asset_identity_identifier_new (
@@ -456,7 +459,7 @@ Ensure (tls_requires_equal_public_key_sets)
                    gvm_asset_identity_identifier_new (
                      GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, c));
   result = decide (input, rows, policy);
-  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
   gvm_asset_identity_decision_free (result);
   g_ptr_array_remove_index (row->identifiers, 2);
   g_ptr_array_add (row->identifiers,
@@ -471,7 +474,7 @@ Ensure (tls_requires_equal_public_key_sets)
   gvm_asset_identity_policy_free (policy);
 }
 
-Ensure (create_returns_owned_merge_targets)
+Ensure (strong_reuse_returns_owned_merge_targets)
 {
   gvm_asset_identity_policy_t *policy = default_policy ();
   gvm_asset_identity_observation_t *input =
@@ -489,17 +492,25 @@ Ensure (create_returns_owned_merge_targets)
   g_ptr_array_remove_index (second->identifiers, 1);
   g_ptr_array_add (input->identifiers, gvm_asset_identity_identifier_new (
                                          GVM_ASSET_IDENTITY_AGENT_ID, "A"));
+  g_ptr_array_add (input->identifiers, gvm_asset_identity_identifier_new (
+                                         GVM_ASSET_IDENTITY_GREENBONE_ID, "G"));
+  for (guint i = 0; i < rows->len; i++)
+    {
+      gvm_asset_identity_candidate_t *row = g_ptr_array_index (rows, i);
+      g_ptr_array_add (row->identifiers,
+                       gvm_asset_identity_identifier_new (
+                         GVM_ASSET_IDENTITY_GREENBONE_ID, "G"));
+    }
   gvm_asset_identity_decision_t *result = decide (input, rows, policy);
   gvm_asset_identity_observation_free (input);
   g_ptr_array_unref (rows);
   gvm_asset_identity_policy_free (policy);
-  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
-  assert_that (result->has_selected_index, is_false);
-  assert_that (result->merge_indices->len, is_equal_to (2));
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
+  assert_that (result->has_selected_index, is_true);
+  assert_that (result->merge_indices->len, is_equal_to (1));
   assert_that (g_array_index (result->merge_indices, gsize, 0),
-               is_equal_to (0));
-  assert_that (g_array_index (result->merge_indices, gsize, 1),
                is_equal_to (1));
+  assert_that (result->selected_key, is_equal_to_string ("K1"));
   gvm_asset_identity_decision_free (result);
 }
 
@@ -533,13 +544,53 @@ Ensure (weak_observation_keeps_conflicting_agent_records_separate)
   gvm_asset_identity_policy_free (policy);
 }
 
+Ensure (continuity_ambiguity_uses_only_matching_candidates)
+{
+  gvm_asset_identity_policy_t *policy = default_policy ();
+  gvm_asset_identity_observation_t *input =
+    observation (GVM_ASSET_IDENTITY_AGENT_ID, "A");
+  GPtrArray *rows = candidates_new ();
+  g_ptr_array_add (rows, candidate ("K0", input));
+  g_ptr_array_add (rows, candidate ("K1", input));
+  gvm_asset_identity_decision_t *result = decide (input, rows, policy);
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
+  assert_that (result->merge_indices->len, is_equal_to (0));
+  gvm_asset_identity_decision_free (result);
+  g_ptr_array_add (input->identifiers, gvm_asset_identity_identifier_new (
+                                         GVM_ASSET_IDENTITY_IP, "192.0.2.10"));
+  gvm_asset_identity_candidate_t *second = g_ptr_array_index (rows, 1);
+  g_ptr_array_add (second->identifiers, gvm_asset_identity_identifier_new (
+                                          GVM_ASSET_IDENTITY_IP, "192.0.2.10"));
+  result = decide (input, rows, policy);
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
+  assert_that (result->stage, is_equal_to (GVM_ASSET_IDENTITY_STAGE_FUZZY));
+  assert_that (result->selected_key, is_equal_to_string ("K1"));
+  assert_that (result->selected_index, is_equal_to (1));
+  assert_that (result->merge_indices->len, is_equal_to (0));
+  gvm_asset_identity_decision_free (result);
+  g_ptr_array_remove_index (second->identifiers, 1);
+  gvm_asset_identity_observation_t *weak =
+    observation (GVM_ASSET_IDENTITY_IP, "192.0.2.10");
+  g_ptr_array_add (rows, candidate ("outside", weak));
+  result = decide (input, rows, policy);
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
+  assert_that (result->has_selected_index, is_false);
+  assert_that (result->merge_indices->len, is_equal_to (0));
+  gvm_asset_identity_decision_free (result);
+  gvm_asset_identity_observation_free (weak);
+  gvm_asset_identity_observation_free (input);
+  g_ptr_array_unref (rows);
+  gvm_asset_identity_policy_free (policy);
+}
+
 int
 main (void)
 {
   TestSuite *suite = create_test_suite ();
+  add_test (suite, continuity_ambiguity_uses_only_matching_candidates);
   add_test (suite, create_and_strong_reuse);
   add_test (suite, strong_reuse_enrichment_and_conflict);
-  add_test (suite, create_returns_owned_merge_targets);
+  add_test (suite, strong_reuse_returns_owned_merge_targets);
   add_test (suite, weak_observation_keeps_conflicting_agent_records_separate);
   add_test (suite, custom_priority_preserves_original_indices);
   add_test (suite, strong_ranking_keeps_nanoseconds_missing_and_key_ties);
@@ -552,6 +603,6 @@ main (void)
   add_test (suite, raw_ssh_scanner_value_matches_public_key);
   add_test (suite, raw_tls_scanner_value_matches_public_key_hash);
   add_test (suite, malformed_scanner_values_return_input_errors);
-  add_test (suite, tls_requires_equal_public_key_sets);
+  add_test (suite, tls_shared_public_key_establishes_continuity);
   return run_test_suite (suite, create_text_reporter ());
 }

@@ -65,7 +65,7 @@ certificate and its tagged hash normalize equally; an all-zero tagged digest is 
 
 Normalization does not check certificate names, signatures, trust, or validity dates. Matching admits a raw certificate
 only when its CN or a DNS SAN names a supplied hostname or FQDN;
-see [strong matching](SPEC-002-reconciliation.md#strong-matching). Supplied tagged hashes remain eligible, but the
+see [matching rules](SPEC-002-reconciliation.md#continuity-matching). Supplied tagged hashes remain eligible, but the
 library cannot verify what the producer hashed. Bare/base64 digests, certificate fingerprints, PEM, other tags,
 malformed DER, and trailing DER data are unsupported.
 

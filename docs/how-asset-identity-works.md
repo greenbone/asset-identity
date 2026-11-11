@@ -1,7 +1,7 @@
 # How Asset Identity Works
 
 Asset-identity decides whether an observation should use an existing asset key or receive a new one. It combines
-identifier normalization, configurable strong-ID priority, and weak evidence. The native Go API and the GLib C API run
+identifier normalization, configurable strong-ID priority, continuity, and weak evidence. The native Go API and the GLib C API run
 the same algorithm.
 
 This document explains the current library through examples. The [specifications](specs/SPEC-001-identifiers.md)
@@ -16,7 +16,7 @@ An application supplies an observation and the existing assets it wants consider
 | Observation | agent-42 | 192.0.2.20 | —                  |
 | Candidate   | agent-42 | 192.0.2.10 | asset-A            |
 
-The Agent ID matches, so the result is `REUSE asset-A`. The IP change does not prevent a strong match.
+The Agent ID matches, so the result is `REUSE asset-A`. The IP change does not prevent this continuity match.
 
 The library returns this decision. The application assigns or generates the key and stores its own data. It also returns
 eligible existing keys to move under the destination key. The application performs those moves.
@@ -28,7 +28,7 @@ eligible existing keys to move under the destination key. The application perfor
 | Observation | The eligible active identifiers describing the newly observed asset             |
 | Candidate   | An existing asset key, its eligible active identifiers, and optional `LastSeen` |
 | Identifier  | A type and a value                                                              |
-| Policy      | Ordered strong identifier types and configured fuzzy types/weights              |
+| Policy      | Strong priority, continuity membership, and fuzzy types/weights              |
 
 One observation or candidate can contain several identifier types and several values of each type. For example, a host
 may have two IP addresses, several SSH keys, and multiple TLS certificates.
@@ -55,12 +55,12 @@ identifier = (type, canonical value)
 | 2        | Greenbone ID        | Any equal value                |
 | 3        | Machine ID          | Any equal value                |
 | 4        | BIOS UUID           | Any equal value                |
-| 5        | Agent ID            | Any equal value                |
-| 6        | SSH host key        | Any equal public key           |
-| 7        | TLS public-key hash | Equal complete public-key sets |
 
 Reuse an existing key when its highest-priority shared strong type matches. Missing stronger IDs allow a lower match; a
 stronger shared conflict blocks it. New evidence enriches the reused asset without replacing its key.
+
+Continuity types are Agent ID, SSH host key, and TLS public-key hash. Any one shared eligible value can identify a
+unique compatible candidate. No continuity type outranks another.
 
 The default fuzzy types are:
 
@@ -76,7 +76,7 @@ FQDN is weak evidence because names can be reassigned or shared. Compare the ful
 `hostname:server` does not match `fqdn:server.example.com`. FQDN participates in weak matching and merge eligibility
 alongside the other configured fuzzy types.
 
-Callers may reorder, omit, or reclassify supported types. A type cannot belong to both stages. An omitted type does not
+Callers may reorder, omit, or reclassify supported types. A type cannot belong to more than one stage. An omitted type does not
 contribute to matching. Empty configuration does not restore defaults.
 
 ## 4. Normalize before comparing
@@ -125,84 +125,78 @@ rules are in [SPEC-001B](specs/SPEC-001B-normalization.md).
 
 ## 5. Four steps
 
-The algorithm first chooses the destination key, then finds existing records that can move under it.
-
-1. **Reuse a compatible strong identity.** Compare the highest strong type present on both sides; a conflict blocks that
-   record. Missing types are skipped. New stronger IDs can be stored on an existing key selected by a lower match.
-2. **Create when no strong record matches.** If incoming strong IDs exist but no record qualifies, return `CREATE`. Weak
-   matches cannot select a key here; compatible records may still merge.
-3. **Use weak evidence when no strong IDs were supplied.** Reuse exactly one compatible candidate. No match or multiple
-   matches returns `CREATE`; timestamps and scores do not resolve ambiguity.
-4. **Plan merges for strong-stage decisions only.** Apply the safeguards below. Fuzzy decisions have no merge indices.
-
-Here, “strong” and “fuzzy” mean the types enabled in the supplied policy. The defaults are listed above.
-`CREATE` requests a new key from the application; the library does not generate one.
+1. **Strong:** use the highest-priority shared machine identity. A strong conflict excludes that candidate from later stages.
+2. **Continuity:** if no strong match wins, reuse one compatible record sharing an Agent ID, SSH key, or TLS key.
+3. **Fuzzy:** with several continuity matches, compare only those records. With none, compare all records without a
+   strong conflict. Keep the issue #11 weak rules and require exactly one qualifying candidate. Otherwise `CREATE`.
+4. **Merging:** only a strong-stage decision may merge related records. Continuity and fuzzy reuse return no merge indices.
 
 ```mermaid
 flowchart TD
-    A[Validate and normalize inputs] --> B{Incoming strong IDs?}
-    B -- Yes --> C{Compatible strong match?}
-    C -- Yes --> D[REUSE key selected by strong priority]
-    C -- No --> E[CREATE a new key]
-    B -- No --> F{Exactly one compatible weak match?}
-    F -- Yes --> G[REUSE its key]
-    F -- No --> J[CREATE a new key]
-    D --> H[Find eligible records to merge into the destination]
-    E --> H
-    H --> I[Return CREATE or REUSE, plus merge indices]
-    G --> K[Return with no merge indices]
-    J --> K
+    A[Validate and normalize] --> B{Strong match?}
+    B -- Yes --> C[REUSE and apply existing strong merge safeguards]
+    B -- No --> D[Exclude strong conflicts]
+    D --> E{Continuity matches?}
+    E -- One --> F[REUSE with no merges]
+    E -- Several --> G[Fuzzy matching within continuity candidates]
+    E -- None --> H[Fuzzy matching within compatible candidates]
+    G --> I{Exactly one weak match?}
+    H --> I
+    I -- Yes --> F
+    I -- No --> J[CREATE with no merges]
 ```
 
-Invalid input returns an error before a decision can be applied.
+The application creates keys, stores incoming evidence, retains history, and applies permitted moves atomically.
 
 ## 6. Choose a key using strong IDs
 
 ### Reuse and enrich an existing key
 
 In the Go API, the incoming record is the `Observation`; `Candidate` means an existing record. Machine ID has higher
-priority than Agent ID:
+priority than continuity evidence:
 
-| Incoming observation | Existing candidates        | Result         | Merge indices |
-|----------------------|----------------------------|----------------|---------------|
-| Machine X, Agent A   | K0: Agent A                | REUSE K0       | `[]`          |
-| Agent A              | K0: Machine X, Agent A     | REUSE K0       | `[]`          |
-| Machine X, Agent A   | K0: Machine Y, Agent A     | CREATE new key | `[]`          |
-| Machine X, Agent B   | K0: Machine X, Agent A     | REUSE K0       | `[]`          |
-| Machine X, Agent A   | K0: Agent A; K1: Machine X | REUSE K1       | `[0]`         |
+| Incoming observation | Existing candidates        | Stage      | Result         | Merge indices |
+|----------------------|----------------------------|------------|----------------|---------------|
+| Machine X, Agent A   | K0: Agent A                | CONTINUITY | REUSE K0       | `[]`          |
+| Agent A              | K0: Machine X, Agent A     | CONTINUITY | REUSE K0       | `[]`          |
+| Machine X, Agent A   | K0: Machine Y, Agent A     | FUZZY      | CREATE new key | `[]`          |
+| Machine X, Agent B   | K0: Machine X, Agent A     | STRONG     | REUSE K0       | `[]`          |
+| Machine X, Agent A   | K0: Agent A; K1: Machine X | STRONG     | REUSE K1       | `[0]`         |
 
 Compare the highest-priority strong type present on both sides. Missing types are skipped; a shared conflict blocks that
 record. Differences below a matching type do not veto it. The same rules follow a custom policy's order.
 
-When Agent A matches but the stored record lacks Machine X, reuse its key and store the incoming evidence on that asset.
+When Agent A matches but the stored record lacks Machine X, continuity reuses its key and the caller stores the incoming evidence.
 This keeps the key stable as more identifiers are discovered. Conflicting Machine IDs remain separate. The application
 retains prior evidence according to its history policy and applies any merge moves atomically.
 
 ### If several candidates match the same strong type
 
-Among eligible candidates, prefer the highest-priority shared match. Except for TLS, one equal value of that type is
-enough. An observation with Agent IDs A and B can therefore match one candidate through A and another through B.
+Among eligible candidates, prefer the highest-priority shared strong match. One equal value of that type is enough.
+Multiple values can match several candidates at that priority.
 
 Choose the candidate with the newest `LastSeen`. Present timestamps rank before missing timestamps; equal or all-missing
 times use the smallest asset key in byte order. Strong timestamps include nanoseconds. This chooses one destination. The
 separate merge rules decide whether other records can join it.
 
-### TLS compares the complete public-key set
+### Continuity after a strong match is unavailable
 
-When TLS is the deciding type, all distinct normalized TLS keys must be equal. Order and duplicates do not matter:
+A unique shared Agent ID, SSH key, or TLS key returns `CONTINUITY REUSE`. Differences in other continuity types or weak
+identifiers do not veto it. A strong conflict still blocks the candidate.
 
-| Incoming keys | Candidate keys | TLS match? |
-|---------------|----------------|------------|
-| A, B          | B, A           | Yes        |
-| A, A, B       | A, B           | Yes        |
-| A, B          | A              | No         |
-| A, B          | A, B, C        | No         |
-| A, B          | A, C           | No         |
+TLS requires only one shared eligible public key:
 
-These are public-key identities, not certificate rows. The same key counts once. When TLS is the highest shared strong
-type, unequal sets block the record. A higher-priority match, such as Agent ID, still wins even when TLS keys differ.
+| Incoming keys | Stored keys | Continuity? |
+|---------------|-------------|-------------|
+| A, B          | B, A        | Yes         |
+| A, B          | A           | Yes         |
+| A, B          | A, C        | Yes         |
+| A, B          | C, D        | No          |
 
-## 7. Choose a key when no strong IDs were supplied
+If several records share continuity evidence, try weak matching only among those records. Do not merge them. If no key
+survives rotation, try weak evidence among candidates without strong conflicts.
+
+## 7. Choose a key using weak evidence
 
 Compare the configured weak identifiers: MAC, hostname, IP, and FQDN by default.
 
@@ -235,7 +229,7 @@ separate record can increase the count until better evidence is available.
 | REUSE  | false       | Existing destination key and its original candidate index |
 | CREATE | true        | Absent; the application generates the destination key     |
 
-`Stage` tells you whether strong or fuzzy matching chose the destination. Go represents an absent index as nil; C uses
+`Stage` tells you whether strong, continuity, or fuzzy matching chose the destination. Go represents an absent index as nil; C uses
 `has_selected_index = FALSE`.
 
 ### The records that can join it
@@ -244,61 +238,46 @@ separate record can increase the count until better evidence is available.
 identifiers and asset key. The selected destination is excluded. An empty list means there are no existing records to
 move. The library does not return copies of candidates or individual historical observations.
 
-Fuzzy decisions always have empty `MergeIndices`. The following merge rules apply only to strong-stage decisions.
+Continuity and fuzzy decisions always have empty `MergeIndices`. The following merge rules apply only to strong-stage decisions.
 
-Use the stored selected candidate as the destination on `REUSE`, or the incoming observation on `CREATE`. Strong `REUSE`
-also binds the incoming strong evidence to that key.
+Use the stored selected candidate as the destination. Incoming evidence can link related records. The merge safeguards
+keep the previous ordering: strong types followed by continuity types.
 
 | Source and destination  | Requirement to merge                                                                                     |
 |-------------------------|----------------------------------------------------------------------------------------------------------|
-| Both have strong IDs    | Match the source's highest-priority type in the destination or, for strong `REUSE`, in the incoming view |
-| Either lacks strong IDs | Every source fuzzy identifier occurs in the destination's nonempty fuzzy set                             |
+| Both have strong or continuity IDs | Match the source's highest-priority type in the destination or, for strong `REUSE`, in the incoming view |
+| Either lacks strong and continuity IDs | Every source fuzzy identifier occurs in the destination's nonempty fuzzy set                             |
 
 For example, incoming Machine X + Agent A can select a Machine-X-only key and merge an Agent-A-only record into it.
 Check each view separately; partial TLS sets cannot be combined into a match. A source whose strongest type is unknown
 to both views stays separate.
 
 For strong `REUSE`, exclude incoming conflicts above the selecting priority, and stored-destination conflicts at or
-above it. Multiple incoming Agent IDs therefore cannot bridge different stored Agent IDs when Agent ID decides.
-Lower-priority differences may follow a higher match. Weak containment still uses the stored destination on `REUSE`; an
+above it. Lower-priority differences may follow a higher strong match. Weak containment still uses the stored destination on `REUSE`; an
 empty source fuzzy set is contained by any nonempty destination fuzzy set.
 
-### Example: combine two partial records under a new key
+### Example: a strong match links related records
 
-Here hostname uses `TypeHostname`. The incoming Agent ID is new; the stored records have only weak identifiers:
+| Input       | Identifiers       | Existing key |
+|-------------|-------------------|--------------|
+| Observation | Machine X, Agent A | —           |
+| Candidate 0 | Machine X         | key-1        |
+| Candidate 1 | Agent A           | key-2        |
 
-| Input       | Identifiers                      | Existing key |
-|-------------|----------------------------------|--------------|
-| Observation | Agent A, IP P, hostname H, MAC M | —            |
-| Candidate 0 | IP P, hostname H                 | key-1        |
-| Candidate 1 | IP P, MAC M                      | key-2        |
-
-Neither stored record matches Agent A, so strong selection returns `CREATE`. Both weak records are fully contained in
-the incoming weak identifiers, so both can move under the new key:
+Machine X selects key-1. The incoming observation links Agent A to that identity, so the existing strong-stage merge
+rules allow candidate 1 to join it:
 
 ```text
-Action: CREATE
-NeedsNewKey: true
-SelectedIndex: absent
-SelectedKey: absent
-MergeIndices: [0, 1]
+Action: REUSE
+Stage: STRONG
+SelectedIndex: 0
+SelectedKey: key-1
+MergeIndices: [1]
 ```
 
-The application generates key-3, stores the observation under key-3, and moves the records belonging to key-1 and key-2
-under key-3 in one transaction. `SelectedIndex` identifies a reused destination;
-`MergeIndices` identifies the existing records to move.
-
-### Other examples
-
-- **Only weak evidence:** remove Agent A from the observation above. Both records qualify, so return `CREATE` with empty
-  `MergeIndices`; leave the existing keys separate.
-- **Weak observation, conflicting strong records:** remove the incoming Agent ID and give candidate 0 Agent ID A and
-  candidate 1 Agent ID B. Return `CREATE` without merges; both existing records keep their keys.
-- **Matching source identity:** Agent-only sources can merge through their matching Agent ID, even with changed IPs.
-  When Machine ID is the source's highest-priority type, it must match; a matching Agent ID cannot override that
-  conflict.
-- **TLS decides:** TLS sets `{A,B}` and `{A}` cannot merge through TLS. A higher-priority matching Agent ID still takes
-  precedence.
+A conflicting Machine ID on candidate 1 prevents this merge. Without a strong match, Agent A could select a key through
+continuity, but that decision would not merge other records. Strong-stage weak containment and TLS merge safeguards
+remain unchanged; overlapping service keys alone do not authorize consolidation.
 
 Go callers retrieve the supplied candidates directly:
 

@@ -132,9 +132,9 @@ jobs:
           library="$root/lib/libgvm_asset_identity.so.$RELEASE_VERSION-$EXPECTED_ARCH"
           file "$library"
           file "$library" | grep -E "$EXPECTED_MACHINE"
-          readelf -d "$library" | grep -F 'Library soname: [libgvm_asset_identity.so.1]'
-          test "$(readlink "$root/lib/libgvm_asset_identity.so")" = libgvm_asset_identity.so.1
-          test "$(readlink "$root/lib/libgvm_asset_identity.so.1")" = "libgvm_asset_identity.so.$RELEASE_VERSION-$EXPECTED_ARCH"
+          readelf -d "$library" | grep -F 'Library soname: [libgvm_asset_identity.so.3]'
+          test "$(readlink "$root/lib/libgvm_asset_identity.so")" = libgvm_asset_identity.so.3
+          test "$(readlink "$root/lib/libgvm_asset_identity.so.3")" = "libgvm_asset_identity.so.$RELEASE_VERSION-$EXPECTED_ARCH"
           test "$(pkg-config --modversion "$root/lib/pkgconfig/libgvm_asset_identity.pc")" = "$RELEASE_VERSION"
           test -f "$root/include/gvm_asset_identity.h"
       - name: Create tarball

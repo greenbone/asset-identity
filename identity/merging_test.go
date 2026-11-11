@@ -35,26 +35,26 @@ func TestMergePlan(t *testing.T) {
 		{"same winning strong identifier", []IdentifierValue{agent}, []Candidate{fuzzyRow("K1", 2, agent, ip), fuzzyRow("K2", 1, agent, host)}, ActionReuse, "K1", []int{1}},
 		{"different strong identifier blocked", []IdentifierValue{agent, ip}, []Candidate{fuzzyRow("K1", 2, agent, ip), fuzzyRow("K2", 1, otherAgent, ip)}, ActionReuse, "K1", nil},
 		{"weak source can join strong destination", []IdentifierValue{agent, ip}, []Candidate{fuzzyRow("K1", 2, agent, ip), fuzzyRow("K2", 1, ip)}, ActionReuse, "K1", []int{1}},
-		{"new strong key absorbs contained weak source", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K1", 1, ip)}, ActionCreate, "", []int{0}},
+		{"new strong id can enrich a weakly selected key", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K1", 1, ip)}, ActionReuse, "K1", nil},
 		{"strong mismatch cannot merge through fuzzy", []IdentifierValue{agent, ip}, []Candidate{fuzzyRow("K1", 1, otherAgent, ip)}, ActionCreate, "", nil},
 		{"equal TLS sets merge", []IdentifierValue{tlsA, tlsB}, []Candidate{fuzzyRow("K1", 2, tlsA, tlsB), fuzzyRow("K2", 1, tlsB, tlsA, tlsA)}, ActionReuse, "K1", []int{1}},
 		{"unequal TLS sets cannot merge", []IdentifierValue{tlsA, tlsB, ip}, []Candidate{fuzzyRow("K1", 2, tlsA, tlsB, ip), fuzzyRow("K2", 1, tlsA, ip)}, ActionReuse, "K1", nil},
 		{"ambiguous fuzzy evidence cannot select conflicting strong IDs", []IdentifierValue{ip}, []Candidate{fuzzyRow("K1", 2, agent, ip), fuzzyRow("K2", 1, otherAgent, ip)}, ActionCreate, "", nil},
 		{"shared observation does not bridge distinct strong IDs", []IdentifierValue{agent, otherAgent}, []Candidate{fuzzyRow("K1", 2, agent), fuzzyRow("K2", 1, otherAgent)}, ActionReuse, "K1", nil},
-		{"different strong types do not establish identity", []IdentifierValue{agent, ip}, []Candidate{fuzzyRow("K1", 1, fuzzyValue(TypeGreenboneID, "g"), ip)}, ActionCreate, "", nil},
+		{"different strong types do not establish identity", []IdentifierValue{agent, ip}, []Candidate{fuzzyRow("K1", 1, fuzzyValue(TypeGreenboneID, "g"), ip)}, ActionReuse, "K1", nil},
 		{"weak observation leaves conflicting strong sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, agent, ip, host), fuzzyRow("K2", 2, otherAgent, ip, mac)}, ActionCreate, "", nil},
 		{"ambiguous weak observation leaves all sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, agent, ip, host), fuzzyRow("K2", 2, otherAgent, ip, mac), fuzzyRow("K3", 3, ip)}, ActionCreate, "", nil},
 		{"reversing conflicting candidates changes no merge outcome", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K2", 2, otherAgent, ip, mac), fuzzyRow("K1", 1, agent, ip, host)}, ActionCreate, "", nil},
 		{"weak observation cannot bridge unequal TLS sets", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, tlsA, tlsB, ip, host), fuzzyRow("K2", 2, tlsA, ip, mac)}, ActionCreate, "", nil},
 		{"weak observation cannot consolidate compatible strong sources", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, agent, ip, host), fuzzyRow("K2", 2, agent, ip, mac)}, ActionCreate, "", nil},
-		{"new strong key absorbs multiple contained weak sources", []IdentifierValue{agent, ip, host, mac}, []Candidate{fuzzyRow("K1", 1, ip, host), fuzzyRow("K2", 2, ip, mac)}, ActionCreate, "", []int{0, 1}},
-		{"new strong key does not absorb partial weak overlap", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K1", 1, ip, mac)}, ActionCreate, "", nil},
+		{"new strong id cannot resolve ambiguous weak candidates", []IdentifierValue{agent, ip, host, mac}, []Candidate{fuzzyRow("K1", 1, ip, host), fuzzyRow("K2", 2, ip, mac)}, ActionCreate, "", nil},
+		{"missing weak evidence permits fallback", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K1", 1, ip, mac)}, ActionReuse, "K1", nil},
 		{"weak observation cannot bridge overlapping strong sources", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K1", 1, agent, ip), fuzzyRow("K2", 2, agent, otherAgent, ip), fuzzyRow("K3", 3, otherAgent, ip)}, ActionCreate, "", nil},
 		{"empty observation never merges", nil, []Candidate{fuzzyRow("K1", 1)}, ActionCreate, "", nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Decide(Observation{Identifiers: tt.incoming}, tt.rows, GreenboneMatchPolicy())
+			got, err := Decide(Observation{Identifiers: tt.incoming}, tt.rows, policyWithAllIdentityTypesStrong())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -63,7 +63,7 @@ func TestMergePlan(t *testing.T) {
 			}
 			if len(got.MergeIndices) > 0 {
 				got.MergeIndices[0] = 99
-				again, err := Decide(Observation{Identifiers: tt.incoming}, tt.rows, GreenboneMatchPolicy())
+				again, err := Decide(Observation{Identifiers: tt.incoming}, tt.rows, policyWithAllIdentityTypesStrong())
 				if err != nil || !reflect.DeepEqual(again.MergeIndices, tt.merges) {
 					t.Fatalf("output mutation retained: %+v %v", again, err)
 				}
@@ -75,7 +75,7 @@ func TestMergePlan(t *testing.T) {
 // Compare the grouped optimization with the original pairwise rule, including
 // non-transitive overlaps, duplicate values, and different strong types.
 func TestGroupedMergesMatchPairwiseRule(t *testing.T) {
-	policy := GreenboneMatchPolicy()
+	policy := policyWithAllIdentityTypesStrong()
 	random := rand.New(rand.NewSource(42))
 	for run := 0; run < 200; run++ {
 		views := make([][]IdentifierValue, 20)
@@ -167,7 +167,7 @@ func BenchmarkMergePlanManyCandidates(b *testing.B) {
 			for i := range rows {
 				rows[i] = Candidate{AssetKey: strconv.Itoa(i), Identifiers: []IdentifierValue{ip, fuzzyValue(TypeAgentID, "a")}}
 			}
-			policy := GreenboneMatchPolicy()
+			policy := policyWithAllIdentityTypesStrong()
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {

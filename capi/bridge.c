@@ -97,6 +97,8 @@ gvm_asset_identity_policy_new (void)
     g_array_new (FALSE, FALSE, sizeof (gvm_asset_identity_identifier_type_t));
   policy->fuzzy =
     g_array_new (FALSE, FALSE, sizeof (gvm_asset_identity_fuzzy_member_t));
+  policy->continuity =
+    g_array_new (FALSE, FALSE, sizeof (gvm_asset_identity_identifier_type_t));
   return policy;
 }
 
@@ -109,6 +111,8 @@ gvm_asset_identity_policy_free (gvm_asset_identity_policy_t *policy)
     g_array_unref (policy->strong_order);
   if (policy->fuzzy)
     g_array_unref (policy->fuzzy);
+  if (policy->continuity)
+    g_array_unref (policy->continuity);
   g_free (policy);
 }
 
@@ -140,6 +144,11 @@ gvm_asset_identity_policy_new_default (GError **error)
     {
       gvm_asset_identity_identifier_type_t type = value->strong_order[i];
       g_array_append_val (policy->strong_order, type);
+    }
+  for (gsize i = 0; i < value->continuity_count; i++)
+    {
+      gvm_asset_identity_identifier_type_t type = value->continuity[i];
+      g_array_append_val (policy->continuity, type);
     }
   for (gsize i = 0; i < value->fuzzy_count; i++)
     {
@@ -225,12 +234,16 @@ static gboolean
 wire_policy (const gvm_asset_identity_policy_t *policy,
              gai_wire_policy_t *value, gsize *remaining, GError **error)
 {
-  if (!policy || !policy->strong_order || !policy->fuzzy
+  if (!policy || !policy->strong_order || !policy->fuzzy || !policy->continuity
       || g_array_get_element_size (policy->strong_order)
+           != sizeof (gvm_asset_identity_identifier_type_t)
+      || g_array_get_element_size (policy->continuity)
            != sizeof (gvm_asset_identity_identifier_type_t)
       || g_array_get_element_size (policy->fuzzy)
            != sizeof (gvm_asset_identity_fuzzy_member_t)
       || policy->strong_order->len > GAI_WIRE_MAX_ITEMS
+      || policy->continuity->len > GAI_WIRE_MAX_ITEMS
+      || (policy->continuity->len && !policy->continuity->data)
       || policy->fuzzy->len > GAI_WIRE_MAX_ITEMS
       || (policy->strong_order->len && !policy->strong_order->data)
       || (policy->fuzzy->len && !policy->fuzzy->data))
@@ -239,6 +252,9 @@ wire_policy (const gvm_asset_identity_policy_t *policy,
   if (!take_input_bytes (policy->strong_order->len,
                          sizeof (gai_wire_identifier_type_t), remaining,
                          GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY, error)
+      || !take_input_bytes (policy->continuity->len,
+                            sizeof (gai_wire_identifier_type_t), remaining,
+                            GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY, error)
       || !take_input_bytes (policy->fuzzy->len,
                             sizeof (gai_wire_fuzzy_member_t), remaining,
                             GVM_ASSET_IDENTITY_ERROR_INVALID_POLICY, error))
@@ -249,6 +265,12 @@ wire_policy (const gvm_asset_identity_policy_t *policy,
   for (gsize i = 0; i < value->strong_count; i++)
     order[i] = g_array_index (policy->strong_order,
                               gvm_asset_identity_identifier_type_t, i);
+  value->continuity_count = policy->continuity->len;
+  guint32 *continuity = g_new (guint32, value->continuity_count);
+  value->continuity = continuity;
+  for (gsize i = 0; i < value->continuity_count; i++)
+    continuity[i] = g_array_index (policy->continuity,
+                                   gvm_asset_identity_identifier_type_t, i);
   value->fuzzy_count = policy->fuzzy->len;
   gai_wire_fuzzy_member_t *fuzzy =
     g_new0 (gai_wire_fuzzy_member_t, value->fuzzy_count);
@@ -363,5 +385,6 @@ cleanup:
   g_free (rows);
   g_free ((gpointer) converted_policy.strong_order);
   g_free ((gpointer) converted_policy.fuzzy);
+  g_free ((gpointer) converted_policy.continuity);
   return success;
 }

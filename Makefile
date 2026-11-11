@@ -27,10 +27,10 @@ CMAKE_SOURCES := tests/c/CMakeLists.txt
 
 build:
 	mkdir -p "$(DIST)/include" "$(DIST)/internal"
-	CGO_ENABLED=1 GOOS=linux GOARCH=$(GOARCH) CC="$(CC)" $(GO) build -buildmode=c-shared -ldflags '-extldflags "-Wl,-soname,$(LIBRARY).1 -Wl,--version-script=$(CURDIR)/capi/exports.map"' -o "$(DIST)/internal/$(LIBRARY_FILE)" ./capi
+	CGO_ENABLED=1 GOOS=linux GOARCH=$(GOARCH) CC="$(CC)" $(GO) build -buildmode=c-shared -ldflags '-extldflags "-Wl,-soname,$(LIBRARY).3 -Wl,--version-script=$(CURDIR)/capi/exports.map"' -o "$(DIST)/internal/$(LIBRARY_FILE)" ./capi
 	cp "$(DIST)/internal/$(LIBRARY_FILE)" "$(DIST)/$(LIBRARY_FILE)"
-	ln -sfn "$(LIBRARY_FILE)" "$(DIST)/$(LIBRARY).1"
-	ln -sfn "$(LIBRARY).1" "$(DIST)/$(LIBRARY)"
+	ln -sfn "$(LIBRARY_FILE)" "$(DIST)/$(LIBRARY).3"
+	ln -sfn "$(LIBRARY).3" "$(DIST)/$(LIBRARY)"
 	cp include/gvm_asset_identity.h "$(DIST)/include/"
 
 format: format-go format-c format-cmake
@@ -73,15 +73,15 @@ test-install: build
 install: build
 	install -d "$(DESTDIR)$(LIBDIR)/pkgconfig" "$(DESTDIR)$(INCLUDEDIR)"
 	install -m 755 "$(DIST)/$(LIBRARY_FILE)" "$(DESTDIR)$(LIBDIR)/$(LIBRARY_FILE)"
-	ln -sfn "$(LIBRARY_FILE)" "$(DESTDIR)$(LIBDIR)/$(LIBRARY).1"
-	ln -sfn "$(LIBRARY).1" "$(DESTDIR)$(LIBDIR)/$(LIBRARY)"
+	ln -sfn "$(LIBRARY_FILE)" "$(DESTDIR)$(LIBDIR)/$(LIBRARY).3"
+	ln -sfn "$(LIBRARY).3" "$(DESTDIR)$(LIBDIR)/$(LIBRARY)"
 	install -m 644 include/gvm_asset_identity.h "$(DESTDIR)$(INCLUDEDIR)/gvm_asset_identity.h"
 	sed -e 's|@PREFIX@|$(PREFIX)|g' -e 's|@LIBDIR@|$(LIBDIR)|g' -e 's|@INCLUDEDIR@|$(INCLUDEDIR)|g' -e 's|@VERSION@|$(VERSION)|g' libgvm_asset_identity.pc.in > "$(DIST)/libgvm_asset_identity.pc"
 	install -m 644 "$(DIST)/libgvm_asset_identity.pc" "$(DESTDIR)$(LIBDIR)/pkgconfig/libgvm_asset_identity.pc"
 
 uninstall:
 	$(RM) "$(DESTDIR)$(LIBDIR)/$(LIBRARY)" \
-		"$(DESTDIR)$(LIBDIR)/$(LIBRARY).1" \
+		"$(DESTDIR)$(LIBDIR)/$(LIBRARY).3" \
 		"$(DESTDIR)$(LIBDIR)/$(LIBRARY_FILE)" \
 		"$(DESTDIR)$(LIBDIR)/pkgconfig/libgvm_asset_identity.pc" \
 		"$(DESTDIR)$(INCLUDEDIR)/gvm_asset_identity.h"

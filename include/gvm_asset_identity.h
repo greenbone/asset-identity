@@ -11,7 +11,7 @@
 
 G_BEGIN_DECLS
 
-#define GVM_ASSET_IDENTITY_ABI_VERSION 2u
+#define GVM_ASSET_IDENTITY_ABI_VERSION 3u
 #define GVM_ASSET_IDENTITY_ERROR (gvm_asset_identity_error_quark ())
 
 typedef enum
@@ -72,6 +72,7 @@ typedef struct
   GArray *strong_order; /* gvm_asset_identity_identifier_type_t entries. */
   GArray *fuzzy; /* gvm_asset_identity_fuzzy_member_t entries, in accumulation
                     order. */
+  GArray *continuity;
 } gvm_asset_identity_policy_t;
 
 typedef enum
@@ -83,7 +84,8 @@ typedef enum
 typedef enum
 {
   GVM_ASSET_IDENTITY_STAGE_STRONG = 1,
-  GVM_ASSET_IDENTITY_STAGE_FUZZY
+  GVM_ASSET_IDENTITY_STAGE_FUZZY,
+  GVM_ASSET_IDENTITY_STAGE_CONTINUITY
 } gvm_asset_identity_stage_t;
 
 typedef struct

@@ -154,6 +154,16 @@ func (d *decoder) policy(value *C.gai_wire_policy_t) (identity.MatchPolicy, erro
 	if err := d.array(unsafe.Pointer(value.fuzzy), value.fuzzy_count, C.sizeof_gai_wire_fuzzy_member_t, unsafe.Alignof(C.gai_wire_fuzzy_member_t{})); err != nil {
 		return policy, err
 	}
+	if err := d.array(unsafe.Pointer(value.continuity), value.continuity_count, C.sizeof_gai_wire_identifier_type_t, unsafe.Alignof(C.gai_wire_identifier_type_t(0))); err != nil {
+		return policy, err
+	}
+	for _, member := range unsafe.Slice(value.continuity, int(value.continuity_count)) {
+		typ, err := identifierType(member)
+		if err != nil {
+			return policy, err
+		}
+		policy.Continuity = append(policy.Continuity, typ)
+	}
 	for _, member := range unsafe.Slice(value.strong_order, int(value.strong_count)) {
 		typ, err := identifierType(member)
 		if err != nil {
@@ -200,6 +210,8 @@ func encodeDecision(value identity.Decision, output *C.gai_wire_decision_t) {
 	switch value.Stage {
 	case identity.StageStrong:
 		output.stage = C.GAI_WIRE_STAGE_STRONG
+	case identity.StageContinuity:
+		output.stage = C.GAI_WIRE_STAGE_CONTINUITY
 	case identity.StageFuzzy:
 		output.stage = C.GAI_WIRE_STAGE_FUZZY
 	default:
@@ -320,6 +332,11 @@ func gvmAssetIdentityDefaultPolicy(policy **C.gai_wire_policy_t, failure **C.gai
 	output.strong_order = (*C.gai_wire_identifier_type_t)(allocate(len(value.StrongOrder), C.sizeof_gai_wire_identifier_type_t))
 	for i, typ := range value.StrongOrder {
 		unsafe.Slice(output.strong_order, len(value.StrongOrder))[i] = encodedType(typ)
+	}
+	output.continuity_count = C.size_t(len(value.Continuity))
+	output.continuity = (*C.gai_wire_identifier_type_t)(allocate(len(value.Continuity), C.sizeof_gai_wire_identifier_type_t))
+	for i, typ := range value.Continuity {
+		unsafe.Slice(output.continuity, len(value.Continuity))[i] = encodedType(typ)
 	}
 	output.fuzzy_count = C.size_t(len(value.Fuzzy))
 	output.fuzzy = (*C.gai_wire_fuzzy_member_t)(allocate(len(value.Fuzzy), C.sizeof_gai_wire_fuzzy_member_t))

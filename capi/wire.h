@@ -15,7 +15,7 @@ extern "C"
 {
 #endif
 
-#define GAI_WIRE_ABI_VERSION 2u
+#define GAI_WIRE_ABI_VERSION 3u
 #define GAI_WIRE_MAX_ITEMS 1048576u
 #define GAI_WIRE_MAX_STRING 16777216u
 #define GAI_WIRE_MAX_INPUT_BYTES 67108864u
@@ -90,6 +90,8 @@ extern "C"
     size_t strong_count;
     const gai_wire_fuzzy_member_t *fuzzy;
     size_t fuzzy_count;
+    const gai_wire_identifier_type_t *continuity;
+    size_t continuity_count;
   } gai_wire_policy_t;
 
   typedef uint32_t gai_wire_action_t;
@@ -103,7 +105,8 @@ extern "C"
   enum
   {
     GAI_WIRE_STAGE_STRONG = 1,
-    GAI_WIRE_STAGE_FUZZY
+    GAI_WIRE_STAGE_FUZZY,
+    GAI_WIRE_STAGE_CONTINUITY
   };
 
   typedef struct
