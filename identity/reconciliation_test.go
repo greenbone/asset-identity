@@ -27,7 +27,7 @@ func TestDecideFQDNWeakMatching(t *testing.T) {
 		{"different names create", []IdentifierValue{fqdn}, fuzzyRow("K", 1, fuzzyValue(TypeFQDN, "other.example.com")), ActionCreate, nil},
 		{"hostname is a distinct type", []IdentifierValue{fqdn}, fuzzyRow("K", 1, fuzzyValue(TypeHostname, "server.example.com")), ActionCreate, nil},
 		{"fqdn prevents partial containment", []IdentifierValue{ip, fqdn}, fuzzyRow("K", 1, ip, fuzzyValue(TypeFQDN, "other.example.com")), ActionCreate, nil},
-		{"contained fqdn is a merge source", []IdentifierValue{ip, fqdn}, fuzzyRow("K", 1, fqdn), ActionCreate, []int{0}},
+		{"missing ip permits fqdn reuse", []IdentifierValue{ip, fqdn}, fuzzyRow("K", 1, fqdn), ActionReuse, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -106,10 +106,10 @@ func TestDecideFuzzyCases(t *testing.T) {
 		selected int
 	}{
 		{"candidate contains observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionReuse, false, 0},
-		{"observation contains candidate", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K", 10, ip1)}, ActionCreate, true, -1},
-		{"partial overlap", []IdentifierValue{ip1, ip3}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionCreate, true, -1},
+		{"observation contains candidate", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K", 10, ip1)}, ActionReuse, false, 0},
+		{"partial overlap", []IdentifierValue{ip1, ip3}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionReuse, false, 0},
 		{"subset of survivor need not overlap observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("selected", 20, ip1, host), fuzzyRow("potential", 10, host)}, ActionReuse, false, 0},
-		{"input order breaks fuzzy ties", []IdentifierValue{ip1}, []Candidate{fuzzyRow("Z", 20, ip1), fuzzyRow("A", 20, ip1)}, ActionReuse, false, 0},
+		{"input order cannot resolve ambiguity", []IdentifierValue{ip1}, []Candidate{fuzzyRow("Z", 20, ip1), fuzzyRow("A", 20, ip1)}, ActionCreate, true, -1},
 		{"empty observation guard", nil, []Candidate{fuzzyRow("K", 10, ip1)}, ActionCreate, true, -1},
 		{"empty candidate subset", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K", 10)}, ActionCreate, true, -1},
 		{"indices refer to supplied list", []IdentifierValue{ip1}, []Candidate{fuzzyRow("unrelated", 1, ip3), fuzzyRow("selected", 20, ip1, host), fuzzyRow("potential", 10, host)}, ActionReuse, false, 1},
@@ -131,14 +131,14 @@ func TestDecideFuzzyCases(t *testing.T) {
 	}
 }
 
-func TestDecideFuzzyUsesCWholeSeconds(t *testing.T) {
+func TestDecideFuzzyNanosecondsCannotResolveAmbiguity(t *testing.T) {
 	ip := fuzzyValue(TypeIP, "192.0.2.1")
 	rows := []Candidate{fuzzyRow("Z", 200, ip), fuzzyRow("A", 200, ip)}
 	newer := time.Unix(200, 999999999)
 	rows[1].LastSeen = &newer
 	got, err := Decide(Observation{Identifiers: []IdentifierValue{ip}}, rows, GreenboneMatchPolicy())
-	if err != nil || got.SelectedKey != "Z" {
-		t.Fatalf("whole-second tie: %+v %v", got, err)
+	if err != nil || got.Action != ActionCreate || got.SelectedIndex != nil || len(got.MergeIndices) != 0 {
+		t.Fatalf("ambiguous timestamps: %+v %v", got, err)
 	}
 }
 
@@ -210,19 +210,18 @@ func TestDecideStrongMultipleValuesPreserveNormalizationAndInputs(t *testing.T) 
 	}
 }
 
-func TestDecideFuzzyMissingTimeUsesEpoch(t *testing.T) {
+func TestDecideFuzzyTimestampPresenceCannotResolveAmbiguity(t *testing.T) {
 	ip := fuzzyValue(TypeIP, "192.0.2.1")
 	tests := []struct {
 		name          string
 		first, second *time.Time
-		selected      string
 	}{
-		{"nil ties epoch retaining first", nil, new(time.Unix(0, 0)), "first"},
-		{"epoch ties nil retaining first", new(time.Unix(0, 0)), nil, "first"},
-		{"nil outranks pre epoch", new(time.Unix(-1, 999999999)), nil, "second"},
-		{"present post epoch outranks nil", nil, new(time.Unix(1, 0)), "second"},
-		{"both missing retain first", nil, nil, "first"},
-		{"present Go zero precedes epoch", new(time.Time{}), nil, "second"},
+		{"missing and epoch timestamps", nil, new(time.Unix(0, 0))},
+		{"epoch and missing timestamps", new(time.Unix(0, 0)), nil},
+		{"pre epoch and missing timestamps", new(time.Unix(-1, 999999999)), nil},
+		{"missing and post epoch timestamps", nil, new(time.Unix(1, 0))},
+		{"both timestamps missing", nil, nil},
+		{"Go zero and missing timestamps", new(time.Time{}), nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -234,7 +233,7 @@ func TestDecideFuzzyMissingTimeUsesEpoch(t *testing.T) {
 				}
 			}
 			got, err := Decide(Observation{Identifiers: []IdentifierValue{ip}}, rows, GreenboneMatchPolicy())
-			if err != nil || got.SelectedKey != tt.selected || got.Action != ActionReuse || got.NeedsNewKey {
+			if err != nil || got.SelectedIndex != nil || got.SelectedKey != "" || got.Action != ActionCreate || !got.NeedsNewKey || len(got.MergeIndices) != 0 {
 				t.Fatalf("fuzzy missing time: %+v %v", got, err)
 			}
 			for i, row := range rows {
@@ -278,7 +277,7 @@ func TestDecideImmutableInputs(t *testing.T) {
 	ip := IdentifierValue{Type: TypeIP, Value: "2001:0DB8::1"}
 	policy := GreenboneMatchPolicy()
 	originalPolicy := policy.Clone()
-	rows := []Candidate{fuzzyRow("K1", 20, ip), fuzzyRow("K2", 10, ip)}
+	rows := []Candidate{fuzzyRow("K1", 20, ip), fuzzyRow("K2", 10, fuzzyValue(TypeIP, "192.0.2.1"))}
 	var wg sync.WaitGroup
 	for range 12 {
 		wg.Go(func() {
@@ -293,7 +292,7 @@ func TestDecideImmutableInputs(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	if rows[0].Identifiers[0] != ip || rows[1].Identifiers[0] != ip || !reflect.DeepEqual(policy, originalPolicy) {
+	if rows[0].Identifiers[0] != ip || rows[1].Identifiers[0].Value != "192.0.2.1" || !reflect.DeepEqual(policy, originalPolicy) {
 		t.Fatal("mutated input")
 	}
 }

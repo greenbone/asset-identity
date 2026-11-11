@@ -355,7 +355,7 @@ func TestDecideLeavesPlaceholdersOutButKeepsTheRest(t *testing.T) {
 	}
 	got, err := identity.Decide(observation, candidates, identity.GreenboneMatchPolicy())
 
-	if err != nil || got.Action != identity.ActionReuse || got.SelectedKey != "shares the real mac" || !reflect.DeepEqual(got.MergeIndices, []int{0}) {
+	if err != nil || got.Action != identity.ActionReuse || got.SelectedKey != "shares the real mac" || len(got.MergeIndices) != 0 {
 		t.Fatalf("decision=%+v err=%v", got, err)
 	}
 	matches, err := identity.MatchingIdentifiers(observation.Identifiers, candidates[1].Identifiers)

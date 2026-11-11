@@ -13,7 +13,7 @@ Ensure (results_outlive_inputs_and_other_results)
     observation (GVM_ASSET_IDENTITY_IP, "2001:0DB8::1");
   GPtrArray *rows = candidates_new ();
   gvm_asset_identity_candidate_t *row = candidate ("K", input);
-  row->last_seen = (gvm_asset_identity_timestamp_t){TRUE, -1, 123};
+  row->last_seen = (gvm_asset_identity_timestamp_t) {TRUE, -1, 123};
   g_ptr_array_add (rows, row);
   gvm_asset_identity_decision_t *first = decide (input, rows, policy),
                                 *second = decide (input, rows, policy);
@@ -72,7 +72,6 @@ Ensure (repeated_reuse_and_error_cleanup)
     observation (GVM_ASSET_IDENTITY_IP, "192.0.2.1");
   GPtrArray *rows = candidates_new ();
   g_ptr_array_add (rows, candidate ("A", input));
-  g_ptr_array_add (rows, candidate ("B", input));
   gboolean valid = TRUE;
   for (guint i = 0; i < 1000; i++)
     {

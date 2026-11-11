@@ -13,7 +13,6 @@ import (
 )
 
 // These matrices exercise Decide, including normalization and merge planning.
-// Expected containment uses fixture bit masks, never the matching implementation.
 // Bits 0..3 stand for IP, hostname, MAC and FQDN respectively.
 func countingWeakValues(mask int, different bool) []IdentifierValue {
 	values := []IdentifierValue{
@@ -83,14 +82,10 @@ func TestCountingWeakMatrix(t *testing.T) {
 				incoming: countingWeakValues(incomingMask, false), candidates: []Candidate{fuzzyRow("K", 10, stored...)},
 				action: ActionCreate, stage: StageFuzzy,
 			}
-			if incomingMask != 0 {
-				switch {
-				case incomingMask&matching == incomingMask:
-					tt.action, tt.selected = ActionReuse, "K"
-				case conflicting == 0 && matching&incomingMask == matching:
-					// Main also treats an empty source as a contained merge source.
-					tt.merges = []int{0}
-				}
+			shared := incomingMask & matching
+			conflicts := incomingMask & conflicting
+			if shared != 0 && conflicts&14 == 0 && (conflicts&1 == 0 || shared&4 != 0) {
+				tt.action, tt.selected = ActionReuse, "K"
 			}
 			cases = append(cases, tt)
 		}
@@ -132,10 +127,8 @@ func TestCountingStrongWeakMatrix(t *testing.T) {
 							case "stored_only":
 								tt.stage = StageFuzzy
 								if incomingMask != 0 {
-									if incomingMask&storedMask == incomingMask {
+									if incomingMask&storedMask != 0 {
 										tt.action, tt.selected = ActionReuse, "K"
-									} else if storedMask&incomingMask == storedMask {
-										tt.merges = []int{0}
 									}
 								}
 							}
@@ -232,9 +225,9 @@ func TestCountingCandidateOrderMatrix(t *testing.T) {
 			cases := []countingCase{
 				{"strong reuse merges equal strong evidence", []IdentifierValue{strong.value, ip, host}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.value, otherIP), fuzzyRow("K2", 10, strong.other, ip)}, ActionReuse, StageStrong, "K0", []int{1}},
 				{"strong create absorbs weak subsets", []IdentifierValue{strong.value, ip, host, mac}, []Candidate{fuzzyRow("K0", 30, ip, host), fuzzyRow("K1", 20, ip, mac), fuzzyRow("K2", 10, strong.other, ip)}, ActionCreate, StageStrong, "", []int{0, 1}},
-				{"weak create absorbs compatible strong sources", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.value, ip, mac), fuzzyRow("K2", 10, mac)}, ActionCreate, StageFuzzy, "", []int{0, 1, 2}},
-				{"weak create excludes conflicting strong sources", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.other, ip, mac), fuzzyRow("K2", 10, mac)}, ActionCreate, StageFuzzy, "", []int{2}},
-				{"weak reuse respects destination strong evidence", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.other, ip), fuzzyRow("K2", 10, host)}, ActionReuse, StageFuzzy, "K0", []int{2}},
+				{"weak ambiguity leaves compatible strong sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.value, ip, mac), fuzzyRow("K2", 10, mac)}, ActionCreate, StageFuzzy, "", nil},
+				{"weak create excludes conflicting strong sources", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.other, ip, mac), fuzzyRow("K2", 10, mac)}, ActionCreate, StageFuzzy, "", nil},
+				{"weak ambiguity leaves conflicting destinations separate", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.other, ip), fuzzyRow("K2", 10, host)}, ActionCreate, StageFuzzy, "", nil},
 				{"reuse merge uses stored destination evidence", []IdentifierValue{strong.value, ip, host}, []Candidate{fuzzyRow("K0", 30, strong.value, ip), fuzzyRow("K1", 20, host), fuzzyRow("K2", 10, ip)}, ActionReuse, StageStrong, "K0", []int{2}},
 			}
 			for _, base := range cases {
@@ -269,13 +262,13 @@ func TestCountingProgressiveStrongMatrix(t *testing.T) {
 				count    int
 			}{
 				{[]IdentifierValue{ip}, ActionCreate, StageFuzzy, "", nil, 1},
-				{[]IdentifierValue{ip, host}, ActionCreate, StageFuzzy, "", []int{0}, 1},
+				{[]IdentifierValue{ip, host}, ActionReuse, StageFuzzy, "K0", nil, 1},
 				{[]IdentifierValue{strong.value, ip, host, mac}, ActionCreate, StageStrong, "", []int{0}, 1},
 				{[]IdentifierValue{strong.value, otherIP}, ActionReuse, StageStrong, "K2", nil, 1},
 				{[]IdentifierValue{ip}, ActionReuse, StageFuzzy, "K2", nil, 1},
 				{[]IdentifierValue{strong.other, ip}, ActionCreate, StageStrong, "", nil, 2},
-				{[]IdentifierValue{ip}, ActionReuse, StageFuzzy, "K5", nil, 2},
-				{[]IdentifierValue{strong.value, ip}, ActionReuse, StageStrong, "K2", nil, 2},
+				{[]IdentifierValue{ip}, ActionCreate, StageFuzzy, "", nil, 3},
+				{[]IdentifierValue{strong.value, ip}, ActionReuse, StageStrong, "K2", []int{2}, 2},
 			}
 			var candidates []Candidate
 			for step, scan := range scans {
