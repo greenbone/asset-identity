@@ -50,9 +50,12 @@ blocks lower-priority matches. Missing stronger identifiers allow a lower match.
 reuses an Agent-A-only key, and the application stores Machine X on that asset without changing its key.
 
 Among reusable candidates, the highest-priority shared match wins, then newest timestamp and asset-key ordering. When
-incoming strong IDs exist but no candidate qualifies, return CREATE without fuzzy fallback. With no incoming strong IDs,
-reuse a candidate containing every incoming weak identifier, or CREATE if none qualifies. Default fuzzy weights are MAC
-(1.0), hostname (0.4), IP (0.4), and FQDN (0.4); hostname and FQDN remain distinct types.
+incoming strong IDs exist but no candidate qualifies, return CREATE without fuzzy fallback.
+
+Without incoming strong IDs, reuse exactly one compatible candidate with shared weak evidence. Missing identifiers are
+allowed. Conflicting MAC or name values block reuse; a shared MAC allows a changed IP. No match or multiple matches
+returns CREATE, regardless of timestamps or scores. Fuzzy decisions never merge records. Default fuzzy weights remain
+MAC (1.0), hostname (0.4), IP (0.4), and FQDN (0.4); hostname and FQDN are distinct types.
 
 TLS compares complete normalized public-key sets, ignoring order and duplicates: `{A,B}` matches `{B,A}`, but not
 `{A}` or `{A,B,C}`. A TLS conflict cannot be bypassed by a lower-priority type; a higher-priority match still wins.
@@ -62,7 +65,8 @@ Other strong types match any equal value.
 from the original candidate array using the returned index. On CREATE, the application generates the destination key; on
 REUSE it uses `SelectedKey`. The application applies the observation and key moves atomically. A strong source must
 match its own highest-priority strong type in the destination or, for strong REUSE, in the incoming view. Conflicting
-records remain separate; records without strong IDs require full fuzzy containment. A weak destination cannot combine sources with conflicting strong IDs.
+records remain separate. These merge rules apply only to strong-stage decisions; weak sources require full containment
+in the destination's weak identifiers.
 See [the algorithm guide](docs/how-asset-identity-works.md#8-the-returned-decision).
 
 ## Scanner identifier values

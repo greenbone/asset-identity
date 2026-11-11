@@ -12,6 +12,9 @@ import (
 
 // planMerges compares canonical source views with the destination's complete view.
 func planMerges(decision *Decision, incoming []IdentifierValue, views [][]IdentifierValue, policy MatchPolicy) error {
+	if decision.Stage == StageFuzzy {
+		return nil
+	}
 	destination := incoming
 	if decision.SelectedIndex != nil {
 		destination = views[*decision.SelectedIndex]

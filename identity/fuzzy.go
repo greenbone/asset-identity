@@ -7,7 +7,6 @@ package identity
 import (
 	"fmt"
 	"math"
-	"time"
 )
 
 type fuzzyKernelResult struct {
@@ -17,7 +16,6 @@ type fuzzyKernelResult struct {
 	SelectedScore float32
 }
 
-// matchFuzzyCanonical selects a candidate containing every observed fuzzy identifier.
 // Inputs are canonical and already validated by the caller.
 func matchFuzzyCanonical(incoming []IdentifierValue, views [][]IdentifierValue, candidates []Candidate, policy MatchPolicy) (fuzzyKernelResult, error) {
 	fail := fuzzyKernelResult{}
@@ -32,21 +30,19 @@ func matchFuzzyCanonical(incoming []IdentifierValue, views [][]IdentifierValue, 
 	}
 	selectedCandidateIndex := -1
 	var selectedScore float32
-	var selectedLastSeen time.Time
-	for i, candidate := range candidates {
+	for i := range candidates {
 		candidateSet := fuzzySetFromCanonical(views[i], weights)
-		if !fuzzySetSubset(observationSet, candidateSet) {
+		if !fuzzyCompatible(observationSet, candidateSet, policy.Fuzzy) {
 			continue
 		}
 		score, err := fuzzyIntersectionScore(observationSet, candidateSet, weights, policy.Fuzzy)
 		if err != nil {
 			return fail, err
 		}
-		lastSeen := fuzzyInstant(candidate.LastSeen)
-		// Exact score/time ties retain the first input row.
-		if selectedCandidateIndex < 0 || score > selectedScore || (score == selectedScore && lastSeen.After(selectedLastSeen)) {
-			selectedCandidateIndex, selectedScore, selectedLastSeen = i, score, lastSeen
+		if selectedCandidateIndex >= 0 {
+			return result, nil
 		}
+		selectedCandidateIndex, selectedScore = i, score
 	}
 	if selectedCandidateIndex >= 0 {
 		index := selectedCandidateIndex
@@ -58,11 +54,22 @@ func matchFuzzyCanonical(incoming []IdentifierValue, views [][]IdentifierValue, 
 	return result, nil
 }
 
-func fuzzyInstant(lastSeen *time.Time) time.Time {
-	if lastSeen == nil {
-		return time.Unix(0, 0).UTC()
+func fuzzyCompatible(incoming, candidate []IdentifierValue, members []FuzzyMember) bool {
+	shared := false
+	sharedMAC := sharesValue(incoming, candidate, TypeMAC)
+	for _, member := range members {
+		if !hasType(incoming, member.Type) || !hasType(candidate, member.Type) {
+			continue
+		}
+		if sharesValue(incoming, candidate, member.Type) {
+			shared = true
+			continue
+		}
+		if member.Type != TypeIP || !sharedMAC {
+			return false
+		}
 	}
-	return lastSeen.UTC().Truncate(time.Second)
+	return shared
 }
 
 func fuzzyWeights(policy MatchPolicy) (map[IdentifierType]float32, error) {

@@ -58,7 +58,7 @@ func decideCountingCase(t *testing.T, policy MatchPolicy, tt countingCase) Decis
 	return got
 }
 
-func TestCountingContainment(t *testing.T) {
+func TestCountingWeakEvidence(t *testing.T) {
 	ip := fuzzyValue(TypeIP, "192.0.2.1")
 	otherIP := fuzzyValue(TypeIP, "192.0.2.2")
 	host := fuzzyValue(TypeHostname, "host-x")
@@ -67,18 +67,18 @@ func TestCountingContainment(t *testing.T) {
 	otherMAC := fuzzyValue(TypeMAC, "02:00:00:00:00:02")
 	runCountingCases(t, GreenboneMatchPolicy(), []countingCase{
 		{"exact ip", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 1, ip)}, ActionReuse, StageFuzzy, "K0", nil},
-		{"add hostname", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 1, ip)}, ActionCreate, StageFuzzy, "", []int{0}},
+		{"add hostname", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 1, ip)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"observation subset", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 1, ip, host)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"exact ip and hostname", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 1, ip, host)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"different hostname", []IdentifierValue{ip, otherHost}, []Candidate{fuzzyRow("K0", 1, ip, host)}, ActionCreate, StageFuzzy, "", nil},
-		{"same mac new ip", []IdentifierValue{otherIP, mac}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionCreate, StageFuzzy, "", nil},
-		{"add hostname to mac", []IdentifierValue{ip, mac, host}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionCreate, StageFuzzy, "", []int{0}},
+		{"same mac new ip", []IdentifierValue{otherIP, mac}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
+		{"add hostname to mac", []IdentifierValue{ip, mac, host}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"different mac", []IdentifierValue{ip, otherMAC}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionCreate, StageFuzzy, "", nil},
 		{"same mac changed host", []IdentifierValue{ip, mac, otherHost}, []Candidate{fuzzyRow("K0", 1, ip, mac, host)}, ActionCreate, StageFuzzy, "", nil},
-		{"two prior candidates", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 2, ip), fuzzyRow("K1", 1, host)}, ActionCreate, StageFuzzy, "", []int{0, 1}},
-		{"richer candidate", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, ip)}, ActionReuse, StageFuzzy, "K0", []int{1}},
-		{"identical candidates", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, ip, host)}, ActionReuse, StageFuzzy, "K0", []int{1}},
-		{"rich observation consolidates two nics", []IdentifierValue{ip, mac, otherIP, otherMAC}, []Candidate{fuzzyRow("K0", 2, ip, mac), fuzzyRow("K1", 1, otherIP, otherMAC)}, ActionCreate, StageFuzzy, "", []int{0, 1}},
+		{"two prior candidates", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 2, ip), fuzzyRow("K1", 1, host)}, ActionCreate, StageFuzzy, "", nil},
+		{"richer candidate", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, ip)}, ActionCreate, StageFuzzy, "", nil},
+		{"identical candidates", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, ip, host)}, ActionCreate, StageFuzzy, "", nil},
+		{"weak observation leaves separately discovered nics unmerged", []IdentifierValue{ip, mac, otherIP, otherMAC}, []Candidate{fuzzyRow("K0", 2, ip, mac), fuzzyRow("K1", 1, otherIP, otherMAC)}, ActionCreate, StageFuzzy, "", nil},
 	})
 }
 
@@ -98,7 +98,7 @@ func TestCountingStrongRules(t *testing.T) {
 		{"conflicting higher type blocks a lower match", []IdentifierValue{g, agent}, []Candidate{fuzzyRow("K0", 1, otherG, agent)}, ActionCreate, StageStrong, "", nil},
 		{"new agent creates a key and absorbs weak record", []IdentifierValue{agent, ip, mac}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionCreate, StageStrong, "", []int{0}},
 		{"conflicting incoming greenbone id is not merged", []IdentifierValue{g, ip, mac}, []Candidate{fuzzyRow("K0", 20, ip, mac), fuzzyRow("K1", 10, otherG, ip, mac)}, ActionCreate, StageStrong, "", []int{0}},
-		{"conflicting incoming mac is not merged", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 20, ip, host), fuzzyRow("K1", 10, ip, host, otherMAC)}, ActionCreate, StageFuzzy, "", []int{0}},
+		{"conflicting incoming mac is not merged", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 20, ip, host), fuzzyRow("K1", 10, ip, host, otherMAC)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"tls mismatch does not fall back to weak evidence", []IdentifierValue{tlsA, tlsB, ip, mac}, []Candidate{fuzzyRow("K0", 1, tlsA, ip, mac)}, ActionCreate, StageStrong, "", nil},
 	})
 }
@@ -159,8 +159,8 @@ func TestCountingProgressiveDiscovery(t *testing.T) {
 		merges []int
 	}{
 		{[]IdentifierValue{ip}, ActionCreate, nil},
-		{[]IdentifierValue{ip, host}, ActionCreate, []int{0}},
-		{[]IdentifierValue{ip, host, mac}, ActionCreate, []int{0}},
+		{[]IdentifierValue{ip, host}, ActionReuse, nil},
+		{[]IdentifierValue{ip, host, mac}, ActionReuse, nil},
 		{[]IdentifierValue{ip}, ActionReuse, nil},
 		{[]IdentifierValue{ip}, ActionReuse, nil},
 		{[]IdentifierValue{agent, ip, host, mac}, ActionCreate, []int{0}},

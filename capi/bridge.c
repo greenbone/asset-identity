@@ -181,7 +181,7 @@ wire_string (const gchar *text, gai_wire_string_t *value, gsize *remaining,
   if (!take_input_bytes (length, 1, remaining,
                          GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT, error))
     return FALSE;
-  *value = (gai_wire_string_t){text, length};
+  *value = (gai_wire_string_t) {text, length};
   return TRUE;
 }
 
@@ -257,7 +257,7 @@ wire_policy (const gvm_asset_identity_policy_t *policy,
     {
       gvm_asset_identity_fuzzy_member_t member =
         g_array_index (policy->fuzzy, gvm_asset_identity_fuzzy_member_t, i);
-      fuzzy[i] = (gai_wire_fuzzy_member_t){member.type, member.weight};
+      fuzzy[i] = (gai_wire_fuzzy_member_t) {member.type, member.weight};
     }
   return TRUE;
 }
@@ -344,7 +344,7 @@ gvm_asset_identity_decide (const gvm_asset_identity_observation_t *observation,
       if (!wire_identifiers (candidate->identifiers, &rows[i].identifiers,
                              &rows[i].identifier_count, &remaining, error))
         goto cleanup;
-      rows[i].last_seen = (gai_wire_timestamp_t){
+      rows[i].last_seen = (gai_wire_timestamp_t) {
         candidate->last_seen.present != FALSE, candidate->last_seen.seconds,
         candidate->last_seen.nanoseconds};
     }
