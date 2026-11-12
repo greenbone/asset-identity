@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-only
 
-FROM golang:1.27-trixie AS builder
+FROM golang:1.27.4-trixie AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 
