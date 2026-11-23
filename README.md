@@ -41,7 +41,7 @@ func main() {
 Pass caller-prepared active views; normalization does not establish producer trust.
 
 | Action | Meaning                        |
-|--------|--------------------------------|
+| ------ | ------------------------------ |
 | CREATE | A new key is required.         |
 | REUSE  | Use the selected existing key. |
 
@@ -51,14 +51,16 @@ Matching runs in three stages:
    that candidate; missing IDs are allowed. Matching candidates use priority, newest timestamp, then asset key.
 2. **Continuity:** Agent ID, SSH key, or TLS public key. Any shared value can select one compatible asset. Other
    continuity or weak differences do not veto a unique match. TLS needs only one shared eligible key.
-3. **Fuzzy:** Keep the issue #11 rules: shared weak evidence, no conflicting MAC/name values, and a shared MAC for
-   changed IPs. Reuse only one qualifying candidate; timestamps and scores do not resolve ambiguity.
+3. **Fuzzy:** Require a shared value other than MAC. Reject conflicting names. Allow missing types.
+   If both records have IP addresses but none matches, require a shared FQDN. A short hostname cannot support this match.
+   Reuse a key only when exactly one candidate meets these rules. Scores and timestamps do not select between multiple matches.
 
 Strong conflicts remain excluded from later stages. Multiple continuity matches restrict fuzzy matching to those
 candidates. With no continuity matches, fuzzy matching considers all candidates without a strong conflict. If neither
 stage resolves a key, return CREATE with no merges.
 
-Default fuzzy weights remain MAC (1.0), hostname (0.4), IP (0.4), and FQDN (0.4).
+Default fuzzy weights are MAC (1.0), hostname (0.4), IP (0.4), and FQDN (0.4). Scores do not select candidates.
+The library normalizes MAC values. Fuzzy matching does not use MAC to accept or reject a candidate.
 
 `MergeIndices` contains original candidate positions. Only strong-stage decisions can merge records. Their existing
 safeguards remain: incoming Agent/SSH/TLS evidence can link related records, and contained weak records may join.
@@ -73,7 +75,7 @@ Every identifier type has its own normalizer, run before matching. Pass raw prod
 BIOS UUID, or `localhost`. Use `NormalizeIdentifier` to get the canonical value to store. For example:
 
 | Type                   | Scanner value                                |
-|------------------------|----------------------------------------------|
+| ---------------------- | -------------------------------------------- |
 | `TypeSSHHostKey`       | `22 ecdsa-sha2-nistp256 <base64-public-key>` |
 | `TypeTLSPublicKeyHash` | `x509:<base64-DER-certificate>`              |
 

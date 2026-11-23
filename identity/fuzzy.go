@@ -56,8 +56,11 @@ func matchFuzzyCanonical(incoming []IdentifierValue, views [][]IdentifierValue, 
 
 func fuzzyCompatible(incoming, candidate []IdentifierValue, members []FuzzyMember) bool {
 	shared := false
-	sharedMAC := sharesValue(incoming, candidate, TypeMAC)
+	sharedFQDN := sharesValue(incoming, candidate, TypeFQDN)
 	for _, member := range members {
+		if member.Type == TypeMAC {
+			continue
+		}
 		if !hasType(incoming, member.Type) || !hasType(candidate, member.Type) {
 			continue
 		}
@@ -65,7 +68,7 @@ func fuzzyCompatible(incoming, candidate []IdentifierValue, members []FuzzyMembe
 			shared = true
 			continue
 		}
-		if member.Type != TypeIP || !sharedMAC {
+		if member.Type != TypeIP || !sharedFQDN {
 			return false
 		}
 	}
