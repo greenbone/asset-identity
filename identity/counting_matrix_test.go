@@ -82,9 +82,9 @@ func TestCountingWeakMatrix(t *testing.T) {
 				incoming: countingWeakValues(incomingMask, false), candidates: []Candidate{fuzzyRow("K", 10, stored...)},
 				action: ActionCreate, stage: StageFuzzy,
 			}
-			shared := incomingMask & matching
-			conflicts := incomingMask & conflicting
-			if shared != 0 && conflicts&14 == 0 && (conflicts&1 == 0 || shared&4 != 0) {
+			shared := incomingMask & matching &^ 4
+			conflicts := incomingMask & conflicting &^ 4
+			if shared != 0 && conflicts&10 == 0 && (conflicts&1 == 0 || shared&8 != 0) {
 				tt.action, tt.selected = ActionReuse, "K"
 			}
 			cases = append(cases, tt)
@@ -121,13 +121,13 @@ func TestCountingStrongWeakMatrix(t *testing.T) {
 							case "same":
 								tt.action, tt.selected, tt.stage = ActionReuse, "K", StageStrong
 							case "incoming_only":
-								if incomingMask&storedMask != 0 {
+								if incomingMask&storedMask&^4 != 0 {
 									tt.action, tt.selected = ActionReuse, "K"
 								}
 							case "stored_only":
 								tt.stage = StageFuzzy
 								if incomingMask != 0 {
-									if incomingMask&storedMask != 0 {
+									if incomingMask&storedMask&^4 != 0 {
 										tt.action, tt.selected = ActionReuse, "K"
 									}
 								}

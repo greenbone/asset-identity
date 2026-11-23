@@ -71,9 +71,9 @@ func TestCountingWeakEvidence(t *testing.T) {
 		{"observation subset", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 1, ip, host)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"exact ip and hostname", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 1, ip, host)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"different hostname", []IdentifierValue{ip, otherHost}, []Candidate{fuzzyRow("K0", 1, ip, host)}, ActionCreate, StageFuzzy, "", nil},
-		{"same mac new ip", []IdentifierValue{otherIP, mac}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
+		{"same mac new ip", []IdentifierValue{otherIP, mac}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionCreate, StageFuzzy, "", nil},
 		{"add hostname to mac", []IdentifierValue{ip, mac, host}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
-		{"different mac", []IdentifierValue{ip, otherMAC}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionCreate, StageFuzzy, "", nil},
+		{"different mac", []IdentifierValue{ip, otherMAC}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"same mac changed host", []IdentifierValue{ip, mac, otherHost}, []Candidate{fuzzyRow("K0", 1, ip, mac, host)}, ActionCreate, StageFuzzy, "", nil},
 		{"two prior candidates", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 2, ip), fuzzyRow("K1", 1, host)}, ActionCreate, StageFuzzy, "", nil},
 		{"richer candidate", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, ip)}, ActionCreate, StageFuzzy, "", nil},
@@ -98,7 +98,7 @@ func TestCountingStrongRules(t *testing.T) {
 		{"conflicting higher type blocks a lower match", []IdentifierValue{g, agent}, []Candidate{fuzzyRow("K0", 1, otherG, agent)}, ActionCreate, StageFuzzy, "", nil},
 		{"new agent creates a key and absorbs weak record", []IdentifierValue{agent, ip, mac}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"conflicting incoming greenbone id is not merged", []IdentifierValue{g, ip, mac}, []Candidate{fuzzyRow("K0", 20, ip, mac), fuzzyRow("K1", 10, otherG, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
-		{"conflicting incoming mac is not merged", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 20, ip, host), fuzzyRow("K1", 10, ip, host, otherMAC)}, ActionReuse, StageFuzzy, "K0", nil},
+		{"mac differences cannot disambiguate weak candidates", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 20, ip, host), fuzzyRow("K1", 10, ip, host, otherMAC)}, ActionCreate, StageFuzzy, "", nil},
 		{"tls mismatch does not fall back to weak evidence", []IdentifierValue{tlsA, tlsB, ip, mac}, []Candidate{fuzzyRow("K0", 1, tlsA, ip, mac)}, ActionCreate, StageFuzzy, "", nil},
 	})
 }

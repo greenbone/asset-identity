@@ -583,6 +583,82 @@ Ensure (continuity_ambiguity_uses_only_matching_candidates)
   gvm_asset_identity_policy_free (policy);
 }
 
+Ensure (fuzzy_mac_is_not_decisive)
+{
+  const struct
+  {
+    const gchar *stored_ip;
+    const gchar *incoming_ip;
+    const gchar *stored_mac;
+    const gchar *incoming_mac;
+    gvm_asset_identity_identifier_type_t name_type;
+    const gchar *name;
+    gboolean reuse;
+  } cases[] = {
+    {"192.0.2.1", "192.0.2.2", "02:00:00:00:00:01", "02:00:00:00:00:01",
+     GVM_ASSET_IDENTITY_HOSTNAME, NULL, FALSE},
+    {"192.0.2.1", "192.0.2.2", "00:00:5e:00:01:01", "00:00:5e:00:01:01",
+     GVM_ASSET_IDENTITY_HOSTNAME, NULL, FALSE},
+    {"192.0.2.1", "192.0.2.1", "02:00:00:00:00:01", "02:00:00:00:00:02",
+     GVM_ASSET_IDENTITY_HOSTNAME, "srv-a", TRUE},
+    {"192.0.2.1", "192.0.2.1", NULL, NULL, GVM_ASSET_IDENTITY_HOSTNAME, NULL,
+     TRUE},
+    {"192.0.2.1", "192.0.2.2", NULL, NULL, GVM_ASSET_IDENTITY_FQDN,
+     "srv-a.example.com", TRUE},
+    {"192.0.2.1", "192.0.2.2", "02:00:00:00:00:01", "02:00:00:00:00:02",
+     GVM_ASSET_IDENTITY_FQDN, "srv-a.example.com", TRUE},
+    {"192.0.2.1", "192.0.2.2", "02:00:00:00:00:01", "02:00:00:00:00:01",
+     GVM_ASSET_IDENTITY_HOSTNAME, "srv-a", FALSE},
+  };
+  gvm_asset_identity_policy_t *policy = default_policy ();
+  for (guint i = 0; i < G_N_ELEMENTS (cases); i++)
+    {
+      gvm_asset_identity_observation_t *stored =
+        observation (GVM_ASSET_IDENTITY_IP, cases[i].stored_ip);
+      gvm_asset_identity_observation_t *input =
+        observation (GVM_ASSET_IDENTITY_IP, cases[i].incoming_ip);
+      if (cases[i].stored_mac)
+        g_ptr_array_add (stored->identifiers,
+                         gvm_asset_identity_identifier_new (
+                           GVM_ASSET_IDENTITY_MAC, cases[i].stored_mac));
+      if (cases[i].incoming_mac)
+        g_ptr_array_add (input->identifiers,
+                         gvm_asset_identity_identifier_new (
+                           GVM_ASSET_IDENTITY_MAC, cases[i].incoming_mac));
+      if (cases[i].name)
+        {
+          g_ptr_array_add (stored->identifiers,
+                           gvm_asset_identity_identifier_new (
+                             cases[i].name_type, cases[i].name));
+          g_ptr_array_add (input->identifiers,
+                           gvm_asset_identity_identifier_new (
+                             cases[i].name_type, cases[i].name));
+        }
+      GPtrArray *rows = candidates_new ();
+      g_ptr_array_add (rows, candidate ("K0", stored));
+      gvm_asset_identity_decision_t *result = decide (input, rows, policy);
+      assert_that (result->action,
+                   is_equal_to (cases[i].reuse ? GVM_ASSET_IDENTITY_REUSE
+                                               : GVM_ASSET_IDENTITY_CREATE));
+      assert_that (result->stage, is_equal_to (GVM_ASSET_IDENTITY_STAGE_FUZZY));
+      assert_that (result->needs_new_key, is_equal_to (!cases[i].reuse));
+      assert_that (result->has_selected_index, is_equal_to (cases[i].reuse));
+      assert_that (result->merge_indices->len, is_equal_to (0));
+      if (cases[i].reuse)
+        {
+          assert_that (result->selected_key, is_equal_to_string ("K0"));
+          assert_that (result->selected_index, is_equal_to (0));
+        }
+      else
+        assert_that (result->selected_key, is_null);
+      gvm_asset_identity_decision_free (result);
+      g_ptr_array_unref (rows);
+      gvm_asset_identity_observation_free (input);
+      gvm_asset_identity_observation_free (stored);
+    }
+  gvm_asset_identity_policy_free (policy);
+}
+
 int
 main (void)
 {
@@ -597,6 +673,7 @@ main (void)
   add_test (suite, strong_no_match_and_multiple_values);
   add_test (suite, fuzzy_reuse_requires_one_compatible_asset);
   add_test (suite, fuzzy_dhcp_reuses_key_without_merging);
+  add_test (suite, fuzzy_mac_is_not_decisive);
   add_test (suite, fuzzy_timestamps_cannot_resolve_ambiguity);
   add_test (suite, semantic_equality_matches_canonical_forms);
   add_test (suite, machine_id_forms_match);

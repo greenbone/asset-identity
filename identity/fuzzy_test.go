@@ -50,7 +50,7 @@ func TestFuzzyKernelEvidence(t *testing.T) {
 		{"negative timestamps cannot resolve ambiguity", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", -10, ip1), fuzzyRow("K2", -20, ip1)}, -1, 0},
 		{"pre epoch versus epoch", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K1", -1, ip1), fuzzyRow("K2", 0, ip1)}, -1, 0},
 		{"hostname weight", []IdentifierValue{host}, []Candidate{fuzzyRow("K1", 10, host)}, 0, .4},
-		{"mac weight", []IdentifierValue{mac}, []Candidate{fuzzyRow("K1", 10, mac)}, 0, 1},
+		{"mac alone is not identity evidence", []IdentifierValue{mac}, []Candidate{fuzzyRow("K1", 10, mac)}, -1, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -85,7 +85,7 @@ func TestFuzzyKernelNormalizationAndConfiguration(t *testing.T) {
 	}{
 		{"semantic DNS duplicates", []IdentifierValue{fuzzyValue(TypeHostname, "HOST."), fuzzyValue(TypeHostname, "host.")}, []IdentifierValue{fuzzyValue(TypeHostname, "host.")}, GreenboneMatchPolicy(), .4, true},
 		{"semantic IPv6 duplicates", []IdentifierValue{fuzzyValue(TypeIP, "2001:0DB8::1"), fuzzyValue(TypeIP, "2001:db8::1")}, []IdentifierValue{fuzzyValue(TypeIP, "2001:db8::1")}, GreenboneMatchPolicy(), .4, true},
-		{"MAC formatting duplicates", []IdentifierValue{fuzzyValue(TypeMAC, "02-AB-CD-EF-01-23"), fuzzyValue(TypeMAC, "02:ab:cd:ef:01:23")}, []IdentifierValue{fuzzyValue(TypeMAC, "02abcdef0123")}, GreenboneMatchPolicy(), 1, true},
+		{"MAC formatting duplicates", []IdentifierValue{ip, fuzzyValue(TypeMAC, "02-AB-CD-EF-01-23"), fuzzyValue(TypeMAC, "02:ab:cd:ef:01:23")}, []IdentifierValue{ip, fuzzyValue(TypeMAC, "02abcdef0123")}, GreenboneMatchPolicy(), 1.4, true},
 		{"missing FQDN permits reuse", []IdentifierValue{ip, fuzzyValue(TypeFQDN, "host.example.")}, []IdentifierValue{ip}, GreenboneMatchPolicy(), .4, true},
 		{"normalized FQDN weight", []IdentifierValue{fuzzyValue(TypeFQDN, "HOST.EXAMPLE.")}, []IdentifierValue{fuzzyValue(TypeFQDN, "host.example")}, GreenboneMatchPolicy(), .4, true},
 		{"FQDN and IP weights", []IdentifierValue{ip, fuzzyValue(TypeFQDN, "host.example.")}, []IdentifierValue{ip, fuzzyValue(TypeFQDN, "host.example")}, GreenboneMatchPolicy(), .8, true},
@@ -202,8 +202,8 @@ func TestFuzzyKernelFloat32Accumulation(t *testing.T) {
 			}
 		})
 	}
-	p := MatchPolicy{Fuzzy: []FuzzyMember{{Type: TypeMAC, Weight: math.MaxFloat32}}}
-	values = append(values[:1], fuzzyValue(TypeMAC, "02:00:00:00:00:02"))
+	p := MatchPolicy{Fuzzy: []FuzzyMember{{Type: TypeMAC, Weight: math.MaxFloat32}, {Type: TypeIP, Weight: .4}}}
+	values = append(values[:1], fuzzyValue(TypeMAC, "02:00:00:00:00:02"), fuzzyValue(TypeIP, "192.0.2.1"))
 	got, err := matchFuzzyKernel(Observation{Identifiers: values}, []Candidate{fuzzyRow("K", 10, values...)}, p)
 	if err == nil || !reflect.DeepEqual(got, fuzzyKernelResult{}) {
 		t.Fatalf("nonfinite score: %+v %v", got, err)
