@@ -2,9 +2,13 @@
 
 # asset-identity
 
-A Go library for identifier normalization and strong-first asset reconciliation.
-`libgvm_asset_identity.so` exposes the same algorithm through a GLib C API (ABI 3). Applications supply eligible
-identifiers and candidates; they own scanner boundaries, authorization, persistence, and merge approval.
+Asset-identity compares new scan results with stored scan snapshots.
+It returns CREATE or REUSE.
+A strong match can also permit merges between existing assets.
+
+The library provides Go and GLib C APIs.
+Both APIs use the same algorithm. The C ABI version is 3.
+The application supplies the inputs and stores the result.
 
 ## Build status
 
@@ -38,67 +42,147 @@ func main() {
 }
 ```
 
-Pass caller-prepared active views; normalization does not establish producer trust.
+Supply only identifiers from permitted sources.
+Normalization makes values comparable. It does not establish trust in the source.
 
-| Action | Meaning                        |
+| Action | Application action             |
 | ------ | ------------------------------ |
-| CREATE | A new key is required.         |
+| CREATE | Generate a new asset key.      |
 | REUSE  | Use the selected existing key. |
 
-Matching runs in three stages:
+## Matching
 
-1. **Strong:** Cloud ID → Greenbone ID → Machine ID → BIOS UUID. The highest shared type decides. A conflict excludes
-   that candidate; missing IDs are allowed. Matching candidates use priority, newest timestamp, then asset key.
-2. **Continuity:** Agent ID, SSH key, or TLS public key. Any shared value can select one compatible asset. Other
-   continuity or weak differences do not veto a unique match. TLS needs only one shared eligible key.
-3. **Fuzzy:** Require a shared value other than MAC. Reject conflicting names. Allow missing types.
-   If both records have IP addresses but none matches, require a shared FQDN. A short hostname cannot support this match.
-   Reuse a key only when exactly one candidate meets these rules. Scores and timestamps do not select between multiple matches.
+The library tries these stages in order:
 
-Strong conflicts remain excluded from later stages. Multiple continuity matches restrict fuzzy matching to those
-candidates. With no continuity matches, fuzzy matching considers all candidates without a strong conflict. If neither
-stage resolves a key, return CREATE with no merges.
+| Stage      | Default identifier types                         | Selection                                                |
+| ---------- | ------------------------------------------------ | -------------------------------------------------------- |
+| Strong     | Cloud ID → Greenbone ID → Machine ID → BIOS UUID | Highest shared priority, then newest qualifying snapshot |
+| Continuity | Agent ID, SSH key, TLS public-key hash           | One distinct matching asset key                          |
+| Fuzzy      | MAC, hostname, IP, FQDN                          | Newest snapshot that meets the weak matching rules       |
 
-Default fuzzy weights are MAC (1.0), hostname (0.4), IP (0.4), and FQDN (0.4). Scores do not select candidates.
-The library normalizes MAC values. Fuzzy matching does not use MAC to accept or reject a candidate.
+Strong conflicts exclude an asset from matching.
+Missing strong types are allowed.
+A match at a higher priority takes precedence over differences at lower priorities.
 
-`MergeIndices` contains original candidate positions. Only strong-stage decisions can merge records. Their existing
-safeguards remain: incoming Agent/SSH/TLS evidence can link related records, and contained weak records may join.
-Continuity reuse never authorizes merging other assets that share a service key. The application stores new evidence,
-retains history, and applies any moves atomically.
-See [the algorithm guide](docs/how-asset-identity-works.md#8-the-returned-decision).
+For continuity, any shared value can select one compatible asset key.
+Several matching snapshots of that key still count as one asset.
+If several keys match, fuzzy matching checks only their continuity-matching snapshots.
+If no key matches, fuzzy matching checks all snapshots without a strong conflict.
+
+For fuzzy matching:
+
+- Require a shared configured value other than MAC.
+- Allow missing identifier types.
+- Reject conflicting names when both records supply that name type.
+- If both records have IPs but none matches, require a shared FQDN.
+- Do not use a short hostname to accept an IP change.
+- Do not use MAC to accept or reject a match.
+
+Default fuzzy weights are MAC (1.0), hostname (0.4), IP (0.4), and FQDN (0.4).
+Scores do not select a candidate.
+A snapshot qualifies when it meets the matching rules.
+If no snapshot qualifies, return CREATE.
+
+## Snapshot candidates
+
+One candidate represents one scan snapshot.
+All identifiers in that candidate share its `LastSeen` observation time.
+Several candidates can have the same asset key.
+Do not combine identifiers from different scans in one candidate.
+Leave an unknown time missing.
+
+For strong conflict checks, use the latest evidence for each strong type within each asset.
+New evidence replaces older timestamped evidence of the same type.
+Keep all equally recent evidence.
+Also keep evidence with missing times, because its order is unknown.
+A newer observation of another type does not replace that evidence.
+These rules do not establish permanent device identity.
+
+Check eligibility before comparing times.
+Known times rank before missing times.
+Equal or missing times use the smallest asset key in byte order.
+This order makes ties repeatable. It does not prove identity.
+
+For example, A reports IP1 on Nov 1 and IP2 on Nov 15.
+B reports IP1 on Nov 14.
+An incoming IP1-only observation reuses B.
+A's newer IP2 snapshot does not qualify.
+
+## Merge results
+
+`SelectedIndex` identifies the selected snapshot in the original candidate array.
+`MergeIndices` identifies source asset keys through their original snapshot positions.
+Each source key occurs once. The destination key is excluded.
+Apply each merge to the whole source asset.
+
+Only strong-stage decisions can return merges.
+Incoming Agent, SSH, or TLS evidence can link related records during a strong merge.
+All source assets must pass the strong merge checks.
+An older snapshot cannot hide current strong conflicts.
+Continuity and fuzzy decisions never return merges.
+
+See [the algorithm guide](docs/how-asset-identity-works.md#8-the-returned-decision) for examples.
+See [SPEC-002](docs/specs/SPEC-002-reconciliation.md) for the complete rules.
+
+## Consumer migration
+
+The Go/C signatures and structures are unchanged.
+ABI 3 remains in use.
+Existing callers still compile.
+They must supply separate snapshots to provide correct observation times.
+`RankStrongCandidates` remains a separate helper with one entry per asset key.
+
+For gvmd integration:
+
+1. Load candidates by snapshot ID.
+2. Load each snapshot's complete eligible identifiers.
+3. Preserve its assigned asset key.
+4. Include the strong evidence needed for conflict checks across the asset's snapshots.
+5. Apply the existing scanner, access, and freshness rules.
+6. Set `LastSeen` to the actual observation time.
+7. Leave unknown times missing.
+
+Update `asset_target_add_candidates` and `asset_candidate_load_identifiers` in `manage_sql_assets.c`.
+Group identifier rows by `asset_snapshot`.
+Use the existing snapshot storage.
+
+Key assignment and merging change snapshot `modification_time`.
+Do not use that field as the observation time.
+Verify the time from the associated scan or report-host event before integration.
+Do not substitute import time, merge time, or asset-level last-seen time.
+Keep the original observation times when merging snapshots.
+The gvmd code is unchanged in this repository.
 
 ## Scanner identifier values
 
-Every identifier type has its own normalizer, run before matching. Pass raw producer values directly in
-`IdentifierValue.Value`; the library trims, normalizes, and leaves out placeholders such as `127.0.0.1`, a zero MAC or
-BIOS UUID, or `localhost`. Use `NormalizeIdentifier` to get the canonical value to store. For example:
+Pass raw values in `IdentifierValue.Value`.
+The library removes surrounding spaces and converts values to a common format.
+It ignores placeholders such as `localhost`, loopback IPs, and zero MAC or BIOS UUID values.
+Other invalid values cause an error.
 
-| Type                   | Scanner value                                |
+| Type                   | Example input                                |
 | ---------------------- | -------------------------------------------- |
 | `TypeSSHHostKey`       | `22 ecdsa-sha2-nistp256 <base64-public-key>` |
 | `TypeTLSPublicKeyHash` | `x509:<base64-DER-certificate>`              |
 
-The library removes the SSH port and normalizes the public key. For TLS, it parses the certificate and calculates the
-public-key hash internally; during matching the certificate counts only when its CN or a DNS SAN equals an FQDN or
-hostname supplied in the same view. Callers do not need to calculate hashes or strip these value prefixes. `Decide`
-performs this normalization automatically. Existing SSH public-key lines and `spki-sha256:` values remain accepted.
-Certificate fingerprints and `SSLDetails`/`SSLInfo` metadata alone cannot supply a public key.
+The library removes the SSH port and uses the public key for comparison.
+For TLS, it calculates the public-key hash from the certificate.
+The certificate's subject CN or DNS SAN must match a hostname or FQDN in the same input record.
+Existing `spki-sha256:` values are also accepted.
+Certificate fingerprints and `SSLDetails` or `SSLInfo` metadata cannot supply the public key.
 
-In C, pass the same values to `gvm_asset_identity_identifier_new` and add them to the observation (or a candidate's
-identifiers):
+In C, add raw values with `gvm_asset_identity_identifier_new`:
 
 ```c
-/* ssh_value is "22 ecdsa-sha2-nistp256 ..."; tls_value is "x509:...". */
 g_ptr_array_add(observation->identifiers,
     gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_SSH_HOST_KEY, ssh_value));
 g_ptr_array_add(observation->identifiers,
     gvm_asset_identity_identifier_new(GVM_ASSET_IDENTITY_TLS_PUBLIC_KEY_HASH, tls_value));
 ```
 
-`gvm_asset_identity_decide` performs parsing and normalization through the same Go implementation. Constructors copy the
-supplied values; malformed values produce `GVM_ASSET_IDENTITY_ERROR_INVALID_INPUT`
-when deciding. No caller-side key extraction or hashing is required.
+Constructors copy the values. `Decide` parses and normalizes them.
+The caller does not need to extract or hash keys.
+See [SPEC-001B](docs/specs/SPEC-001B-normalization.md) for all accepted formats.
 
 ## Formatting and linting
 
@@ -118,18 +202,21 @@ Set `GOLANGCI_LINT`, `CLANG_FORMAT`, or `GERSEMI` to override executable paths.
 
 ## Coverage
 
-Run `make cover` to test the core `identity` package with the race detector and generate `coverage.out` and an HTML
-report at `coverage.html`. The Go C API adapter in `capi` and C sources are excluded from this report; the separate C
-integration tests exercise that boundary through `make test-c`.
+Run `make cover` to test the `identity` package with the race detector.
+This command creates `coverage.out` and `coverage.html`.
+These reports exclude the C adapter and C sources.
+Run `make test-c` to test the C interface.
 
-CI saves both reports as the `coverage-report` artifact and uploads coverage to Codecov. Enable
-`greenbone/asset-identity` in Codecov and configure the repository secret `CODECOV_TOKEN` to match the upload setup used
-by `gvm-report-service`.
+CI saves both reports in the `coverage-report` artifact.
+It also uploads coverage to Codecov.
+Enable `greenbone/asset-identity` in Codecov.
+Set the repository secret `CODECOV_TOKEN` for uploads.
 
 ## C build, test, and install
 
-Linux builds require Go matching [go.mod](go.mod), a C compiler, pkg-config, and GLib development headers. C tests also
-require CMake 3.18+ and Cgreen 1.6.4+.
+For Linux builds, install Go matching [go.mod](go.mod).
+Also install a C compiler, pkg-config, and GLib development headers.
+For C tests, install CMake 3.18+ and Cgreen 1.6.4+.
 
 ```sh
 make build                       # dist/libgvm_asset_identity.so
@@ -139,9 +226,10 @@ make install                     # /opt/gvm
 make uninstall                   # same PREFIX/LIBDIR/INCLUDEDIR as install
 ```
 
-Use `PREFIX`, `LIBDIR`, and `INCLUDEDIR` to change installation paths, or `DESTDIR`
-for staging. For a nonstandard Cgreen location, pass
-`CMAKE_ARGS=-DCMAKE_PREFIX_PATH=/path/to/cgreen`. `make clean` removes `dist/` and `build/`.
+Use `PREFIX`, `LIBDIR`, and `INCLUDEDIR` to change installation paths.
+Use `DESTDIR` to stage an installation.
+For a custom Cgreen location, set `CMAKE_ARGS=-DCMAKE_PREFIX_PATH=/path/to/cgreen`.
+`make clean` removes `dist/` and `build/`.
 
 Save this example as `example.c`:
 
@@ -176,10 +264,13 @@ cc example.c $(pkg-config --cflags --libs libgvm_asset_identity) \
 ./example
 ```
 
-Constructors return owned objects; parents own their children. `decide` borrows immutable inputs and returns an
-independently owned decision. Free functions accept NULL; errors use `GError`. Consumers need only the installed
-header/library and GLib. See the [public header](include/gvm_asset_identity.h) and
-[C contract](docs/specs/SPEC-002-reconciliation.md#c-api) for details.
+Constructors return objects that the caller owns.
+Parent objects own their children.
+`decide` borrows inputs and returns an owned decision.
+Do not change inputs during the call.
+Free functions accept NULL. Errors use `GError`.
+Consumers need the installed header, library, and GLib.
+See the [public header](include/gvm_asset_identity.h) and [C contract](docs/specs/SPEC-002-reconciliation.md#c-api).
 
 ## Container image
 
@@ -189,18 +280,17 @@ Build the library image with Docker:
 docker build -f .docker/Dockerfile -t asset-identity .
 ```
 
-Like `gvm-auth-lib`, the image carries installation files under `/install/usr/local`:
-the shared library, public header, and pkg-config metadata. A consuming image can copy `/install/` into `/` during its
-build. Consumers still need GLib at build and runtime as described above.
+The image stores the library, header, and pkg-config file under `/install/usr/local`.
+A consuming image can copy `/install/` into `/` during its build.
+Consumers need GLib during build and runtime.
 
-The container workflow uses Greenbone's shared build and push workflow to publish
-`ghcr.io/greenbone/asset-identity` on main branch and version tag pushes, with pull request builds and a manual ref
-input.
+The container workflow uses Greenbone's shared build and push workflow.
+It publishes `ghcr.io/greenbone/asset-identity` on main branch and version tag pushes.
+It also supports pull request builds and manual runs.
 
 ## Algorithm guide
 
-[How Asset Identity Works](docs/how-asset-identity-works.md) explains the decision flow, strong priority, continuity,
-weak evidence, and Go/C usage through examples.
+[How Asset Identity Works](docs/how-asset-identity-works.md) explains matching and merging with examples.
 
 ## Technical reference
 
@@ -213,5 +303,5 @@ weak evidence, and Go/C usage through examples.
 
 Copyright (C) 2026 Greenbone AG.
 
-Licensed under the GNU Affero General Public License v3.0 only (`AGPL-3.0-only`). See [LICENSE](LICENSE) for the full
-license text.
+Licensed under the GNU Affero General Public License v3.0 only (`AGPL-3.0-only`).
+See [LICENSE](LICENSE) for the full text.

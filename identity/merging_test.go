@@ -29,7 +29,7 @@ func TestMergePlan(t *testing.T) {
 		selected string
 		merges   []int
 	}{
-		{"weak observation cannot combine partial records", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, ip, host), fuzzyRow("K2", 2, ip, mac)}, ActionCreate, "", nil},
+		{"weak observation cannot combine partial records", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, ip, host), fuzzyRow("K2", 2, ip, mac)}, ActionReuse, "K2", nil},
 		{"fuzzy reuse leaves narrower records separate", []IdentifierValue{ip}, []Candidate{fuzzyRow("K1", 2, ip, host), fuzzyRow("K2", 1, host)}, ActionReuse, "K1", nil},
 		{"missing hostname permits reuse without merges", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K1", 1, ip, mac)}, ActionReuse, "K1", nil},
 		{"same winning strong identifier", []IdentifierValue{agent}, []Candidate{fuzzyRow("K1", 2, agent, ip), fuzzyRow("K2", 1, agent, host)}, ActionReuse, "K1", []int{1}},
@@ -39,17 +39,17 @@ func TestMergePlan(t *testing.T) {
 		{"strong mismatch cannot merge through fuzzy", []IdentifierValue{agent, ip}, []Candidate{fuzzyRow("K1", 1, otherAgent, ip)}, ActionCreate, "", nil},
 		{"equal TLS sets merge", []IdentifierValue{tlsA, tlsB}, []Candidate{fuzzyRow("K1", 2, tlsA, tlsB), fuzzyRow("K2", 1, tlsB, tlsA, tlsA)}, ActionReuse, "K1", []int{1}},
 		{"unequal TLS sets cannot merge", []IdentifierValue{tlsA, tlsB, ip}, []Candidate{fuzzyRow("K1", 2, tlsA, tlsB, ip), fuzzyRow("K2", 1, tlsA, ip)}, ActionReuse, "K1", nil},
-		{"ambiguous fuzzy evidence cannot select conflicting strong IDs", []IdentifierValue{ip}, []Candidate{fuzzyRow("K1", 2, agent, ip), fuzzyRow("K2", 1, otherAgent, ip)}, ActionCreate, "", nil},
+		{"fuzzy selection does not merge conflicting strong IDs", []IdentifierValue{ip}, []Candidate{fuzzyRow("K1", 2, agent, ip), fuzzyRow("K2", 1, otherAgent, ip)}, ActionReuse, "K1", nil},
 		{"shared observation does not bridge distinct strong IDs", []IdentifierValue{agent, otherAgent}, []Candidate{fuzzyRow("K1", 2, agent), fuzzyRow("K2", 1, otherAgent)}, ActionReuse, "K1", nil},
 		{"different strong types do not establish identity", []IdentifierValue{agent, ip}, []Candidate{fuzzyRow("K1", 1, fuzzyValue(TypeGreenboneID, "g"), ip)}, ActionReuse, "K1", nil},
-		{"weak observation leaves conflicting strong sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, agent, ip, host), fuzzyRow("K2", 2, otherAgent, ip, mac)}, ActionCreate, "", nil},
-		{"ambiguous weak observation leaves all sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, agent, ip, host), fuzzyRow("K2", 2, otherAgent, ip, mac), fuzzyRow("K3", 3, ip)}, ActionCreate, "", nil},
-		{"reversing conflicting candidates changes no merge outcome", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K2", 2, otherAgent, ip, mac), fuzzyRow("K1", 1, agent, ip, host)}, ActionCreate, "", nil},
-		{"weak observation cannot bridge unequal TLS sets", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, tlsA, tlsB, ip, host), fuzzyRow("K2", 2, tlsA, ip, mac)}, ActionCreate, "", nil},
-		{"weak observation cannot consolidate compatible strong sources", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, agent, ip, host), fuzzyRow("K2", 2, agent, ip, mac)}, ActionCreate, "", nil},
-		{"new strong id cannot resolve ambiguous weak candidates", []IdentifierValue{agent, ip, host, mac}, []Candidate{fuzzyRow("K1", 1, ip, host), fuzzyRow("K2", 2, ip, mac)}, ActionCreate, "", nil},
+		{"weak observation leaves conflicting strong sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, agent, ip, host), fuzzyRow("K2", 2, otherAgent, ip, mac)}, ActionReuse, "K2", nil},
+		{"ambiguous weak observation leaves all sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, agent, ip, host), fuzzyRow("K2", 2, otherAgent, ip, mac), fuzzyRow("K3", 3, ip)}, ActionReuse, "K3", nil},
+		{"reversing conflicting candidates changes no merge outcome", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K2", 2, otherAgent, ip, mac), fuzzyRow("K1", 1, agent, ip, host)}, ActionReuse, "K2", nil},
+		{"weak observation cannot bridge unequal TLS sets", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, tlsA, tlsB, ip, host), fuzzyRow("K2", 2, tlsA, ip, mac)}, ActionReuse, "K2", nil},
+		{"weak observation cannot consolidate compatible strong sources", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K1", 1, agent, ip, host), fuzzyRow("K2", 2, agent, ip, mac)}, ActionReuse, "K2", nil},
+		{"fuzzy timestamps select a key without a strong match", []IdentifierValue{agent, ip, host, mac}, []Candidate{fuzzyRow("K1", 1, ip, host), fuzzyRow("K2", 2, ip, mac)}, ActionReuse, "K2", nil},
 		{"missing weak evidence permits fallback", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K1", 1, ip, mac)}, ActionReuse, "K1", nil},
-		{"weak observation cannot bridge overlapping strong sources", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K1", 1, agent, ip), fuzzyRow("K2", 2, agent, otherAgent, ip), fuzzyRow("K3", 3, otherAgent, ip)}, ActionCreate, "", nil},
+		{"weak observation cannot bridge overlapping strong sources", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K1", 1, agent, ip), fuzzyRow("K2", 2, agent, otherAgent, ip), fuzzyRow("K3", 3, otherAgent, ip)}, ActionReuse, "K3", nil},
 		{"empty observation never merges", nil, []Candidate{fuzzyRow("K1", 1)}, ActionCreate, "", nil},
 	}
 	for _, tt := range tests {

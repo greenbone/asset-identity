@@ -11,7 +11,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"math/big"
 	"reflect"
 	"strings"
@@ -75,10 +74,10 @@ func TestCountingWeakEvidence(t *testing.T) {
 		{"add hostname to mac", []IdentifierValue{ip, mac, host}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"different mac", []IdentifierValue{ip, otherMAC}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"same mac changed host", []IdentifierValue{ip, mac, otherHost}, []Candidate{fuzzyRow("K0", 1, ip, mac, host)}, ActionCreate, StageFuzzy, "", nil},
-		{"two prior candidates", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 2, ip), fuzzyRow("K1", 1, host)}, ActionCreate, StageFuzzy, "", nil},
-		{"richer candidate", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, ip)}, ActionCreate, StageFuzzy, "", nil},
-		{"identical candidates", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, ip, host)}, ActionCreate, StageFuzzy, "", nil},
-		{"weak observation leaves separately discovered nics unmerged", []IdentifierValue{ip, mac, otherIP, otherMAC}, []Candidate{fuzzyRow("K0", 2, ip, mac), fuzzyRow("K1", 1, otherIP, otherMAC)}, ActionCreate, StageFuzzy, "", nil},
+		{"two prior candidates", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 2, ip), fuzzyRow("K1", 1, host)}, ActionReuse, StageFuzzy, "K0", nil},
+		{"richer candidate", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, ip)}, ActionReuse, StageFuzzy, "K0", nil},
+		{"identical candidates", []IdentifierValue{ip, host}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, ip, host)}, ActionReuse, StageFuzzy, "K0", nil},
+		{"weak observation leaves separately discovered nics unmerged", []IdentifierValue{ip, mac, otherIP, otherMAC}, []Candidate{fuzzyRow("K0", 2, ip, mac), fuzzyRow("K1", 1, otherIP, otherMAC)}, ActionReuse, StageFuzzy, "K0", nil},
 	})
 }
 
@@ -98,7 +97,7 @@ func TestCountingStrongRules(t *testing.T) {
 		{"conflicting higher type blocks a lower match", []IdentifierValue{g, agent}, []Candidate{fuzzyRow("K0", 1, otherG, agent)}, ActionCreate, StageFuzzy, "", nil},
 		{"new agent creates a key and absorbs weak record", []IdentifierValue{agent, ip, mac}, []Candidate{fuzzyRow("K0", 1, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"conflicting incoming greenbone id is not merged", []IdentifierValue{g, ip, mac}, []Candidate{fuzzyRow("K0", 20, ip, mac), fuzzyRow("K1", 10, otherG, ip, mac)}, ActionReuse, StageFuzzy, "K0", nil},
-		{"mac differences cannot disambiguate weak candidates", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 20, ip, host), fuzzyRow("K1", 10, ip, host, otherMAC)}, ActionCreate, StageFuzzy, "", nil},
+		{"mac differences cannot disambiguate weak candidates", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 20, ip, host), fuzzyRow("K1", 10, ip, host, otherMAC)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"tls mismatch does not fall back to weak evidence", []IdentifierValue{tlsA, tlsB, ip, mac}, []Candidate{fuzzyRow("K0", 1, tlsA, ip, mac)}, ActionCreate, StageFuzzy, "", nil},
 	})
 }
@@ -110,7 +109,7 @@ func TestCountingStrongDestinationMergesWeakRecords(t *testing.T) {
 	mac := fuzzyValue(TypeMAC, "02:00:00:00:00:01")
 	runCountingCases(t, policyWithAllIdentityTypesStrong(), []countingCase{
 		{"create merges a weak record with identical weak identifiers", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 1, ip, host)}, ActionReuse, StageFuzzy, "K0", nil},
-		{"create merges all contained weak records", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 2, ip), fuzzyRow("K1", 1, ip, host)}, ActionCreate, StageFuzzy, "", nil},
+		{"fuzzy timestamp selection does not merge contained records", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 2, ip), fuzzyRow("K1", 1, ip, host)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"create does not merge a weak record with an additional mac", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 1, ip, host, mac)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"reuse merges a weak record contained in the selected asset", []IdentifierValue{agent}, []Candidate{fuzzyRow("K0", 2, ip, host), fuzzyRow("K1", 1, agent, ip, host)}, ActionReuse, StageStrong, "K1", []int{0}},
 		{"reuse does not use incoming weak additions for containment", []IdentifierValue{agent, ip, host}, []Candidate{fuzzyRow("K0", 2, agent, ip), fuzzyRow("K1", 1, ip, host)}, ActionReuse, StageStrong, "K0", nil},
@@ -176,25 +175,10 @@ func TestCountingProgressiveDiscovery(t *testing.T) {
 			t.Fatalf("scan %d: %+v", step, decision)
 		}
 
-		// Apply the decision as a caller would, retaining evidence from every moved record.
-		key := decision.SelectedKey
-		values := append([]IdentifierValue(nil), scan.values...)
-		if decision.NeedsNewKey {
-			key = fmt.Sprintf("K%d", step)
-		} else {
-			values = append(values, candidates[*decision.SelectedIndex].Identifiers...)
-		}
-		for _, index := range decision.MergeIndices {
-			values = append(values, candidates[index].Identifiers...)
-		}
-		count := len(candidates) - len(decision.MergeIndices)
-		if decision.NeedsNewKey {
-			count++
-		}
-		if count != 1 {
+		candidates = applyCountingDecision(scan.values, candidates, decision, step)
+		if count := countingAssetCount(candidates); count != 1 {
 			t.Fatalf("scan %d left %d assets", step, count)
 		}
-		candidates = []Candidate{fuzzyRow(key, int64(step), values...)}
 	}
 }
 

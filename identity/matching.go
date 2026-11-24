@@ -224,16 +224,7 @@ func RankStrongCandidates(candidates []StrongRankingCandidate) ([]int, error) {
 	}
 	sort.Slice(order, func(i, j int) bool {
 		left, right := candidates[order[i]], candidates[order[j]]
-		if (left.LastSeen == nil) != (right.LastSeen == nil) {
-			return left.LastSeen != nil
-		}
-		if left.LastSeen != nil {
-			leftTime, rightTime := left.LastSeen.UTC(), right.LastSeen.UTC()
-			if !leftTime.Equal(rightTime) {
-				return leftTime.After(rightTime)
-			}
-		}
-		return left.AssetKey < right.AssetKey
+		return ranksBefore(left.AssetKey, left.LastSeen, right.AssetKey, right.LastSeen)
 	})
 	return order, nil
 }

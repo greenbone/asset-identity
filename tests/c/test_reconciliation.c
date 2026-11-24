@@ -198,7 +198,7 @@ Ensure (strong_no_match_and_multiple_values)
   gvm_asset_identity_policy_free (policy);
 }
 
-Ensure (fuzzy_reuse_requires_one_compatible_asset)
+Ensure (fuzzy_reuse_ranks_compatible_snapshots)
 {
   gvm_asset_identity_policy_t *policy = default_policy ();
   gvm_asset_identity_observation_t *input =
@@ -211,13 +211,14 @@ Ensure (fuzzy_reuse_requires_one_compatible_asset)
   wide->last_seen = (gvm_asset_identity_timestamp_t) {TRUE, 20, 0};
   g_ptr_array_add (rows, wide);
   gvm_asset_identity_decision_t *result = decide (input, rows, policy);
+  assert_that (result->selected_key, is_equal_to_string ("wide"));
   assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
   gvm_asset_identity_decision_free (result);
   g_ptr_array_add (rows, narrow);
   result = decide (input, rows, policy);
-  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
-  assert_that (result->needs_new_key, is_true);
-  assert_that (result->has_selected_index, is_false);
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
+  assert_that (result->needs_new_key, is_false);
+  assert_that (result->has_selected_index, is_true);
   assert_that (result->merge_indices->len, is_equal_to (0));
   gvm_asset_identity_decision_free (result);
   g_ptr_array_remove_index (rows, 0);
@@ -269,7 +270,7 @@ Ensure (fuzzy_dhcp_reuses_key_without_merging)
   gvm_asset_identity_policy_free (policy);
 }
 
-Ensure (fuzzy_timestamps_cannot_resolve_ambiguity)
+Ensure (fuzzy_timestamps_rank_compatible_snapshots)
 {
   gvm_asset_identity_policy_t *policy = default_policy ();
   gvm_asset_identity_observation_t *input =
@@ -281,12 +282,14 @@ Ensure (fuzzy_timestamps_cannot_resolve_ambiguity)
   g_ptr_array_add (rows, z);
   g_ptr_array_add (rows, a);
   gvm_asset_identity_decision_t *result = decide (input, rows, policy);
-  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
+  assert_that (result->selected_key, is_equal_to_string ("A"));
   assert_that (result->merge_indices->len, is_equal_to (0));
   gvm_asset_identity_decision_free (result);
   z->last_seen = (gvm_asset_identity_timestamp_t) {TRUE, -1, 999999999};
   result = decide (input, rows, policy);
-  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
+  assert_that (result->selected_key, is_equal_to_string ("A"));
   assert_that (result->merge_indices->len, is_equal_to (0));
   gvm_asset_identity_decision_free (result);
   gvm_asset_identity_observation_free (input);
@@ -536,7 +539,8 @@ Ensure (weak_observation_keeps_conflicting_agent_records_separate)
   g_ptr_array_add (second->identifiers, gvm_asset_identity_identifier_new (
                                           GVM_ASSET_IDENTITY_AGENT_ID, "B"));
   gvm_asset_identity_decision_t *result = decide (input, rows, policy);
-  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_CREATE));
+  assert_that (result->action, is_equal_to (GVM_ASSET_IDENTITY_REUSE));
+  assert_that (result->selected_key, is_equal_to_string ("K1"));
   assert_that (result->merge_indices->len, is_equal_to (0));
   gvm_asset_identity_decision_free (result);
   gvm_asset_identity_observation_free (input);
@@ -659,10 +663,325 @@ Ensure (fuzzy_mac_is_not_decisive)
   gvm_asset_identity_policy_free (policy);
 }
 
+static gvm_asset_identity_observation_t *
+snapshot_input (guint mask)
+{
+  static const struct
+  {
+    gvm_asset_identity_identifier_type_t type;
+    const gchar *value;
+  } values[] = {
+    {GVM_ASSET_IDENTITY_IP, "192.0.2.1"},
+    {GVM_ASSET_IDENTITY_IP, "192.0.2.2"},
+    {GVM_ASSET_IDENTITY_MACHINE_ID, "0123456789abcdef0123456789abcdef"},
+    {GVM_ASSET_IDENTITY_MACHINE_ID, "fedcba9876543210fedcba9876543210"},
+    {GVM_ASSET_IDENTITY_AGENT_ID, "agent-a"},
+    {GVM_ASSET_IDENTITY_MAC, "02:00:00:00:00:01"},
+    {GVM_ASSET_IDENTITY_MAC, "02:00:00:00:00:02"},
+    {GVM_ASSET_IDENTITY_FQDN, "host.example.org"},
+    {GVM_ASSET_IDENTITY_HOSTNAME, "host"},
+    {GVM_ASSET_IDENTITY_BIOS_UUID, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"},
+    {GVM_ASSET_IDENTITY_CLOUD_IDENTIFIER, "cloud/other"},
+  };
+  gvm_asset_identity_observation_t *input =
+    gvm_asset_identity_observation_new ();
+  for (guint i = 0; i < G_N_ELEMENTS (values); i++)
+    if (mask & (1u << i))
+      g_ptr_array_add (input->identifiers, gvm_asset_identity_identifier_new (
+                                             values[i].type, values[i].value));
+  return input;
+}
+
+Ensure (snapshot_candidates_rank_and_merge_by_asset_key)
+{
+  enum
+  {
+    IP = 1,
+    IP2 = 2,
+    MACHINE = 4,
+    OTHER_MACHINE = 8,
+    AGENT = 16,
+    MAC = 32,
+    OTHER_MAC = 64,
+    FQDN = 128,
+    HOST = 256,
+    BIOS = 512,
+    CLOUD = 1024
+  };
+  const struct
+  {
+    guint incoming;
+    guint count;
+    struct
+    {
+      const gchar *key;
+      gint64 seconds;
+      guint identifiers;
+    } rows[4];
+    gvm_asset_identity_stage_t stage;
+    const gchar *selected;
+    const gchar *merged;
+  } cases[] = {
+    {IP,
+     3,
+     {{"A", 1, IP | MAC}, {"B", 14, IP | OTHER_MAC}, {"A", 15, IP2 | MAC}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     "B",
+     NULL},
+    {MACHINE,
+     3,
+     {{"X", 1, MACHINE}, {"Y", 14, MACHINE}, {"X", 15, OTHER_MACHINE}},
+     GVM_ASSET_IDENTITY_STAGE_STRONG,
+     "Y",
+     NULL},
+    {MACHINE,
+     3,
+     {{"X", 1, MACHINE}, {"Y", 14, MACHINE}, {"X", 15, IP2}},
+     GVM_ASSET_IDENTITY_STAGE_STRONG,
+     "Y",
+     "X"},
+    {AGENT,
+     2,
+     {{"K", 1, AGENT}, {"K", 2, AGENT | IP2}},
+     GVM_ASSET_IDENTITY_STAGE_CONTINUITY,
+     "K",
+     NULL},
+    {IP,
+     2,
+     {{"K", 1, IP}, {"K", 2, IP | HOST}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     "K",
+     NULL},
+    {MACHINE | AGENT,
+     2,
+     {{"K", 1, AGENT}, {"K", 2, OTHER_MACHINE | AGENT}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     NULL,
+     NULL},
+    {MACHINE | IP,
+     2,
+     {{"K", 1, IP}, {"K", 2, OTHER_MACHINE}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     NULL,
+     NULL},
+    {MACHINE,
+     2,
+     {{"K", 2, MACHINE}, {"K", 2, OTHER_MACHINE}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     NULL,
+     NULL},
+    {MACHINE,
+     2,
+     {{"K", 0, OTHER_MACHINE}, {"K", 2, MACHINE}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     NULL,
+     NULL},
+    {MACHINE,
+     2,
+     {{"K", 1, OTHER_MACHINE}, {"K", 2, MACHINE}},
+     GVM_ASSET_IDENTITY_STAGE_STRONG,
+     "K",
+     NULL},
+    {MACHINE | AGENT,
+     2,
+     {{"K", 1, OTHER_MACHINE}, {"K", 2, AGENT}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     NULL,
+     NULL},
+    {MACHINE | BIOS,
+     2,
+     {{"K", 1, OTHER_MACHINE}, {"K", 2, BIOS}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     NULL,
+     NULL},
+    {MACHINE | BIOS,
+     2,
+     {{"A", 1, MACHINE}, {"B", 20, BIOS}},
+     GVM_ASSET_IDENTITY_STAGE_STRONG,
+     "A",
+     "B"},
+    {MACHINE | AGENT,
+     3,
+     {{"D", 3, MACHINE}, {"K", 1, AGENT}, {"K", 2, OTHER_MACHINE | AGENT}},
+     GVM_ASSET_IDENTITY_STAGE_STRONG,
+     "D",
+     NULL},
+    {MACHINE | AGENT,
+     4,
+     {{"D", 3, MACHINE}, {"D", 2, MACHINE}, {"K", 1, AGENT}, {"K", 2, AGENT}},
+     GVM_ASSET_IDENTITY_STAGE_STRONG,
+     "D",
+     "K"},
+    {IP2 | FQDN | MAC,
+     1,
+     {{"K", 1, IP | FQDN | OTHER_MAC}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     "K",
+     NULL},
+    {IP2 | HOST | MAC,
+     1,
+     {{"K", 1, IP | HOST | MAC}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     NULL,
+     NULL},
+    {IP | MAC,
+     1,
+     {{"K", 1, IP | OTHER_MAC}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     "K",
+     NULL},
+    {MAC, 1, {{"K", 1, MAC}}, GVM_ASSET_IDENTITY_STAGE_FUZZY, NULL, NULL},
+    {IP,
+     2,
+     {{"B", 1, IP}, {"A", 1, IP}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     "A",
+     NULL},
+    {IP,
+     2,
+     {{"B", 0, IP}, {"A", 0, IP}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     "A",
+     NULL},
+    {IP,
+     2,
+     {{"A", 0, IP}, {"B", 1, IP}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     "B",
+     NULL},
+    {AGENT | IP,
+     3,
+     {{"A", 1, AGENT | IP}, {"A", 20, AGENT | IP2}, {"B", 14, AGENT | IP}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     "B",
+     NULL},
+    {AGENT,
+     3,
+     {{"A", 1, AGENT}, {"A", 20, AGENT}, {"B", 14, AGENT}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     NULL,
+     NULL},
+    {MACHINE | AGENT,
+     3,
+     {{"D", 3, MACHINE}, {"K", 1, AGENT}, {"K", 2, CLOUD}},
+     GVM_ASSET_IDENTITY_STAGE_STRONG,
+     "D",
+     NULL},
+    {BIOS,
+     4,
+     {{"D", 3, BIOS},
+      {"D", 4, MACHINE},
+      {"K", 1, BIOS},
+      {"K", 2, OTHER_MACHINE}},
+     GVM_ASSET_IDENTITY_STAGE_STRONG,
+     "D",
+     NULL},
+    {MACHINE,
+     4,
+     {{"D", 3, MACHINE | IP},
+      {"D", 3, MACHINE | HOST},
+      {"H", 1, HOST},
+      {"I", 2, IP}},
+     GVM_ASSET_IDENTITY_STAGE_STRONG,
+     "D",
+     "H"},
+    {IP | FQDN | MAC,
+     2,
+     {{"A", 1, IP | FQDN | MAC}, {"B", 14, IP}},
+     GVM_ASSET_IDENTITY_STAGE_FUZZY,
+     "B",
+     NULL},
+  };
+  gvm_asset_identity_policy_t *policy = default_policy ();
+  for (guint c = 0; c < G_N_ELEMENTS (cases); c++)
+    {
+      guint combinations = 1;
+      for (guint i = 0; i < cases[c].count; i++)
+        combinations *= cases[c].count;
+      for (guint permutation = 0; permutation < combinations; permutation++)
+        {
+          guint order[4], used = 0, code = permutation;
+          gboolean valid = TRUE;
+          for (guint i = 0; i < cases[c].count; i++)
+            {
+              order[i] = code % cases[c].count;
+              code /= cases[c].count;
+              if (used & (1u << order[i]))
+                valid = FALSE;
+              used |= 1u << order[i];
+            }
+          if (!valid)
+            continue;
+          GPtrArray *rows = candidates_new ();
+          for (guint i = 0; i < cases[c].count; i++)
+            {
+              guint source = order[i];
+              gvm_asset_identity_observation_t *values =
+                snapshot_input (cases[c].rows[source].identifiers);
+              gvm_asset_identity_candidate_t *row =
+                candidate (cases[c].rows[source].key, values);
+              row->last_seen = (gvm_asset_identity_timestamp_t) {
+                cases[c].rows[source].seconds != 0,
+                cases[c].rows[source].seconds, 0};
+              g_ptr_array_add (rows, row);
+              gvm_asset_identity_observation_free (values);
+            }
+          gvm_asset_identity_observation_t *input =
+            snapshot_input (cases[c].incoming);
+          gvm_asset_identity_decision_t *result = decide (input, rows, policy);
+          assert_that (result->action,
+                       is_equal_to (cases[c].selected
+                                      ? GVM_ASSET_IDENTITY_REUSE
+                                      : GVM_ASSET_IDENTITY_CREATE));
+          assert_that (result->stage, is_equal_to (cases[c].stage));
+          assert_that (result->needs_new_key == (cases[c].selected == NULL),
+                       is_true);
+          assert_that (
+            result->has_selected_index == (cases[c].selected != NULL), is_true);
+          if (cases[c].selected)
+            {
+              assert_that (result->selected_key,
+                           is_equal_to_string (cases[c].selected));
+              gvm_asset_identity_candidate_t *selected =
+                g_ptr_array_index (rows, result->selected_index);
+              assert_that (selected->asset_key,
+                           is_equal_to_string (cases[c].selected));
+              guint original = order[result->selected_index];
+              for (guint i = 0; i < cases[c].count; i++)
+                if (strcmp (cases[c].rows[i].key, cases[c].selected) == 0
+                    && (cases[c].rows[i].identifiers & cases[c].incoming)
+                         == cases[c].incoming)
+                  assert_that (cases[c].rows[original].seconds
+                                 >= cases[c].rows[i].seconds,
+                               is_true);
+            }
+          assert_that (result->merge_indices->len,
+                       is_equal_to (cases[c].merged ? 1 : 0));
+          if (cases[c].merged && result->merge_indices->len == 1)
+            {
+              gsize index = g_array_index (result->merge_indices, gsize, 0);
+              gvm_asset_identity_candidate_t *source =
+                g_ptr_array_index (rows, index);
+              assert_that (source->asset_key,
+                           is_equal_to_string (cases[c].merged));
+              if (cases[c].incoming == (MACHINE | AGENT) && cases[c].count == 4)
+                assert_that (source->last_seen.seconds, is_equal_to (2));
+              assert_that (
+                strcmp (source->asset_key, result->selected_key) != 0, is_true);
+            }
+          gvm_asset_identity_decision_free (result);
+          gvm_asset_identity_observation_free (input);
+          g_ptr_array_unref (rows);
+        }
+    }
+  gvm_asset_identity_policy_free (policy);
+}
+
 int
 main (void)
 {
   TestSuite *suite = create_test_suite ();
+  add_test (suite, snapshot_candidates_rank_and_merge_by_asset_key);
   add_test (suite, continuity_ambiguity_uses_only_matching_candidates);
   add_test (suite, create_and_strong_reuse);
   add_test (suite, strong_reuse_enrichment_and_conflict);
@@ -671,10 +990,10 @@ main (void)
   add_test (suite, custom_priority_preserves_original_indices);
   add_test (suite, strong_ranking_keeps_nanoseconds_missing_and_key_ties);
   add_test (suite, strong_no_match_and_multiple_values);
-  add_test (suite, fuzzy_reuse_requires_one_compatible_asset);
+  add_test (suite, fuzzy_reuse_ranks_compatible_snapshots);
   add_test (suite, fuzzy_dhcp_reuses_key_without_merging);
   add_test (suite, fuzzy_mac_is_not_decisive);
-  add_test (suite, fuzzy_timestamps_cannot_resolve_ambiguity);
+  add_test (suite, fuzzy_timestamps_rank_compatible_snapshots);
   add_test (suite, semantic_equality_matches_canonical_forms);
   add_test (suite, machine_id_forms_match);
   add_test (suite, raw_ssh_scanner_value_matches_public_key);

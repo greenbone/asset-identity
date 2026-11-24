@@ -32,24 +32,24 @@ func TestIssue11WeakReuseAndAmbiguity(t *testing.T) {
 		{"ip only reuses one richer asset", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 1, agent, ip, mac, fqdn)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"unknown ip creates without merging", []IdentifierValue{unknownIP}, []Candidate{fuzzyRow("K0", 1, ip, mac, fqdn)}, ActionCreate, StageFuzzy, "", nil},
 		{"retired ip is not matched through last seen", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 999, nextIP, mac, fqdn)}, ActionCreate, StageFuzzy, "", nil},
-		{"mac cannot disambiguate reassigned address", []IdentifierValue{ip, otherMAC}, []Candidate{fuzzyRow("K0", 999, agent, ip, mac), fuzzyRow("K1", 1, otherAgent, ip, otherMAC)}, ActionCreate, StageFuzzy, "", nil},
-		{"ip only cannot distinguish reassigned address", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 999, agent, ip, mac), fuzzyRow("K1", 1, otherAgent, ip, otherMAC)}, ActionCreate, StageFuzzy, "", nil},
+		{"mac cannot disambiguate reassigned address", []IdentifierValue{ip, otherMAC}, []Candidate{fuzzyRow("K0", 999, agent, ip, mac), fuzzyRow("K1", 1, otherAgent, ip, otherMAC)}, ActionReuse, StageFuzzy, "K0", nil},
+		{"ip only cannot distinguish reassigned address", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 999, agent, ip, mac), fuzzyRow("K1", 1, otherAgent, ip, otherMAC)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"shared mac cannot identify an unknown ip", []IdentifierValue{unknownIP, mac}, []Candidate{fuzzyRow("K0", 999, ip, mac), fuzzyRow("K1", 1, nextIP, mac)}, ActionCreate, StageFuzzy, "", nil},
-		{"higher score cannot resolve multiple compatible assets", []IdentifierValue{ip, mac, fqdn}, []Candidate{fuzzyRow("K0", 999, ip, mac, fqdn), fuzzyRow("K1", 1, ip)}, ActionCreate, StageFuzzy, "", nil},
+		{"higher score cannot resolve multiple compatible assets", []IdentifierValue{ip, mac, fqdn}, []Candidate{fuzzyRow("K0", 999, ip, mac, fqdn), fuzzyRow("K1", 1, ip)}, ActionReuse, StageFuzzy, "K0", nil},
 		{"fuzzy reuse does not merge unrelated narrower record", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 1, ip, fqdn), fuzzyRow("K1", 999, fqdn)}, ActionReuse, StageFuzzy, "K0", nil},
-		{"weak combined interfaces cannot consolidate records", []IdentifierValue{ip, mac, nextIP, otherMAC}, []Candidate{fuzzyRow("K0", 999, ip, mac), fuzzyRow("K1", 1, nextIP, otherMAC)}, ActionCreate, StageFuzzy, "", nil},
+		{"weak combined interfaces cannot consolidate records", []IdentifierValue{ip, mac, nextIP, otherMAC}, []Candidate{fuzzyRow("K0", 999, ip, mac), fuzzyRow("K1", 1, nextIP, otherMAC)}, ActionReuse, StageFuzzy, "K0", nil},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			for range 2 {
 				decision := decideCountingCase(t, GreenboneMatchPolicy(), tt)
 				after := applyCountingDecision(tt.incoming, tt.candidates, decision, 1000)
-				wantCount := len(tt.candidates)
+				wantCount := countingAssetCount(tt.candidates)
 				if tt.action == ActionCreate {
 					wantCount++
 				}
-				if len(after) != wantCount {
-					t.Fatalf("asset count=%d want=%d", len(after), wantCount)
+				if countingAssetCount(after) != wantCount {
+					t.Fatalf("asset count=%d want=%d", countingAssetCount(after), wantCount)
 				}
 				slices.Reverse(tt.candidates)
 			}
@@ -69,9 +69,8 @@ func TestIssue11ProgressiveDHCPPreservesKeyAndCount(t *testing.T) {
 		}
 		decision := decideCountingCase(t, GreenboneMatchPolicy(), expected)
 		rows = applyCountingDecision(incoming, rows, decision, step)
-		if len(rows) != 1 || rows[0].AssetKey != "K0" {
+		if countingAssetCount(rows) != 1 || rows[0].AssetKey != "K0" {
 			t.Fatalf("step=%d inventory=%+v", step, rows)
 		}
-		rows[0].Identifiers = incoming
 	}
 }

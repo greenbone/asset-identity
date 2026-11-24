@@ -39,10 +39,9 @@ func matchFuzzyCanonical(incoming []IdentifierValue, views [][]IdentifierValue, 
 		if err != nil {
 			return fail, err
 		}
-		if selectedCandidateIndex >= 0 {
-			return result, nil
+		if selectedCandidateIndex < 0 || snapshotBefore(i, selectedCandidateIndex, candidates, views) {
+			selectedCandidateIndex, selectedScore = i, score
 		}
-		selectedCandidateIndex, selectedScore = i, score
 	}
 	if selectedCandidateIndex >= 0 {
 		index := selectedCandidateIndex

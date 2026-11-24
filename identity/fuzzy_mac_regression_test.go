@@ -38,7 +38,7 @@ func TestIssue19MACDoesNotIdentifyRoutedHosts(t *testing.T) {
 		{"same ip with different mac and no name", []IdentifierValue{ip1, routerMAC}, []Candidate{fuzzyRow("srv-a", 1, ip1, realMAC)}, ActionReuse, StageFuzzy, "srv-a", nil},
 		{"shared mac alone", []IdentifierValue{routerMAC}, []Candidate{fuzzyRow("srv-a", 1, routerMAC)}, ActionCreate, StageFuzzy, "", nil},
 		{"shared mac cannot override fqdn conflict", []IdentifierValue{ip1, routerMAC, fqdn}, []Candidate{fuzzyRow("srv-a", 1, ip1, routerMAC, fuzzyValue(TypeFQDN, "srv-b.example.com"))}, ActionCreate, StageFuzzy, "", nil},
-		{"multiple ip matches remain ambiguous", []IdentifierValue{ip1}, []Candidate{fuzzyRow("srv-a", 1, ip1, realMAC), fuzzyRow("other", 999, ip1, routerMAC)}, ActionCreate, StageFuzzy, "", nil},
+		{"multiple ip matches use observation time", []IdentifierValue{ip1}, []Candidate{fuzzyRow("srv-a", 1, ip1, realMAC), fuzzyRow("other", 999, ip1, routerMAC)}, ActionReuse, StageFuzzy, "other", nil},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
