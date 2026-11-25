@@ -224,10 +224,10 @@ func TestCountingCandidateOrderMatrix(t *testing.T) {
 		t.Run(strong.name, func(t *testing.T) {
 			cases := []countingCase{
 				{"strong reuse merges equal strong evidence", []IdentifierValue{strong.value, ip, host}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.value, otherIP), fuzzyRow("K2", 10, strong.other, ip)}, ActionReuse, StageStrong, "K0", []int{1}},
-				{"strong create absorbs weak subsets", []IdentifierValue{strong.value, ip, host, mac}, []Candidate{fuzzyRow("K0", 30, ip, host), fuzzyRow("K1", 20, ip, mac), fuzzyRow("K2", 10, strong.other, ip)}, ActionCreate, StageFuzzy, "", nil},
-				{"weak ambiguity leaves compatible strong sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.value, ip, mac), fuzzyRow("K2", 10, mac)}, ActionCreate, StageFuzzy, "", nil},
-				{"weak create excludes conflicting strong sources", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.other, ip, mac), fuzzyRow("K2", 10, mac)}, ActionCreate, StageFuzzy, "", nil},
-				{"weak ambiguity leaves conflicting destinations separate", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.other, ip), fuzzyRow("K2", 10, host)}, ActionCreate, StageFuzzy, "", nil},
+				{"incoming strong ID permits fuzzy selection without merges", []IdentifierValue{strong.value, ip, host, mac}, []Candidate{fuzzyRow("K0", 30, ip, host), fuzzyRow("K1", 20, ip, mac), fuzzyRow("K2", 10, strong.other, ip)}, ActionReuse, StageFuzzy, "K0", nil},
+				{"weak ambiguity leaves compatible strong sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.value, ip, mac), fuzzyRow("K2", 10, mac)}, ActionReuse, StageFuzzy, "K0", nil},
+				{"fuzzy selection leaves conflicting strong sources separate", []IdentifierValue{ip, host, mac}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.other, ip, mac), fuzzyRow("K2", 10, mac)}, ActionReuse, StageFuzzy, "K0", nil},
+				{"weak ambiguity leaves conflicting destinations separate", []IdentifierValue{ip}, []Candidate{fuzzyRow("K0", 30, strong.value, ip, host), fuzzyRow("K1", 20, strong.other, ip), fuzzyRow("K2", 10, host)}, ActionReuse, StageFuzzy, "K0", nil},
 				{"reuse merge uses stored destination evidence", []IdentifierValue{strong.value, ip, host}, []Candidate{fuzzyRow("K0", 30, strong.value, ip), fuzzyRow("K1", 20, host), fuzzyRow("K2", 10, ip)}, ActionReuse, StageStrong, "K0", []int{2}},
 			}
 			for _, base := range cases {
@@ -267,8 +267,8 @@ func TestCountingProgressiveStrongMatrix(t *testing.T) {
 				{[]IdentifierValue{strong.value, otherIP}, ActionReuse, StageStrong, "K0", nil, 1},
 				{[]IdentifierValue{ip}, ActionReuse, StageFuzzy, "K0", nil, 1},
 				{[]IdentifierValue{strong.other, ip}, ActionCreate, StageFuzzy, "", nil, 2},
-				{[]IdentifierValue{ip}, ActionCreate, StageFuzzy, "", nil, 3},
-				{[]IdentifierValue{strong.value, ip}, ActionReuse, StageStrong, "K0", []int{2}, 2},
+				{[]IdentifierValue{ip}, ActionReuse, StageFuzzy, "K5", nil, 2},
+				{[]IdentifierValue{strong.value, ip}, ActionReuse, StageStrong, "K0", nil, 2},
 			}
 			var candidates []Candidate
 			for step, scan := range scans {
@@ -278,8 +278,8 @@ func TestCountingProgressiveStrongMatrix(t *testing.T) {
 						stage: scan.stage, selected: scan.selected, merges: scan.merges,
 					})
 					candidates = applyCountingDecision(scan.incoming, candidates, decision, step)
-					if len(candidates) != scan.count {
-						t.Fatalf("got %d assets, want %d", len(candidates), scan.count)
+					if countingAssetCount(candidates) != scan.count {
+						t.Fatalf("got %d assets, want %d", countingAssetCount(candidates), scan.count)
 					}
 				})
 				if t.Failed() {
@@ -319,8 +319,8 @@ func TestCountingProgressiveStrongEnrichmentMatrix(t *testing.T) {
 				}(), selected: scan.selected, merges: scan.merges,
 			})
 			candidates = applyCountingDecision(scan.incoming, candidates, decision, step)
-			if len(candidates) != scan.count {
-				t.Fatalf("got %d assets, want %d", len(candidates), scan.count)
+			if countingAssetCount(candidates) != scan.count {
+				t.Fatalf("got %d assets, want %d", countingAssetCount(candidates), scan.count)
 			}
 		})
 		if t.Failed() {
@@ -329,20 +329,28 @@ func TestCountingProgressiveStrongEnrichmentMatrix(t *testing.T) {
 	}
 }
 
-// Model the caller applying the plan, retaining evidence and untouched assets.
 func applyCountingDecision(incoming []IdentifierValue, candidates []Candidate, decision Decision, step int) []Candidate {
 	key := decision.SelectedKey
-	values := slices.Clone(incoming)
 	if decision.NeedsNewKey {
 		key = fmt.Sprintf("K%d", step)
 	}
-	var remaining []Candidate
-	for index, candidate := range candidates {
-		if candidate.AssetKey == decision.SelectedKey || slices.Contains(decision.MergeIndices, index) {
-			values = append(values, candidate.Identifiers...)
-		} else {
-			remaining = append(remaining, candidate)
+	sources := make(map[string]bool)
+	for _, index := range decision.MergeIndices {
+		sources[candidates[index].AssetKey] = true
+	}
+	rows := slices.Clone(candidates)
+	for i := range rows {
+		if sources[rows[i].AssetKey] {
+			rows[i].AssetKey = key
 		}
 	}
-	return append(remaining, fuzzyRow(key, int64(step+1), values...))
+	return append(rows, fuzzyRow(key, int64(step+1), slices.Clone(incoming)...))
+}
+
+func countingAssetCount(candidates []Candidate) int {
+	keys := make(map[string]bool)
+	for _, candidate := range candidates {
+		keys[candidate.AssetKey] = true
+	}
+	return len(keys)
 }

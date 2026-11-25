@@ -1,31 +1,39 @@
 # SPEC-001: Asset Identifiers
 
-The library normalizes identifiers, chooses `CREATE` or `REUSE`, and returns candidates to merge. Go and GLib C callers
-use the same algorithm.
+The library normalizes identifiers and returns CREATE or REUSE.
+It also returns a merge plan when a strong match permits merges.
+The Go and GLib C APIs use the same algorithm.
 
 ## Requirements
 
-- Accept multiple identifier types and multiple values per type.
-- Compare type and canonical value. Duplicates add no evidence.
-- Reuse a key through the highest-priority shared strong match, and let the application store new evidence on that key.
-- Keep conflicting stronger identities separate and merge compatible existing records.
-- Try continuity and then conservative fuzzy matching when no strong match resolves a key.
-- A strong conflict excludes that candidate from all later stages.
-- Only strong-stage decisions may merge records; continuity and weak evidence alone never authorize merges.
-- Return an error for invalid input. Preserve caller data and return independently owned results.
-- Keep timestamps and history separate from identifier equality.
-- Keep the Go core independent of C, databases, and network services; it must work with `CGO_ENABLED=0`.
+- Accept several identifier types and several values per type.
+- Compare the type and normalized value. Repeated values add no evidence.
+- Reuse a key through the highest-priority shared strong match.
+- Keep assets separate when a relevant strong identifier conflicts.
+- Try continuity matching, then fuzzy matching, if no strong match selects a key.
+- Exclude an asset with a strong conflict from later stages.
+- Permit merges only at the strong stage.
+- Return an error for invalid input.
+- Keep caller data unchanged and return independently owned results.
+- Exclude timestamps and history from identifier equality.
+- Keep the Go core independent of C, databases, and network services.
+- Support `CGO_ENABLED=0`.
 
-Applications supply eligible active identifiers and candidates, enforce eligibility and access boundaries, create keys,
-retain evidence, and apply merges. The library does not discover assets, verify producer trust, or store results.
+## Application responsibilities
 
-## Contracts
+The application supplies eligible identifiers and stored scan snapshots.
+It enforces access, scope, freshness, and retention rules.
+It creates keys, stores evidence, and applies merges.
 
-| Specification                              | Defines                                       |
-|--------------------------------------------|-----------------------------------------------|
-| [SPEC-001A](SPEC-001A-identifier-model.md) | Types, timestamps, history, and ownership     |
-| [SPEC-001B](SPEC-001B-normalization.md)    | Accepted formats, normalization, and equality |
-| [SPEC-002](SPEC-002-reconciliation.md)     | Policy, matching, merge plans, and the C API  |
+The library does not discover assets, verify trust in identifier sources, or store results.
+Matching identifiers do not establish global uniqueness.
 
-Supported formats are explicit; the library does not guess conversions or global uniqueness. Tests live in [
-`identity`](../../identity) and [`tests/c`](../../tests/c).
+## Specifications
+
+| Specification                              | Content                                                 |
+| ------------------------------------------ | ------------------------------------------------------- |
+| [SPEC-001A](SPEC-001A-identifier-model.md) | Types, timestamps, history, and ownership               |
+| [SPEC-001B](SPEC-001B-normalization.md)    | Accepted formats, normalization, and equality           |
+| [SPEC-002](SPEC-002-reconciliation.md)     | Policy, snapshots, matching, merge plans, and the C API |
+
+Tests are in [identity](../../identity) and [tests/c](../../tests/c).

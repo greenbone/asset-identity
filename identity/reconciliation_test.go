@@ -114,7 +114,7 @@ func TestDecideFuzzyCases(t *testing.T) {
 		{"observation contains candidate", []IdentifierValue{ip1, ip2}, []Candidate{fuzzyRow("K", 10, ip1)}, ActionReuse, false, 0},
 		{"partial overlap", []IdentifierValue{ip1, ip3}, []Candidate{fuzzyRow("K", 10, ip1, ip2)}, ActionReuse, false, 0},
 		{"subset of survivor need not overlap observation", []IdentifierValue{ip1}, []Candidate{fuzzyRow("selected", 20, ip1, host), fuzzyRow("potential", 10, host)}, ActionReuse, false, 0},
-		{"input order cannot resolve ambiguity", []IdentifierValue{ip1}, []Candidate{fuzzyRow("Z", 20, ip1), fuzzyRow("A", 20, ip1)}, ActionCreate, true, -1},
+		{"equal timestamps use key order", []IdentifierValue{ip1}, []Candidate{fuzzyRow("Z", 20, ip1), fuzzyRow("A", 20, ip1)}, ActionReuse, false, 1},
 		{"empty observation guard", nil, []Candidate{fuzzyRow("K", 10, ip1)}, ActionCreate, true, -1},
 		{"empty candidate subset", []IdentifierValue{ip1}, []Candidate{fuzzyRow("K", 10)}, ActionCreate, true, -1},
 		{"indices refer to supplied list", []IdentifierValue{ip1}, []Candidate{fuzzyRow("unrelated", 1, ip3), fuzzyRow("selected", 20, ip1, host), fuzzyRow("potential", 10, host)}, ActionReuse, false, 1},
@@ -136,23 +136,23 @@ func TestDecideFuzzyCases(t *testing.T) {
 	}
 }
 
-func TestDecideFuzzyNanosecondsCannotResolveAmbiguity(t *testing.T) {
+func TestDecideFuzzyNanosecondsResolveTies(t *testing.T) {
 	ip := fuzzyValue(TypeIP, "192.0.2.1")
 	rows := []Candidate{fuzzyRow("Z", 200, ip), fuzzyRow("A", 200, ip)}
 	newer := time.Unix(200, 999999999)
 	rows[1].LastSeen = &newer
 	got, err := Decide(Observation{Identifiers: []IdentifierValue{ip}}, rows, policyWithAllIdentityTypesStrong())
-	if err != nil || got.Action != ActionCreate || got.SelectedIndex != nil || len(got.MergeIndices) != 0 {
+	if err != nil || got.Action != ActionReuse || got.SelectedIndex == nil || *got.SelectedIndex != 1 || len(got.MergeIndices) != 0 {
 		t.Fatalf("ambiguous timestamps: %+v %v", got, err)
 	}
 }
 
-func TestDecideRejectsDuplicateKeysBeforeMatching(t *testing.T) {
+func TestDecideAcceptsRepeatedSnapshotKeys(t *testing.T) {
 	ip := fuzzyValue(TypeIP, "192.0.2.1")
 	for _, values := range [][]IdentifierValue{nil, {ip}, {fuzzyValue(TypeGreenboneID, "G")}} {
-		got, err := Decide(Observation{Identifiers: values}, []Candidate{fuzzyRow("duplicate", 10, ip), fuzzyRow("duplicate", 20, ip)}, policyWithAllIdentityTypesStrong())
-		if !errors.Is(err, ErrDuplicateCandidateKey) || !reflect.DeepEqual(got, Decision{}) {
-			t.Fatalf("duplicates: %+v %v", got, err)
+		_, err := Decide(Observation{Identifiers: values}, []Candidate{fuzzyRow("duplicate", 10, ip), fuzzyRow("duplicate", 20, ip)}, policyWithAllIdentityTypesStrong())
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 }
@@ -219,7 +219,7 @@ func TestDecideStrongMultipleValuesPreserveNormalizationAndInputs(t *testing.T) 
 	}
 }
 
-func TestDecideFuzzyTimestampPresenceCannotResolveAmbiguity(t *testing.T) {
+func TestDecideFuzzyTimestampPresenceRanksSnapshots(t *testing.T) {
 	ip := fuzzyValue(TypeIP, "192.0.2.1")
 	tests := []struct {
 		name          string
@@ -242,7 +242,11 @@ func TestDecideFuzzyTimestampPresenceCannotResolveAmbiguity(t *testing.T) {
 				}
 			}
 			got, err := Decide(Observation{Identifiers: []IdentifierValue{ip}}, rows, policyWithAllIdentityTypesStrong())
-			if err != nil || got.SelectedIndex != nil || got.SelectedKey != "" || got.Action != ActionCreate || !got.NeedsNewKey || len(got.MergeIndices) != 0 {
+			expected := "first"
+			if tt.first == nil && tt.second != nil {
+				expected = "second"
+			}
+			if err != nil || got.SelectedIndex == nil || got.SelectedKey != expected || got.Action != ActionReuse || got.NeedsNewKey || len(got.MergeIndices) != 0 {
 				t.Fatalf("fuzzy missing time: %+v %v", got, err)
 			}
 			for i, row := range rows {
@@ -262,8 +266,8 @@ func TestDecideRejectsEmptyKeysBeforeMatching(t *testing.T) {
 		}
 	}
 	row := fuzzyRow("K", 10, fuzzyValue(TypeIP, "192.0.2.1"))
-	if _, err := Decide(Observation{}, []Candidate{row, row}, policyWithAllIdentityTypesStrong()); !errors.Is(err, ErrDuplicateCandidateKey) {
-		t.Fatalf("identical rows accepted: %v", err)
+	if _, err := Decide(Observation{}, []Candidate{row, row}, policyWithAllIdentityTypesStrong()); err != nil {
+		t.Fatalf("identical snapshots rejected: %v", err)
 	}
 }
 
